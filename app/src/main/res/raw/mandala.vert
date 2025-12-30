@@ -1,7 +1,10 @@
 #version 300 es
 
-layout(location = 0) in vec4 aPosition;
+layout(location = 0) in float u;
 
 void main() {
-    gl_Position = aPosition;
+    // For now, just a placeholder. 
+    // We will compute the actual position in the next phase.
+    gl_Position = vec4(u * 2.0 - 1.0, 0.0, 0.0, 1.0);
+    gl_PointSize = 2.0;
 }

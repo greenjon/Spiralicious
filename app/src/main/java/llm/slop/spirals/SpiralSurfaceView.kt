@@ -12,7 +12,7 @@ class SpiralSurfaceView(context: Context, attrs: AttributeSet? = null) : GLSurfa
         // Create an OpenGL ES 3.0 context
         setEGLContextClientVersion(3)
 
-        renderer = SpiralRenderer()
+        renderer = SpiralRenderer(context)
 
         // Set the Renderer for drawing on the GLSurfaceView
         setRenderer(renderer)

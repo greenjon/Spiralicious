@@ -11,23 +11,15 @@ data class MandalaParams(
     val l3: Float = 0.2f,
     val phi1: Float = 0f,
     val phi2: Float = 0f,
-    val phi3: Float = 0f
+    val phi3: Float = 0f,
+    val thickness: Float = 0.01f
 ) {
-    /**
-     * Computes the fundamental period T and symmetry order.
-     * For integer omegas, the period is 2*PI / GCD(abs(omega1), abs(omega2), abs(omega3)).
-     * However, the user specifically requested GCD of pairwise differences.
-     */
     fun computeSymmetryInfo(): SymmetryInfo {
         val d12 = abs(omega1 - omega2)
         val d23 = abs(omega2 - omega3)
         val d31 = abs(omega3 - omega1)
 
         val commonGcd = gcd(d12, gcd(d23, d31))
-        
-        // If all omegas are integers, the total curve repeats every 2*PI.
-        // The GCD of differences gives the rotational symmetry order.
-        // The fundamental period of the "unique" part of the curve is 2*PI / commonGcd.
         
         return SymmetryInfo(
             gcd = commonGcd,

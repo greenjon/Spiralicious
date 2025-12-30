@@ -4,13 +4,15 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Text
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -21,9 +23,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         setContent {
-            MaterialTheme {
+            MaterialTheme(colorScheme = darkColorScheme()) {
                 MandalaScreen()
             }
         }
@@ -31,91 +32,107 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun MandalaScreen() {
-        var params by remember { mutableStateOf(MandalaParams()) }
+        var params by remember { mutableStateOf(MandalaParams(omega1 = 20, omega2 = 17, omega3 = 11)) }
+        var currentTab by remember { mutableStateOf("Speed") }
+        var selectedLobeFilter by remember { mutableStateOf<Int?>(null) }
+        var isLobeMenuExpanded by remember { mutableStateOf(false) }
+
+        val allRatios = MandalaLibrary.MandalaRatios
+        val lobesOptions = remember { allRatios.map { it.lobes }.distinct().sorted() }
+        val filteredRatios = remember(selectedLobeFilter) {
+            if (selectedLobeFilter == null) allRatios else allRatios.filter { it.lobes == selectedLobeFilter }
+        }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            // OpenGL Surface
             AndroidView(
-                factory = { context ->
-                    SpiralSurfaceView(context).also {
-                        spiralSurfaceView = it
-                    }
-                },
-                update = { view ->
-                    view.setParams(params)
-                },
+                factory = { context -> SpiralSurfaceView(context).also { spiralSurfaceView = it } },
+                update = { view -> view.setParams(params) },
                 modifier = Modifier.fillMaxSize()
             )
 
-            // UI Overlay
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .align(androidx.compose.ui.Alignment.BottomCenter)
-                    .background(Color.Black.copy(alpha = 0.5f))
+                    .fillMaxWidth(0.4f)
+                    .fillMaxHeight(0.6f)
+                    .align(Alignment.TopStart)
                     .padding(16.dp)
-                    .verticalScroll(rememberScrollState())
+                    .background(Color.Black.copy(alpha = 0.7f))
             ) {
-                // Omega Controls
-                ParameterSlider(
-                    label = "Omega 1: ${params.omega1}",
-                    value = params.omega1.toFloat(),
-                    range = -20f..20f,
-                    onValueChange = { params = params.copy(omega1 = it.toInt()) }
-                )
-                ParameterSlider(
-                    label = "Omega 2: ${params.omega2}",
-                    value = params.omega2.toFloat(),
-                    range = -20f..20f,
-                    onValueChange = { params = params.copy(omega2 = it.toInt()) }
-                )
-                ParameterSlider(
-                    label = "Omega 3: ${params.omega3}",
-                    value = params.omega3.toFloat(),
-                    range = -20f..20f,
-                    onValueChange = { params = params.copy(omega3 = it.toInt()) }
-                )
+                // Tab Header
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = { currentTab = "Speed" },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (currentTab == "Speed") MaterialTheme.colorScheme.primary else Color.Gray
+                        ),
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.extraSmall
+                    ) {
+                        Text("Speed")
+                    }
+                    // Future tabs can be added here
+                }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                if (currentTab == "Speed") {
+                    // Lobe Filter Dropdown
+                    Box(modifier = Modifier.padding(8.dp)) {
+                        OutlinedButton(
+                            onClick = { isLobeMenuExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(text = if (selectedLobeFilter == null) "All Lobes" else "Lobes: $selectedLobeFilter")
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                        }
+                        DropdownMenu(
+                            expanded = isLobeMenuExpanded,
+                            onDismissRequest = { isLobeMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("All Lobes") },
+                                onClick = {
+                                    selectedLobeFilter = null
+                                    isLobeMenuExpanded = false
+                                }
+                            )
+                            lobesOptions.forEach { lobeCount ->
+                                DropdownMenuItem(
+                                    text = { Text("$lobeCount Lobes") },
+                                    onClick = {
+                                        selectedLobeFilter = lobeCount
+                                        isLobeMenuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
 
-                // Length Controls
-                ParameterSlider(
-                    label = "Length 1: ${String.format("%.2f", params.l1)}",
-                    value = params.l1,
-                    range = 0f..0.5f,
-                    onValueChange = { params = params.copy(l1 = it) }
-                )
-                ParameterSlider(
-                    label = "Length 2: ${String.format("%.2f", params.l2)}",
-                    value = params.l2,
-                    range = 0f..0.5f,
-                    onValueChange = { params = params.copy(l2 = it) }
-                )
-                ParameterSlider(
-                    label = "Length 3: ${String.format("%.2f", params.l3)}",
-                    value = params.l3,
-                    range = 0f..0.5f,
-                    onValueChange = { params = params.copy(l3 = it) }
-                )
+                    // Ratio List
+                    LazyColumn(modifier = Modifier.weight(1f)) {
+                        items(filteredRatios) { ratio ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        params = params.copy(
+                                            omega1 = ratio.omega1,
+                                            omega2 = ratio.omega2,
+                                            omega3 = ratio.omega3
+                                        )
+                                    }
+                                    .padding(8.dp)
+                                    .background(if (params.omega1 == ratio.omega1 && params.omega2 == ratio.omega2 && params.omega3 == ratio.omega3) 
+                                        Color.White.copy(alpha = 0.2f) else Color.Transparent)
+                            ) {
+                                Text(
+                                    text = "${ratio.omega1} : ${ratio.omega2} : ${ratio.omega3}",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
             }
-        }
-    }
-
-    @Composable
-    fun ParameterSlider(
-        label: String,
-        value: Float,
-        range: ClosedFloatingPointRange<Float>,
-        onValueChange: (Float) -> Unit
-    ) {
-        Column {
-            Text(text = label, color = Color.White, style = MaterialTheme.typography.bodySmall)
-            Slider(
-                value = value,
-                onValueChange = onValueChange,
-                valueRange = range,
-                modifier = Modifier.height(32.dp)
-            )
         }
     }
 

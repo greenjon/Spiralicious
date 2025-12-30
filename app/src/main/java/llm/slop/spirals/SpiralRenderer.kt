@@ -37,7 +37,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glEnable(GLES30.GL_BLEND)
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
 
-        program = ShaderHelper.buildProgram(context, R.raw.mandala, R.raw.mandala.frag)
+        // Updated resource IDs to avoid duplicate resource conflict
+        program = ShaderHelper.buildProgram(context, R.raw.mandala_vert, R.raw.mandala_frag)
         
         uOmegaLocation = GLES30.glGetUniformLocation(program, "uOmega")
         uLLocation = GLES30.glGetUniformLocation(program, "uL")

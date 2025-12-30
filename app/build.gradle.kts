@@ -18,6 +18,13 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    sourceSets {
+        getByName("main") {
+            res.srcDirs("src/main/res")
+            resources.exclude("**/mandala.frag", "**/mandala.vert")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

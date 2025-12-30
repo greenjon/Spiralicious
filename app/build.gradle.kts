@@ -18,11 +18,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    sourceSets {
-        getByName("main") {
-            res.exclude("**/mandala.frag")
-            res.exclude("**/mandala.vert")
-        }
+    aaptOptions {
+        ignoreAssetsPattern = "mandala.vert:mandala.frag"
     }
 
     buildTypes {

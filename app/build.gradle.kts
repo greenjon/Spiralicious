@@ -20,8 +20,8 @@ android {
 
     sourceSets {
         getByName("main") {
-            res.srcDirs("src/main/res")
-            resources.exclude("**/mandala.frag", "**/mandala.vert")
+            res.exclude("**/mandala.frag")
+            res.exclude("**/mandala.vert")
         }
     }
 

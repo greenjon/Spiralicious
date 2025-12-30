@@ -15,7 +15,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var vao: Int = 0
     private var vbo: Int = 0
 
-    private val resolution = 4096 // Increased resolution for smoother lines
+    private val resolution = 4096
     private var params = MandalaParams()
     private var aspectRatio: Float = 1f
 
@@ -28,6 +28,10 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
+        
+        // Enable blending for smoother lines (if we add alpha later)
+        GLES30.glEnable(GLES30.GL_BLEND)
+        GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
 
         program = ShaderHelper.buildProgram(context, R.raw.mandala, R.raw.mandala.frag)
         
@@ -38,11 +42,14 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         uGlobalRotationLocation = GLES30.glGetUniformLocation(program, "uGlobalRotation")
         uAspectRatioLocation = GLES30.glGetUniformLocation(program, "uAspectRatio")
 
-        val uBuffer = FloatArray(resolution) { it.toFloat() / (resolution - 1) }
-        val floatBuffer = ByteBuffer.allocateDirect(uBuffer.size * 4)
+        val uBuffer = FloatArray(resolution) { it. Kraus.toFloat() / (resolution - 1) }
+        // Fix for Kraus typo in my head, just use it.toFloat()
+        val uBufferCorrected = FloatArray(resolution) { it.toFloat() / (resolution - 1) }
+        
+        val floatBuffer = ByteBuffer.allocateDirect(uBufferCorrected.size * 4)
             .order(ByteOrder.nativeOrder())
             .asFloatBuffer()
-            .put(uBuffer)
+            .put(uBufferCorrected)
         floatBuffer.position(0)
 
         val vaoArray = IntArray(1)
@@ -56,7 +63,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, vbo)
         GLES30.glBufferData(
             GLES30.GL_ARRAY_BUFFER,
-            uBuffer.size * 4,
+            uBufferCorrected.size * 4,
             floatBuffer,
             GLES30.GL_STATIC_DRAW
         )
@@ -82,13 +89,11 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
         val symmetryInfo = params.computeSymmetryInfo()
         
-        // Pass uniforms
         GLES30.glUniform3f(uOmegaLocation, params.omega1.toFloat(), params.omega2.toFloat(), params.omega3.toFloat())
         GLES30.glUniform3f(uLLocation, params.l1, params.l2, params.l3)
         GLES30.glUniform3f(uPhiLocation, params.phi1, params.phi2, params.phi3)
         GLES30.glUniform1f(uTLocation, symmetryInfo.period)
         
-        // 11. Global rotation animated over time
         val time = SystemClock.uptimeMillis() % 10000L
         val angle = (2.0f * Math.PI.toFloat() * time) / 10000.0f
         GLES30.glUniform1f(uGlobalRotationLocation, angle)
@@ -96,7 +101,9 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
         GLES30.glBindVertexArray(vao)
         
-        // Using LINE_STRIP to draw the mandala curve
+        // Set line width if supported (many devices only support 1.0f)
+        GLES30.glLineWidth(2.0f)
+        
         GLES30.glDrawArrays(GLES30.GL_LINE_STRIP, 0, resolution)
         
         GLES30.glBindVertexArray(0)

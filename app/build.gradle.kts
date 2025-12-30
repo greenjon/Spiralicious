@@ -6,13 +6,11 @@ plugins {
 
 android {
     namespace = "llm.slop.spirals"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "llm.slop.spirals"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"

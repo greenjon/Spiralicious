@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
 
             Column(
                 modifier = Modifier
-                    .fillMaxWidth(0.4f)
+                    .fillMaxWidth() // Changed from fillMaxWidth(0.4f)
                     .fillMaxHeight(0.6f)
                     .align(Alignment.TopStart)
                     .padding(16.dp)
@@ -70,69 +70,102 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text("Speed")
                     }
-                    // Future tabs can be added here
+                    Button(
+                        onClick = { currentTab = "Length" },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (currentTab == "Length") MaterialTheme.colorScheme.primary else Color.Gray
+                        ),
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.extraSmall
+                    ) {
+                        Text("Length")
+                    }
                 }
 
-                if (currentTab == "Speed") {
-                    // Lobe Filter Dropdown
-                    Box(modifier = Modifier.padding(8.dp)) {
-                        OutlinedButton(
-                            onClick = { isLobeMenuExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(text = if (selectedLobeFilter == null) "All Lobes" else "Lobes: $selectedLobeFilter")
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                        }
-                        DropdownMenu(
-                            expanded = isLobeMenuExpanded,
-                            onDismissRequest = { isLobeMenuExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("All Lobes") },
-                                onClick = {
-                                    selectedLobeFilter = null
-                                    isLobeMenuExpanded = false
-                                }
-                            )
-                            lobesOptions.forEach { lobeCount ->
+                Spacer(modifier = Modifier.height(8.dp))
+
+                when (currentTab) {
+                    "Speed" -> {
+                        // Lobe Filter Dropdown
+                        Box(modifier = Modifier.padding(horizontal = 8.dp)) {
+                            OutlinedButton(
+                                onClick = { isLobeMenuExpanded = true },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(text = if (selectedLobeFilter == null) "All Lobes" else "Lobes: $selectedLobeFilter", style = MaterialTheme.typography.labelSmall)
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                            }
+                            DropdownMenu(
+                                expanded = isLobeMenuExpanded,
+                                onDismissRequest = { isLobeMenuExpanded = false }
+                            ) {
                                 DropdownMenuItem(
-                                    text = { Text("$lobeCount Lobes") },
+                                    text = { Text("All Lobes") },
                                     onClick = {
-                                        selectedLobeFilter = lobeCount
+                                        selectedLobeFilter = null
                                         isLobeMenuExpanded = false
                                     }
                                 )
+                                lobesOptions.forEach { lobeCount ->
+                                    DropdownMenuItem(
+                                        text = { Text("$lobeCount Lobes") },
+                                        onClick = {
+                                            selectedLobeFilter = lobeCount
+                                            isLobeMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Ratio List
+                        LazyColumn(modifier = Modifier.weight(1f)) {
+                            items(filteredRatios) { ratio ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            params = params.copy(
+                                                omega1 = ratio.omega1,
+                                                omega2 = ratio.omega2,
+                                                omega3 = ratio.omega3
+                                            )
+                                        }
+                                        .padding(8.dp)
+                                        .background(if (params.omega1 == ratio.omega1 && params.omega2 == ratio.omega2 && params.omega3 == ratio.omega3) 
+                                            Color.White.copy(alpha = 0.2f) else Color.Transparent)
+                                ) {
+                                    Text(
+                                        text = "${ratio.omega1} : ${ratio.omega2} : ${ratio.omega3}",
+                                        color = Color.White,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
                             }
                         }
                     }
-
-                    // Ratio List
-                    LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(filteredRatios) { ratio ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        params = params.copy(
-                                            omega1 = ratio.omega1,
-                                            omega2 = ratio.omega2,
-                                            omega3 = ratio.omega3
-                                        )
-                                    }
-                                    .padding(8.dp)
-                                    .background(if (params.omega1 == ratio.omega1 && params.omega2 == ratio.omega2 && params.omega3 == ratio.omega3) 
-                                        Color.White.copy(alpha = 0.2f) else Color.Transparent)
-                            ) {
-                                Text(
-                                    text = "${ratio.omega1} : ${ratio.omega2} : ${ratio.omega3}",
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
+                    "Length" -> {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            LengthSlider("L1", params.l1) { params = params.copy(l1 = it) }
+                            LengthSlider("L2", params.l2) { params = params.copy(l2 = it) }
+                            LengthSlider("L3", params.l3) { params = params.copy(l3 = it) }
                         }
                     }
                 }
             }
+        }
+    }
+
+    @Composable
+    fun LengthSlider(label: String, value: Float, onValueChange: (Float) -> Unit) {
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Text(text = "$label: ${String.format("%.2f", value)}", color = Color.White, style = MaterialTheme.typography.labelSmall)
+            Slider(
+                value = value,
+                onValueChange = onValueChange,
+                valueRange = 0f..1f,
+                modifier = Modifier.height(24.dp)
+            )
         }
     }
 

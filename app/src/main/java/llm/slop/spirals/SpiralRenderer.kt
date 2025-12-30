@@ -8,6 +8,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.PI
 
 class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
@@ -18,7 +19,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private val resolution = 2048 // 2048 points * 2 vertices per point for triangle strip
     
     @Volatile
-    var params = MandalaParams(omega1 = 17, omega2 = -4, omega3 = 2, thickness = 0.005f)
+    var params = MandalaParams(omega1 = 20, omega2 = 17, omega3 = 11, thickness = 0.005f)
     
     private var aspectRatio: Float = 1f
 
@@ -37,7 +38,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glEnable(GLES30.GL_BLEND)
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
 
-        // Using distinct names to avoid R.raw.mandala conflict
+        // Updated resource IDs to match existing files in res/raw
         program = ShaderHelper.buildProgram(context, R.raw.mandala_vertex, R.raw.mandala_fragment)
         
         uOmegaLocation = GLES30.glGetUniformLocation(program, "uOmega")
@@ -105,17 +106,17 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glUseProgram(program)
 
         val currentParams = params
-        val symmetryInfo = currentParams.computeSymmetryInfo()
+        val period = (2.0 * PI).toFloat()
         
         GLES30.glUniform3f(uOmegaLocation, currentParams.omega1.toFloat(), currentParams.omega2.toFloat(), currentParams.omega3.toFloat())
         GLES30.glUniform3f(uLLocation, currentParams.l1, currentParams.l2, currentParams.l3)
         GLES30.glUniform3f(uPhiLocation, currentParams.phi1, currentParams.phi2, currentParams.phi3)
-        GLES30.glUniform1f(uTLocation, symmetryInfo.period)
+        GLES30.glUniform1f(uTLocation, period)
         GLES30.glUniform1f(uThicknessLocation, currentParams.thickness)
         
-        val totalTime = SystemClock.uptimeMillis() / 1000.0f
+        val totalTime = 0.0f 
+        val angle = 0.0f
         
-        val angle = (2.0f * Math.PI.toFloat() * (totalTime % 20.0f)) / 20.0f
         GLES30.glUniform1f(uGlobalRotationLocation, angle)
         GLES30.glUniform1f(uAspectRatioLocation, aspectRatio)
         GLES30.glUniform1f(uTimeLocation, totalTime)

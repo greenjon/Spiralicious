@@ -3,9 +3,9 @@
 layout(location = 0) in float u;
 layout(location = 1) in float side; // -1.0 or 1.0
 
-uniform vec3 uOmega;
-uniform vec3 uL;
-uniform vec3 uPhi;
+uniform vec4 uOmega; // Changed from vec3 to vec4
+uniform vec4 uL;     // Changed from vec3 to vec4
+uniform vec4 uPhi;   // Changed from vec3 to vec4
 uniform float uT;
 uniform float uGlobalRotation;
 uniform float uAspectRatio;
@@ -15,11 +15,13 @@ vec2 getPos(float uVal) {
     float t = uVal * uT;
     float x = uL.x * cos(uOmega.x * t + uPhi.x) +
               uL.y * cos(uOmega.y * t + uPhi.y) +
-              uL.z * cos(uOmega.z * t + uPhi.z);
+              uL.z * cos(uOmega.z * t + uPhi.z) +
+              uL.w * cos(uOmega.w * t + uPhi.w); // Added 4th arm
 
     float y = uL.x * sin(uOmega.x * t + uPhi.x) +
               uL.y * sin(uOmega.y * t + uPhi.y) +
-              uL.z * sin(uOmega.z * t + uPhi.z);
+              uL.z * sin(uOmega.z * t + uPhi.z) +
+              uL.w * sin(uOmega.w * t + uPhi.w); // Added 4th arm
     return vec2(x, y);
 }
 

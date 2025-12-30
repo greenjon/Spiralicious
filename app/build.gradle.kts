@@ -4,6 +4,16 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+tasks.register("deleteConflictingShaders") {
+    doLast {
+        val rawDir = file("src/main/res/raw")
+        if (rawDir.exists()) {
+            file("src/main/res/raw/mandala.vert").delete()
+            file("src/main/res/raw/mandala.frag").delete()
+        }
+    }
+}
+
 android {
     namespace = "llm.slop.spirals"
     compileSdk = 36
@@ -16,10 +26,6 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    aaptOptions {
-        ignoreAssetsPattern = "mandala.vert:mandala.frag"
     }
 
     buildTypes {

@@ -37,8 +37,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glEnable(GLES30.GL_BLEND)
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
 
-        // Updated resource IDs to avoid duplicate resource conflict
-        program = ShaderHelper.buildProgram(context, R.raw.mandala_vert, R.raw.mandala_frag)
+        // Using distinct names to avoid R.raw.mandala conflict
+        program = ShaderHelper.buildProgram(context, R.raw.mandala_vertex, R.raw.mandala_fragment)
         
         uOmegaLocation = GLES30.glGetUniformLocation(program, "uOmega")
         uLLocation = GLES30.glGetUniformLocation(program, "uL")
@@ -50,15 +50,12 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         uThicknessLocation = GLES30.glGetUniformLocation(program, "uThickness")
 
         // Interleaved buffer: [u, side, u, side, ...]
-        // For a triangle strip representing a line, we need 2 vertices per 'u' value
         val totalVertices = resolution * 2
         val vertexData = FloatArray(totalVertices * 2)
         for (i in 0 until resolution) {
             val u = i.toFloat() / (resolution - 1)
-            // Left side vertex
             vertexData[i * 4 + 0] = u
             vertexData[i * 4 + 1] = -1.0f
-            // Right side vertex
             vertexData[i * 4 + 2] = u
             vertexData[i * 4 + 3] = 1.0f
         }
@@ -85,11 +82,9 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             GLES30.GL_STATIC_DRAW
         )
 
-        // Attribute 0: u (float)
         GLES30.glEnableVertexAttribArray(0)
         GLES30.glVertexAttribPointer(0, 1, GLES30.GL_FLOAT, false, 8, 0)
         
-        // Attribute 1: side (float)
         GLES30.glEnableVertexAttribArray(1)
         GLES30.glVertexAttribPointer(1, 1, GLES30.GL_FLOAT, false, 8, 4)
 
@@ -126,7 +121,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glUniform1f(uTimeLocation, totalTime)
 
         GLES30.glBindVertexArray(vao)
-        // Draw as a triangle strip for actual thickness
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, resolution * 2)
         
         GLES30.glBindVertexArray(0)

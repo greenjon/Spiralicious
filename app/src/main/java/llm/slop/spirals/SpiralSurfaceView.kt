@@ -6,7 +6,7 @@ import android.util.AttributeSet
 
 class SpiralSurfaceView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(context, attrs) {
 
-    private val renderer: SpiralRenderer
+    val renderer: SpiralRenderer
 
     init {
         // Create an OpenGL ES 3.0 context
@@ -20,5 +20,9 @@ class SpiralSurfaceView(context: Context, attrs: AttributeSet? = null) : GLSurfa
         // Render the view only when there is a change in the drawing data
         // For continuous animation, we use RENDERMODE_CONTINUOUSLY (default)
         renderMode = RENDERMODE_CONTINUOUSLY
+    }
+    
+    fun setParams(params: MandalaParams) {
+        renderer.params = params
     }
 }

@@ -61,6 +61,10 @@ class MainActivity : ComponentActivity() {
             }.sortedBy { it.shapeRatio }
         }
 
+        val currentRatio = remember(params) {
+            allRatios.find { it.omega1 == params.omega1 && it.omega2 == params.omega2 && it.omega3 == params.omega3 && it.omega4 == params.omega4 }
+        }
+
         val currentIndex = remember(params, filteredRatios) {
             filteredRatios.indexOfFirst { it.omega1 == params.omega1 && it.omega2 == params.omega2 && it.omega3 == params.omega3 && it.omega4 == params.omega4 }
         }
@@ -108,12 +112,21 @@ class MainActivity : ComponentActivity() {
                     color = Color.Black.copy(alpha = 0.5f),
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                 ) {
-                    Text(
-                        text = "Speeds: ${params.omega1}, ${params.omega2}, ${params.omega3}, ${params.omega4} | L: ${params.l1}, ${params.l2}, ${params.l3}, ${params.l4}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.Cyan,
-                        modifier = Modifier.padding(8.dp)
-                    )
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Text(
+                            text = "Speeds: ${params.omega1}, ${params.omega2}, ${params.omega3}, ${params.omega4}" + 
+                                   (currentRatio?.let { 
+                                       "   (${it.lobes} lobes; ${String.format(Locale.US, "%.1f", it.shapeRatio)} sr)" 
+                                   } ?: ""),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.Cyan
+                        )
+                        Text(
+                            text = "Lengths: ${String.format(Locale.US, "%.3f, %.3f, %.3f, %.3f", params.l1, params.l2, params.l3, params.l4)}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.Cyan.copy(alpha = 0.8f)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))

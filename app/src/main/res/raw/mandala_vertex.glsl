@@ -3,9 +3,9 @@
 layout(location = 0) in float u;
 layout(location = 1) in float side; // -1.0 or 1.0
 
-uniform vec4 uOmega; // Changed from vec3 to vec4
-uniform vec4 uL;     // Changed from vec3 to vec4
-uniform vec4 uPhi;   // Changed from vec3 to vec4
+uniform vec4 uOmega; 
+uniform vec4 uL;     
+uniform vec4 uPhi;   
 uniform float uT;
 uniform float uGlobalRotation;
 uniform float uAspectRatio;
@@ -16,19 +16,18 @@ vec2 getPos(float uVal) {
     float x = uL.x * cos(uOmega.x * t + uPhi.x) +
               uL.y * cos(uOmega.y * t + uPhi.y) +
               uL.z * cos(uOmega.z * t + uPhi.z) +
-              uL.w * cos(uOmega.w * t + uPhi.w); // Added 4th arm
+              uL.w * cos(uOmega.w * t + uPhi.w); 
 
     float y = uL.x * sin(uOmega.x * t + uPhi.x) +
               uL.y * sin(uOmega.y * t + uPhi.y) +
               uL.z * sin(uOmega.z * t + uPhi.z) +
-              uL.w * sin(uOmega.w * t + uPhi.w); // Added 4th arm
+              uL.w * sin(uOmega.w * t + uPhi.w); 
     return vec2(x, y);
 }
 
 void main() {
     vec2 pos = getPos(u);
     
-    // Approximate tangent for thickness offset
     float eps = 0.0001;
     vec2 posNext = getPos(u + eps);
     vec2 tangent = normalize(posNext - pos);
@@ -36,7 +35,6 @@ void main() {
 
     vec2 finalPos = pos + normal * uThickness * side;
 
-    // Apply global rotation
     float cosR = cos(uGlobalRotation);
     float sinR = sin(uGlobalRotation);
     
@@ -49,5 +47,6 @@ void main() {
         rotY *= uAspectRatio;
     }
 
-    gl_Position = vec4(rotX, rotY, 0.0, 1.0);
+    // Offset center to lower 1/3 (approx -0.33 in NDC)
+    gl_Position = vec4(rotX, rotY - 0.33, 0.0, 1.0);
 }

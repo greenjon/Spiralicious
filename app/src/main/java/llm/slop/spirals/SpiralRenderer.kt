@@ -3,7 +3,6 @@ package llm.slop.spirals
 import android.content.Context
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
-import android.os.SystemClock
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.microedition.khronos.egl.EGLConfig
@@ -38,7 +37,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glEnable(GLES30.GL_BLEND)
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
 
-        // Updated resource IDs to match existing files in res/raw
         program = ShaderHelper.buildProgram(context, R.raw.mandala_vertex, R.raw.mandala_fragment)
         
         uOmegaLocation = GLES30.glGetUniformLocation(program, "uOmega")
@@ -54,7 +52,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         val totalVertices = resolution * 2
         val vertexData = FloatArray(totalVertices * 2)
         for (i in 0 until resolution) {
-            val u = i.toFloat() / (resolution - 1)
+            val u = i.generateU()
             vertexData[i * 4 + 0] = u
             vertexData[i * 4 + 1] = -1.0f
             vertexData[i * 4 + 2] = u
@@ -93,6 +91,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glBindVertexArray(0)
     }
 
+    private fun Int.generateU(): Float = this.toFloat() / (resolution - 1)
+
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES30.glViewport(0, 0, width, height)
         aspectRatio = width.toFloat() / height.toFloat()
@@ -108,18 +108,15 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         val currentParams = params
         val period = (2.0 * PI).toFloat()
         
-        GLES30.glUniform3f(uOmegaLocation, currentParams.omega1.toFloat(), currentParams.omega2.toFloat(), currentParams.omega3.toFloat())
-        GLES30.glUniform3f(uLLocation, currentParams.l1, currentParams.l2, currentParams.l3)
-        GLES30.glUniform3f(uPhiLocation, currentParams.phi1, currentParams.phi2, currentParams.phi3)
+        GLES30.glUniform4f(uOmegaLocation, currentParams.omega1.toFloat(), currentParams.omega2.toFloat(), currentParams.omega3.toFloat(), currentParams.omega4.toFloat())
+        GLES30.glUniform4f(uLLocation, currentParams.l1, currentParams.l2, currentParams.l3, currentParams.l4)
+        GLES30.glUniform4f(uPhiLocation, currentParams.phi1, currentParams.phi2, currentParams.phi3, currentParams.phi4)
         GLES30.glUniform1f(uTLocation, period)
         GLES30.glUniform1f(uThicknessLocation, currentParams.thickness)
         
-        val totalTime = 0.0f 
-        val angle = 0.0f
-        
-        GLES30.glUniform1f(uGlobalRotationLocation, angle)
+        GLES30.glUniform1f(uGlobalRotationLocation, 0.0f)
         GLES30.glUniform1f(uAspectRatioLocation, aspectRatio)
-        GLES30.glUniform1f(uTimeLocation, totalTime)
+        GLES30.glUniform1f(uTimeLocation, 0.0f)
 
         GLES30.glBindVertexArray(vao)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, resolution * 2)

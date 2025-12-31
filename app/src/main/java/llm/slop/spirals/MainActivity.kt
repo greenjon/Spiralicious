@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun MandalaScreen() {
-        var params by remember { mutableStateOf(MandalaParams(omega1 = 20, omega2 = 17, omega3 = 11)) }
+        var params by remember { mutableStateOf(MandalaParams(omega1 = 22, omega2 = 19, omega3 = 19, omega4 = 19, l4 = 0.1f)) }
         var currentTab by remember { mutableStateOf("Speed") }
         var selectedLobeFilter by remember { mutableStateOf<Int?>(null) }
         var isLobeMenuExpanded by remember { mutableStateOf(false) }
@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
 
             Column(
                 modifier = Modifier
-                    .fillMaxWidth() // Changed from fillMaxWidth(0.4f)
+                    .fillMaxWidth()
                     .fillMaxHeight(0.6f)
                     .align(Alignment.TopStart)
                     .padding(16.dp)
@@ -128,15 +128,19 @@ class MainActivity : ComponentActivity() {
                                             params = params.copy(
                                                 omega1 = ratio.omega1,
                                                 omega2 = ratio.omega2,
-                                                omega3 = ratio.omega3
+                                                omega3 = ratio.omega3,
+                                                omega4 = ratio.omega4,
+                                                // If omega4 is non-zero and l4 is zero, give it some length
+                                                l4 = if (ratio.omega4 != 0 && params.l4 == 0f) 0.1f else params.l4
                                             )
                                         }
                                         .padding(8.dp)
-                                        .background(if (params.omega1 == ratio.omega1 && params.omega2 == ratio.omega2 && params.omega3 == ratio.omega3) 
+                                        .background(if (params.omega1 == ratio.omega1 && params.omega2 == ratio.omega2 && 
+                                                        params.omega3 == ratio.omega3 && params.omega4 == ratio.omega4) 
                                             Color.White.copy(alpha = 0.2f) else Color.Transparent)
                                 ) {
                                     Text(
-                                        text = "${ratio.omega1} : ${ratio.omega2} : ${ratio.omega3}",
+                                        text = "${ratio.omega1} : ${ratio.omega2} : ${ratio.omega3} : ${ratio.omega4} (${ratio.lobes}L)",
                                         color = Color.White,
                                         style = MaterialTheme.typography.bodySmall
                                     )
@@ -149,6 +153,8 @@ class MainActivity : ComponentActivity() {
                             LengthSlider("L1", params.l1) { params = params.copy(l1 = it) }
                             LengthSlider("L2", params.l2) { params = params.copy(l2 = it) }
                             LengthSlider("L3", params.l3) { params = params.copy(l3 = it) }
+                            LengthSlider("L4", params.l4) { params = params.copy(l4 = it) }
+                            LengthSlider("Thickness", params.thickness) { params = params.copy(thickness = it) }
                         }
                     }
                 }
@@ -159,7 +165,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun LengthSlider(label: String, value: Float, onValueChange: (Float) -> Unit) {
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
-            Text(text = "$label: ${String.format("%.2f", value)}", color = Color.White, style = MaterialTheme.typography.labelSmall)
+            Text(text = "$label: ${String.format("%.3f", value)}", color = Color.White, style = MaterialTheme.typography.labelSmall)
             Slider(
                 value = value,
                 onValueChange = onValueChange,

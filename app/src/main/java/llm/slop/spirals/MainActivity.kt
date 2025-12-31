@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private var spiralSurfaceView: SpiralSurfaceView? = null
@@ -156,7 +157,7 @@ class MainActivity : ComponentActivity() {
                                             .background(if (currentIndex == index) Color.White.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.2f))
                                     ) {
                                         Text(
-                                            text = "(${String.format("%.2f", ratio.shapeRatio)}) ${ratio.omega1}, ${ratio.omega2}, ${ratio.omega3}, ${ratio.omega4}",
+                                            text = "(${String.format(Locale.US, "%.2f", ratio.shapeRatio)}) ${ratio.omega1}, ${ratio.omega2}, ${ratio.omega3}, ${ratio.omega4}",
                                             color = if (currentTag != null) Color.Yellow else Color.White,
                                             style = MaterialTheme.typography.bodySmall,
                                             modifier = Modifier.weight(1f)
@@ -171,7 +172,10 @@ class MainActivity : ComponentActivity() {
                             // VERTICAL SCRUB BAR
                             if (filteredRatios.isNotEmpty()) {
                                 Slider(
-                                    value = if (filteredRatios.size > 1) listState.firstVisibleItemIndex.toFloat() / (filteredRatios.size - 1) else 0f,
+                                    value = if (filteredRatios.size > 1) {
+                                        val firstVisible = listState.firstVisibleItemIndex
+                                        firstVisible.toFloat() / (filteredRatios.size - 1)
+                                    } else 0f,
                                     onValueChange = { scrollPercent ->
                                         scope.launch {
                                             val targetIndex = (scrollPercent * (filteredRatios.size - 1)).toInt()
@@ -253,7 +257,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun LengthSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float> = 0f..1f, onValueChange: (Float) -> Unit) {
         Column(modifier = Modifier.padding(vertical = 4.dp)) {
-            Text(text = "$label: ${String.format("%.3f", value)}", color = Color.White, style = MaterialTheme.typography.labelSmall)
+            Text(text = "$label: ${String.format(Locale.US, "%.3f", value)}", color = Color.White, style = MaterialTheme.typography.labelSmall)
             Slider(value = value, onValueChange = onValueChange, valueRange = range, modifier = Modifier.height(20.dp))
         }
     }

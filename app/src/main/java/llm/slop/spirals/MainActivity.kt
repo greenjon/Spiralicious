@@ -32,7 +32,7 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun MandalaScreen() {
-        var params by remember { mutableStateOf(MandalaParams(omega1 = 22, omega2 = 19, omega3 = 19, omega4 = 19, l4 = 0.1f)) }
+        var params by remember { mutableStateOf(MandalaParams(omega1 = 22, omega2 = 19, omega3 = 19, omega4 = 19, l4 = 0.1f, thickness = 0.005f)) }
         var currentTab by remember { mutableStateOf("Speed") }
         var selectedLobeFilter by remember { mutableStateOf<Int?>(null) }
         var isLobeMenuExpanded by remember { mutableStateOf(false) }
@@ -40,7 +40,8 @@ class MainActivity : ComponentActivity() {
         val allRatios = MandalaLibrary.MandalaRatios
         val lobesOptions = remember { allRatios.map { it.lobes }.distinct().sorted() }
         val filteredRatios = remember(selectedLobeFilter) {
-            if (selectedLobeFilter == null) allRatios else allRatios.filter { it.lobes == selectedLobeFilter }
+            val base = if (selectedLobeFilter == null) allRatios else allRatios.filter { it.lobes == selectedLobeFilter }
+            base.sortedBy { it.shapeRatio } // Sort by shapeRatio
         }
 
         Box(modifier = Modifier.fillMaxSize()) {
@@ -56,14 +57,14 @@ class MainActivity : ComponentActivity() {
                     .fillMaxHeight(0.6f)
                     .align(Alignment.TopStart)
                     .padding(16.dp)
-                    .background(Color.Black.copy(alpha = 0.7f))
+                    .background(Color.Transparent)
             ) {
                 // Tab Header
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = { currentTab = "Speed" },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (currentTab == "Speed") MaterialTheme.colorScheme.primary else Color.Gray
+                            containerColor = if (currentTab == "Speed") MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.4f)
                         ),
                         modifier = Modifier.weight(1f),
                         shape = MaterialTheme.shapes.extraSmall
@@ -73,7 +74,7 @@ class MainActivity : ComponentActivity() {
                     Button(
                         onClick = { currentTab = "Length" },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (currentTab == "Length") MaterialTheme.colorScheme.primary else Color.Gray
+                            containerColor = if (currentTab == "Length") MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.4f)
                         ),
                         modifier = Modifier.weight(1f),
                         shape = MaterialTheme.shapes.extraSmall
@@ -90,7 +91,8 @@ class MainActivity : ComponentActivity() {
                         Box(modifier = Modifier.padding(horizontal = 8.dp)) {
                             OutlinedButton(
                                 onClick = { isLobeMenuExpanded = true },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
                             ) {
                                 Text(text = if (selectedLobeFilter == null) "All Lobes" else "Lobes: $selectedLobeFilter", style = MaterialTheme.typography.labelSmall)
                                 Icon(Icons.Default.ArrowDropDown, contentDescription = null)
@@ -130,17 +132,17 @@ class MainActivity : ComponentActivity() {
                                                 omega2 = ratio.omega2,
                                                 omega3 = ratio.omega3,
                                                 omega4 = ratio.omega4,
-                                                // If omega4 is non-zero and l4 is zero, give it some length
                                                 l4 = if (ratio.omega4 != 0 && params.l4 == 0f) 0.1f else params.l4
                                             )
                                         }
                                         .padding(8.dp)
                                         .background(if (params.omega1 == ratio.omega1 && params.omega2 == ratio.omega2 && 
                                                         params.omega3 == ratio.omega3 && params.omega4 == ratio.omega4) 
-                                            Color.White.copy(alpha = 0.2f) else Color.Transparent)
+                                            Color.White.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.2f))
                                 ) {
+                                    // Modified text format: (shapeRatio) omega1, omega2, omega3, omega4
                                     Text(
-                                        text = "${ratio.omega1} : ${ratio.omega2} : ${ratio.omega3} : ${ratio.omega4} (${ratio.lobes}L)",
+                                        text = "(${String.format("%.2f", ratio.shapeRatio)}) ${ratio.omega1}, ${ratio.omega2}, ${ratio.omega3}, ${ratio.omega4}",
                                         color = Color.White,
                                         style = MaterialTheme.typography.bodySmall
                                     )
@@ -149,12 +151,21 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     "Length" -> {
-                        Column(modifier = Modifier.padding(16.dp)) {
+                        Column(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .background(Color.Black.copy(alpha = 0.3f))
+                        ) {
                             LengthSlider("L1", params.l1) { params = params.copy(l1 = it) }
                             LengthSlider("L2", params.l2) { params = params.copy(l2 = it) }
                             LengthSlider("L3", params.l3) { params = params.copy(l3 = it) }
                             LengthSlider("L4", params.l4) { params = params.copy(l4 = it) }
-                            LengthSlider("Thickness", params.thickness) { params = params.copy(thickness = it) }
+                            LengthSlider(
+                                label = "Thickness", 
+                                value = params.thickness, 
+                                range = 0.001f..0.015f,
+                                onValueChange = { params = params.copy(thickness = it) }
+                            )
                         }
                     }
                 }
@@ -163,13 +174,18 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun LengthSlider(label: String, value: Float, onValueChange: (Float) -> Unit) {
+    fun LengthSlider(
+        label: String, 
+        value: Float, 
+        range: ClosedFloatingPointRange<Float> = 0f..1f, 
+        onValueChange: (Float) -> Unit
+    ) {
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
             Text(text = "$label: ${String.format("%.3f", value)}", color = Color.White, style = MaterialTheme.typography.labelSmall)
             Slider(
                 value = value,
                 onValueChange = onValueChange,
-                valueRange = 0f..1f,
+                valueRange = range,
                 modifier = Modifier.height(24.dp)
             )
         }

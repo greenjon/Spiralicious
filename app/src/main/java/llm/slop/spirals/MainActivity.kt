@@ -49,16 +49,29 @@ class MainActivity : ComponentActivity() {
         var selectedPetalFilter by remember { mutableStateOf<Int?>(null) }
         var showOnlyUntagged by remember { mutableStateOf(false) }
         var isPetalMenuExpanded by remember { mutableStateOf(false) }
+        
+        var currentSortBy by remember { mutableStateOf("shapeRatio") }
+        var isSortMenuExpanded by remember { mutableStateOf(false) }
 
         val allRatios = MandalaLibrary.MandalaRatios
         val tags by vm.tags.collectAsState()
         
-        val filteredRatios = remember(selectedPetalFilter, showOnlyUntagged, tags) {
-            allRatios.filter { ratio ->
+        val filteredRatios = remember(selectedPetalFilter, showOnlyUntagged, tags, currentSortBy) {
+            val filtered = allRatios.filter { ratio ->
                 val petalMatch = selectedPetalFilter == null || ratio.petals == selectedPetalFilter
                 val tagMatch = !showOnlyUntagged || !tags.containsKey(ratio.id)
                 petalMatch && tagMatch
-            }.sortedBy { it.shapeRatio }
+            }
+            
+            when (currentSortBy) {
+                "multiplicityClass" -> filtered.sortedBy { it.multiplicityClass }
+                "independentFreqCount" -> filtered.sortedBy { it.independentFreqCount }
+                "twoFoldLikely" -> filtered.sortedBy { if (it.twoFoldLikely) 1 else 0 }
+                "hierarchyDepth" -> filtered.sortedBy { it.hierarchyDepth }
+                "dominanceRatio" -> filtered.sortedBy { it.dominanceRatio }
+                "radialVariance" -> filtered.sortedBy { it.radialVariance }
+                else -> filtered.sortedBy { it.shapeRatio }
+            }
         }
 
         val currentRatio = remember(params) {
@@ -71,6 +84,28 @@ class MainActivity : ComponentActivity() {
 
         val scope = rememberCoroutineScope()
         val listState = rememberLazyListState()
+
+        val goToNext = {
+            if (currentIndex < filteredRatios.size - 1) {
+                val nextIndex = currentIndex + 1
+                val next = filteredRatios[nextIndex]
+                params = params.copy(omega1 = next.a, omega2 = next.b, omega3 = next.c, omega4 = next.d)
+                scope.launch {
+                    listState.animateScrollToItem(nextIndex)
+                }
+            }
+        }
+
+        val goToPrev = {
+            if (currentIndex > 0) {
+                val prevIndex = currentIndex - 1
+                val prev = filteredRatios[prevIndex]
+                params = params.copy(omega1 = prev.a, omega2 = prev.b, omega3 = prev.c, omega4 = prev.d)
+                scope.launch {
+                    listState.animateScrollToItem(prevIndex)
+                }
+            }
+        }
 
         Box(modifier = Modifier.fillMaxSize()) {
             AndroidView(
@@ -146,11 +181,26 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
+                            // Sort Menu
+                            Box(modifier = Modifier.weight(1f).padding(horizontal = 4.dp)) {
+                                OutlinedButton(onClick = { isSortMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                                    Text(text = "Sort: $currentSortBy", style = MaterialTheme.typography.labelSmall)
+                                }
+                                DropdownMenu(expanded = isSortMenuExpanded, onDismissRequest = { isSortMenuExpanded = false }) {
+                                    val sortOptions = listOf(
+                                        "shapeRatio", "multiplicityClass", "independentFreqCount", 
+                                        "twoFoldLikely", "hierarchyDepth", "dominanceRatio", "radialVariance"
+                                    )
+                                    sortOptions.forEach { option ->
+                                        DropdownMenuItem(text = { Text(option) }, onClick = { currentSortBy = option; isSortMenuExpanded = false })
+                                    }
+                                }
+                            }
                             // Untagged Toggle
                             FilterChip(
                                 selected = showOnlyUntagged,
                                 onClick = { showOnlyUntagged = !showOnlyUntagged },
-                                label = { Text("Untagged Only", style = MaterialTheme.typography.labelSmall) }
+                                label = { Text("Untagged", style = MaterialTheme.typography.labelSmall) }
                             )
                         }
 
@@ -222,12 +272,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 // Prev Button
                 IconButton(
-                    onClick = {
-                        if (currentIndex > 0) {
-                            val prev = filteredRatios[currentIndex - 1]
-                            params = params.copy(omega1 = prev.a, omega2 = prev.b, omega3 = prev.c, omega4 = prev.d)
-                        }
-                    },
+                    onClick = goToPrev,
                     enabled = currentIndex > 0
                 ) { Icon(Icons.Default.ArrowBack, contentDescription = "Prev", tint = Color.White) }
 
@@ -235,22 +280,17 @@ class MainActivity : ComponentActivity() {
                 if (currentId != null) {
                     val currentTag = tags[currentId]
                     Row(modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), MaterialTheme.shapes.medium)) {
-                        TagButton(icon = Icons.Default.Delete, label = "trash", active = currentTag == "trash") { vm.toggleTag(currentId, "trash") }
-                        TagButton(label = "1", active = currentTag == "1") { vm.toggleTag(currentId, "1") }
-                        TagButton(label = "2", active = currentTag == "2") { vm.toggleTag(currentId, "2") }
-                        TagButton(label = "3", active = currentTag == "3") { vm.toggleTag(currentId, "3") }
-                        TagButton(label = "?", active = currentTag == "?") { vm.toggleTag(currentId, "?") }
+                        TagButton(icon = Icons.Default.Delete, label = "trash", active = currentTag == "trash") { vm.toggleTag(currentId, "trash"); goToNext() }
+                        TagButton(label = "1", active = currentTag == "1") { vm.toggleTag(currentId, "1"); goToNext() }
+                        TagButton(label = "2", active = currentTag == "2") { vm.toggleTag(currentId, "2"); goToNext() }
+                        TagButton(label = "3", active = currentTag == "3") { vm.toggleTag(currentId, "3"); goToNext() }
+                        TagButton(label = "?", active = currentTag == "?") { vm.toggleTag(currentId, "?"); goToNext() }
                     }
                 }
 
                 // Next Button
                 IconButton(
-                    onClick = {
-                        if (currentIndex < filteredRatios.size - 1) {
-                            val next = filteredRatios[currentIndex + 1]
-                            params = params.copy(omega1 = next.a, omega2 = next.b, omega3 = next.c, omega4 = next.d)
-                        }
-                    },
+                    onClick = goToNext,
                     enabled = currentIndex < filteredRatios.size - 1
                 ) { Icon(Icons.Default.ArrowForward, contentDescription = "Next", tint = Color.White) }
             }

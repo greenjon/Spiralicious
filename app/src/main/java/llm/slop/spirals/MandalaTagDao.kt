@@ -14,6 +14,6 @@ interface MandalaTagDao {
     @Delete
     suspend fun deleteTag(mandalaTag: MandalaTag)
     
-    @Query("SELECT * FROM mandala_tags WHERE speeds = :speeds LIMIT 1")
-    suspend fun getTagForSpeeds(speeds: String): MandalaTag?
+    @Query("SELECT * FROM mandala_tags WHERE id = :id LIMIT 1")
+    suspend fun getTagForId(id: String): MandalaTag?
 }

@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [MandalaTag::class], version = 1, exportSchema = false)
+@Database(entities = [MandalaTag::class], version = 2, exportSchema = false)
 abstract class MandalaDatabase : RoomDatabase() {
     abstract fun mandalaTagDao(): MandalaTagDao
 
@@ -19,7 +19,9 @@ abstract class MandalaDatabase : RoomDatabase() {
                     context.applicationContext,
                     MandalaDatabase::class.java,
                     "mandala_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }

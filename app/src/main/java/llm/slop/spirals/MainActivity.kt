@@ -46,27 +46,27 @@ class MainActivity : ComponentActivity() {
     fun MandalaScreen(vm: MandalaViewModel = viewModel(), onShare: (String) -> Unit) {
         var params by remember { mutableStateOf(MandalaParams(omega1 = 22, omega2 = 19, omega3 = 19, omega4 = 19, l1 = 0.4f, l2 = 0.3f, l3 = 0.2f, l4 = 0.1f, thickness = 0.005f)) }
         var currentTab by remember { mutableStateOf("Speed") }
-        var selectedLobeFilter by remember { mutableStateOf<Int?>(null) }
+        var selectedPetalFilter by remember { mutableStateOf<Int?>(null) }
         var showOnlyUntagged by remember { mutableStateOf(false) }
-        var isLobeMenuExpanded by remember { mutableStateOf(false) }
+        var isPetalMenuExpanded by remember { mutableStateOf(false) }
 
         val allRatios = MandalaLibrary.MandalaRatios
         val tags by vm.tags.collectAsState()
         
-        val filteredRatios = remember(selectedLobeFilter, showOnlyUntagged, tags) {
+        val filteredRatios = remember(selectedPetalFilter, showOnlyUntagged, tags) {
             allRatios.filter { ratio ->
-                val lobeMatch = selectedLobeFilter == null || ratio.lobes == selectedLobeFilter
-                val tagMatch = !showOnlyUntagged || !tags.containsKey("${ratio.omega1}-${ratio.omega2}-${ratio.omega3}-${ratio.omega4}")
-                lobeMatch && tagMatch
+                val petalMatch = selectedPetalFilter == null || ratio.petals == selectedPetalFilter
+                val tagMatch = !showOnlyUntagged || !tags.containsKey(ratio.id)
+                petalMatch && tagMatch
             }.sortedBy { it.shapeRatio }
         }
 
         val currentRatio = remember(params) {
-            allRatios.find { it.omega1 == params.omega1 && it.omega2 == params.omega2 && it.omega3 == params.omega3 && it.omega4 == params.omega4 }
+            allRatios.find { it.a == params.omega1 && it.b == params.omega2 && it.c == params.omega3 && it.d == params.omega4 }
         }
 
         val currentIndex = remember(params, filteredRatios) {
-            filteredRatios.indexOfFirst { it.omega1 == params.omega1 && it.omega2 == params.omega2 && it.omega3 == params.omega3 && it.omega4 == params.omega4 }
+            filteredRatios.indexOfFirst { it.a == params.omega1 && it.b == params.omega2 && it.c == params.omega3 && it.d == params.omega4 }
         }
 
         val scope = rememberCoroutineScope()
@@ -116,7 +116,7 @@ class MainActivity : ComponentActivity() {
                         Text(
                             text = "Speeds: ${params.omega1}, ${params.omega2}, ${params.omega3}, ${params.omega4}" + 
                                    (currentRatio?.let { 
-                                       "   (${it.lobes} lobes; ${String.format(Locale.US, "%.1f", it.shapeRatio)} sr)" 
+                                       "   (${it.petals} petals; ${String.format(Locale.US, "%.1f", it.shapeRatio)} sr)" 
                                    } ?: ""),
                             style = MaterialTheme.typography.labelMedium,
                             color = Color.Cyan
@@ -134,15 +134,15 @@ class MainActivity : ComponentActivity() {
                 when (currentTab) {
                     "Speed" -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            // Lobe Filter
+                            // Petal Filter
                             Box(modifier = Modifier.weight(1f).padding(horizontal = 4.dp)) {
-                                OutlinedButton(onClick = { isLobeMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
-                                    Text(text = if (selectedLobeFilter == null) "All Lobes" else "${selectedLobeFilter}L", style = MaterialTheme.typography.labelSmall)
+                                OutlinedButton(onClick = { isPetalMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                                    Text(text = if (selectedPetalFilter == null) "All Petals" else "${selectedPetalFilter}P", style = MaterialTheme.typography.labelSmall)
                                 }
-                                DropdownMenu(expanded = isLobeMenuExpanded, onDismissRequest = { isLobeMenuExpanded = false }) {
-                                    DropdownMenuItem(text = { Text("All") }, onClick = { selectedLobeFilter = null; isLobeMenuExpanded = false })
-                                    listOf(3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16).forEach { l ->
-                                        DropdownMenuItem(text = { Text("${l}L") }, onClick = { selectedLobeFilter = l; isLobeMenuExpanded = false })
+                                DropdownMenu(expanded = isPetalMenuExpanded, onDismissRequest = { isPetalMenuExpanded = false }) {
+                                    DropdownMenuItem(text = { Text("All") }, onClick = { selectedPetalFilter = null; isPetalMenuExpanded = false })
+                                    listOf(3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16).forEach { p ->
+                                        DropdownMenuItem(text = { Text("${p}P") }, onClick = { selectedPetalFilter = p; isPetalMenuExpanded = false })
                                     }
                                 }
                             }
@@ -158,19 +158,18 @@ class MainActivity : ComponentActivity() {
                         Row(modifier = Modifier.weight(1f)) {
                             LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
                                 itemsIndexed(filteredRatios) { index, ratio ->
-                                    val speedsKey = "${ratio.omega1}-${ratio.omega2}-${ratio.omega3}-${ratio.omega4}"
-                                    val currentTag = tags[speedsKey]
+                                    val currentTag = tags[ratio.id]
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clickable {
-                                                params = params.copy(omega1 = ratio.omega1, omega2 = ratio.omega2, omega3 = ratio.omega3, omega4 = ratio.omega4)
+                                                params = params.copy(omega1 = ratio.a, omega2 = ratio.b, omega3 = ratio.c, omega4 = ratio.d)
                                             }
                                             .padding(4.dp)
                                             .background(if (currentIndex == index) Color.White.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.2f))
                                     ) {
                                         Text(
-                                            text = "(${String.format(Locale.US, "%.2f", ratio.shapeRatio)}) ${ratio.omega1}, ${ratio.omega2}, ${ratio.omega3}, ${ratio.omega4}",
+                                            text = "(${String.format(Locale.US, "%.2f", ratio.shapeRatio)}) ${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d}",
                                             color = if (currentTag != null) Color.Yellow else Color.White,
                                             style = MaterialTheme.typography.bodySmall,
                                             modifier = Modifier.weight(1f)
@@ -214,8 +213,7 @@ class MainActivity : ComponentActivity() {
             }
 
             // BOTTOM CONTROLS
-            val speedsKey = "${params.omega1}-${params.omega2}-${params.omega3}-${params.omega4}"
-            val currentTag = tags[speedsKey]
+            val currentId = currentRatio?.id
 
             Row(
                 modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(16.dp),
@@ -227,19 +225,22 @@ class MainActivity : ComponentActivity() {
                     onClick = {
                         if (currentIndex > 0) {
                             val prev = filteredRatios[currentIndex - 1]
-                            params = params.copy(omega1 = prev.omega1, omega2 = prev.omega2, omega3 = prev.omega3, omega4 = prev.omega4)
+                            params = params.copy(omega1 = prev.a, omega2 = prev.b, omega3 = prev.c, omega4 = prev.d)
                         }
                     },
                     enabled = currentIndex > 0
                 ) { Icon(Icons.Default.ArrowBack, contentDescription = "Prev", tint = Color.White) }
 
                 // Tag Buttons
-                Row(modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), MaterialTheme.shapes.medium)) {
-                    TagButton(icon = Icons.Default.Delete, label = "trash", active = currentTag == "trash") { vm.toggleTag(speedsKey, "trash") }
-                    TagButton(label = "1", active = currentTag == "1") { vm.toggleTag(speedsKey, "1") }
-                    TagButton(label = "2", active = currentTag == "2") { vm.toggleTag(speedsKey, "2") }
-                    TagButton(label = "3", active = currentTag == "3") { vm.toggleTag(speedsKey, "3") }
-                    TagButton(label = "?", active = currentTag == "?") { vm.toggleTag(speedsKey, "?") }
+                if (currentId != null) {
+                    val currentTag = tags[currentId]
+                    Row(modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), MaterialTheme.shapes.medium)) {
+                        TagButton(icon = Icons.Default.Delete, label = "trash", active = currentTag == "trash") { vm.toggleTag(currentId, "trash") }
+                        TagButton(label = "1", active = currentTag == "1") { vm.toggleTag(currentId, "1") }
+                        TagButton(label = "2", active = currentTag == "2") { vm.toggleTag(currentId, "2") }
+                        TagButton(label = "3", active = currentTag == "3") { vm.toggleTag(currentId, "3") }
+                        TagButton(label = "?", active = currentTag == "?") { vm.toggleTag(currentId, "?") }
+                    }
                 }
 
                 // Next Button
@@ -247,7 +248,7 @@ class MainActivity : ComponentActivity() {
                     onClick = {
                         if (currentIndex < filteredRatios.size - 1) {
                             val next = filteredRatios[currentIndex + 1]
-                            params = params.copy(omega1 = next.omega1, omega2 = next.omega2, omega3 = next.omega3, omega4 = next.omega4)
+                            params = params.copy(omega1 = next.a, omega2 = next.b, omega3 = next.c, omega4 = next.d)
                         }
                     },
                     enabled = currentIndex < filteredRatios.size - 1

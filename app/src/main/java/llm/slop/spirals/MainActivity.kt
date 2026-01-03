@@ -209,6 +209,15 @@ class MainActivity : ComponentActivity() {
                             LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
                                 itemsIndexed(filteredRatios) { index, ratio ->
                                     val currentTag = tags[ratio.id]
+                                    val displayValue = when (currentSortBy) {
+                                        "multiplicityClass" -> ratio.multiplicityClass.toString()
+                                        "independentFreqCount" -> ratio.independentFreqCount.toString()
+                                        "twoFoldLikely" -> ratio.twoFoldLikely.toString()
+                                        "hierarchyDepth" -> ratio.hierarchyDepth.toString()
+                                        "dominanceRatio" -> String.format(Locale.US, "%.2f", ratio.dominanceRatio)
+                                        "radialVariance" -> String.format(Locale.US, "%.2f", ratio.radialVariance)
+                                        else -> String.format(Locale.US, "%.2f", ratio.shapeRatio)
+                                    }
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -219,7 +228,7 @@ class MainActivity : ComponentActivity() {
                                             .background(if (currentIndex == index) Color.White.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.2f))
                                     ) {
                                         Text(
-                                            text = "(${String.format(Locale.US, "%.2f", ratio.shapeRatio)}) ${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d}",
+                                            text = "($displayValue) ${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d}",
                                             color = if (currentTag != null) Color.Yellow else Color.White,
                                             style = MaterialTheme.typography.bodySmall,
                                             modifier = Modifier.weight(1f)

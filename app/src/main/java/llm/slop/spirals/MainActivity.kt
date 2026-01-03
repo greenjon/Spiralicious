@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -28,6 +29,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent {
             MaterialTheme(colorScheme = darkColorScheme()) {
                 MandalaScreen { csvData ->
@@ -44,7 +46,14 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun MandalaScreen(vm: MandalaViewModel = viewModel(), onShare: (String) -> Unit) {
-        var params by remember { mutableStateOf(MandalaParams(omega1 = 22, omega2 = 19, omega3 = 19, omega4 = 19, l1 = 0.4f, l2 = 0.3f, l3 = 0.2f, l4 = 0.1f, thickness = 0.005f)) }
+        val allRatios = MandalaLibrary.MandalaRatios
+        var params by remember { 
+            mutableStateOf(
+                allRatios.firstOrNull()?.let { 
+                    MandalaParams(omega1 = it.a, omega2 = it.b, omega3 = it.c, omega4 = it.d, l1 = 0.4f, l2 = 0.3f, l3 = 0.2f, l4 = 0.1f, thickness = 0.005f) 
+                } ?: MandalaParams(omega1 = 22, omega2 = 19, omega3 = 19, omega4 = 19, l1 = 0.4f, l2 = 0.3f, l3 = 0.2f, l4 = 0.1f, thickness = 0.005f)
+            )
+        }
         var currentTab by remember { mutableStateOf("Speed") }
         var selectedPetalFilter by remember { mutableStateOf<Int?>(null) }
         var showOnlyUntagged by remember { mutableStateOf(false) }
@@ -53,7 +62,6 @@ class MainActivity : ComponentActivity() {
         var currentSortBy by remember { mutableStateOf("shapeRatio") }
         var isSortMenuExpanded by remember { mutableStateOf(false) }
 
-        val allRatios = MandalaLibrary.MandalaRatios
         val tags by vm.tags.collectAsState()
         
         val filteredRatios = remember(selectedPetalFilter, showOnlyUntagged, tags, currentSortBy) {
@@ -120,6 +128,7 @@ class MainActivity : ComponentActivity() {
                     .fillMaxWidth()
                     .fillMaxHeight(0.7f)
                     .align(Alignment.TopStart)
+                    .statusBarsPadding()
                     .padding(16.dp)
                     .background(Color.Transparent)
             ) {
@@ -283,7 +292,11 @@ class MainActivity : ComponentActivity() {
             val currentId = currentRatio?.id
 
             Row(
-                modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -303,6 +316,9 @@ class MainActivity : ComponentActivity() {
                         TagButton(label = "3", active = currentTag == "3") { vm.toggleTag(currentId, "3"); goToNext() }
                         TagButton(label = "?", active = currentTag == "?") { vm.toggleTag(currentId, "?"); goToNext() }
                     }
+                } else {
+                    // Spacer to keep layout consistent if buttons are missing
+                    Spacer(modifier = Modifier.weight(1f))
                 }
 
                 // Next Button

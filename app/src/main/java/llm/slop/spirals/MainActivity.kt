@@ -225,7 +225,7 @@ class MainActivity : ComponentActivity() {
                         Row(modifier = Modifier.weight(1f)) {
                             LazyColumn(state = listState, modifier = Modifier.weight(1f)) {
                                 itemsIndexed(filteredRatios) { index, ratio ->
-                                    val currentTag = tags[ratio.id]
+                                    val currentTags = tags[ratio.id] ?: emptyList()
                                     val displayValue = when (currentSortBy) {
                                         "multiplicityClass" -> ratio.multiplicityClass.toString()
                                         "independentFreqCount" -> ratio.independentFreqCount.toString()
@@ -246,12 +246,12 @@ class MainActivity : ComponentActivity() {
                                     ) {
                                         Text(
                                             text = "($displayValue) ${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d}",
-                                            color = if (currentTag != null) Color.Yellow else Color.White,
+                                            color = if (currentTags.isNotEmpty()) Color.Yellow else Color.White,
                                             style = MaterialTheme.typography.bodySmall,
                                             modifier = Modifier.weight(1f)
                                         )
-                                        if (currentTag != null) {
-                                            Text(text = currentTag, color = Color.Yellow, style = MaterialTheme.typography.labelSmall)
+                                        if (currentTags.isNotEmpty()) {
+                                            Text(text = currentTags.joinToString(","), color = Color.Yellow, style = MaterialTheme.typography.labelSmall)
                                         }
                                     }
                                 }
@@ -308,16 +308,32 @@ class MainActivity : ComponentActivity() {
 
                 // Tag Buttons
                 if (currentId != null) {
-                    val currentTag = tags[currentId]
+                    val currentTags = tags[currentId] ?: emptyList()
                     Row(modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), MaterialTheme.shapes.medium)) {
-                        TagButton(icon = Icons.Default.Delete, label = "trash", active = currentTag == "trash") { vm.toggleTag(currentId, "trash"); goToNext() }
-                        TagButton(label = "1", active = currentTag == "1") { vm.toggleTag(currentId, "1"); goToNext() }
-                        TagButton(label = "2", active = currentTag == "2") { vm.toggleTag(currentId, "2"); goToNext() }
-                        TagButton(label = "3", active = currentTag == "3") { vm.toggleTag(currentId, "3"); goToNext() }
-                        TagButton(label = "?", active = currentTag == "?") { vm.toggleTag(currentId, "?"); goToNext() }
+                        TagButton(icon = Icons.Default.Delete, label = "trash", active = "trash" in currentTags) { 
+                            vm.toggleTag(currentId, "trash")
+                            goToNext() 
+                        }
+                        TagButton(label = "1", active = "1" in currentTags) { 
+                            vm.toggleTag(currentId, "1")
+                            goToNext() 
+                        }
+                        TagButton(label = "2", active = "2" in currentTags) { 
+                            vm.toggleTag(currentId, "2")
+                            goToNext() 
+                        }
+                        TagButton(label = "3", active = "3" in currentTags) { 
+                            vm.toggleTag(currentId, "3")
+                            goToNext() 
+                        }
+                        TagButton(label = "OVAL", active = "oval" in currentTags) { 
+                            vm.toggleTag(currentId, "oval")
+                        }
+                        TagButton(label = "BRAID", active = "braid" in currentTags) { 
+                            vm.toggleTag(currentId, "braid")
+                        }
                     }
                 } else {
-                    // Spacer to keep layout consistent if buttons are missing
                     Spacer(modifier = Modifier.weight(1f))
                 }
 
@@ -336,7 +352,7 @@ class MainActivity : ComponentActivity() {
             if (icon != null) {
                 Icon(icon, contentDescription = label, tint = if (active) Color.Red else Color.Gray)
             } else {
-                Text(text = label, color = if (active) Color.Green else Color.White, style = MaterialTheme.typography.labelLarge)
+                Text(text = label, color = if (active) Color.Green else Color.White, style = MaterialTheme.typography.labelSmall)
             }
         }
     }

@@ -13,16 +13,24 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     private val db = MandalaDatabase.getDatabase(application)
     private val dao = db.mandalaTagDao()
 
-    val tags: StateFlow<Map<String, String>> = dao.getAllTags()
-        .map { list -> list.associate { it.id to (it.tag ?: "") } }
+    val tags: StateFlow<Map<String, List<String>>> = dao.getAllTags()
+        .map { list -> 
+            list.groupBy({ it.id }, { it.tag })
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     fun toggleTag(id: String, tag: String) {
         viewModelScope.launch {
-            val current = dao.getTagForId(id)
-            if (current?.tag == tag) {
-                dao.deleteTag(current)
+            val allForId = dao.getAllTagsForId(id)
+            val existing = allForId.find { it.tag == tag }
+            if (existing != null) {
+                dao.deleteTag(existing)
             } else {
+                // For "trash", "1", "2", "3", they are mutually exclusive ratings
+                val ratings = listOf("trash", "1", "2", "3")
+                if (tag in ratings) {
+                    allForId.filter { it.tag in ratings }.forEach { dao.deleteTag(it) }
+                }
                 dao.insertTag(MandalaTag(id, tag))
             }
         }
@@ -32,9 +40,9 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         val currentTags = tags.value
         if (currentTags.isEmpty()) return "No tags recorded."
         
-        val sb = StringBuilder("ID,Tag\n")
-        currentTags.forEach { (id, tag) ->
-            sb.append("$id,$tag\n")
+        val sb = StringBuilder("ID,Tags\n")
+        currentTags.forEach { (id, tagsList) ->
+            sb.append("$id,${tagsList.joinToString("|")}\n")
         }
         return sb.toString()
     }

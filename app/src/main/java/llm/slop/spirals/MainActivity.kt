@@ -170,14 +170,22 @@ class MainActivity : ComponentActivity() {
                     "Speed" -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             // Petal Filter
-                            Box(modifier = Modifier.weight(1f).padding(horizontal = 4.dp)) {
+                            Box(modifier = Modifier.weight(1.2f).padding(horizontal = 4.dp)) {
+                                val label = if (selectedPetalFilter == null) "All Petals" else "${selectedPetalFilter}P"
+                                val count = remember(selectedPetalFilter, allRatios) {
+                                    if (selectedPetalFilter == null) allRatios.size
+                                    else allRatios.count { it.petals == selectedPetalFilter }
+                                }
                                 OutlinedButton(onClick = { isPetalMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
-                                    Text(text = if (selectedPetalFilter == null) "All Petals" else "${selectedPetalFilter}P", style = MaterialTheme.typography.labelSmall)
+                                    Text(text = "$label - $count", style = MaterialTheme.typography.labelSmall)
                                 }
                                 DropdownMenu(expanded = isPetalMenuExpanded, onDismissRequest = { isPetalMenuExpanded = false }) {
-                                    DropdownMenuItem(text = { Text("All") }, onClick = { selectedPetalFilter = null; isPetalMenuExpanded = false })
+                                    DropdownMenuItem(text = { Text("All (${allRatios.size})") }, onClick = { selectedPetalFilter = null; isPetalMenuExpanded = false })
                                     listOf(3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16).forEach { p ->
-                                        DropdownMenuItem(text = { Text("${p}P") }, onClick = { selectedPetalFilter = p; isPetalMenuExpanded = false })
+                                        val pCount = allRatios.count { it.petals == p }
+                                        if (pCount > 0) {
+                                            DropdownMenuItem(text = { Text("${p}P ($pCount)") }, onClick = { selectedPetalFilter = p; isPetalMenuExpanded = false })
+                                        }
                                     }
                                 }
                             }

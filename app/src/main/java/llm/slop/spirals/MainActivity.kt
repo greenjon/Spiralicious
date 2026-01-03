@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import llm.slop.spirals.ui.CvLabScreen
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -126,7 +127,7 @@ class MainActivity : ComponentActivity() {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(0.7f)
+                    .fillMaxHeight(if (currentTab == "CV Lab") 1.0f else 0.7f)
                     .align(Alignment.TopStart)
                     .statusBarsPadding()
                     .padding(16.dp)
@@ -134,42 +135,50 @@ class MainActivity : ComponentActivity() {
             ) {
                 // Tab Header
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    Button(
-                        onClick = { currentTab = "Speed" },
-                        colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "Speed") MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.4f)),
-                        modifier = Modifier.weight(1f),
-                        shape = MaterialTheme.shapes.extraSmall
-                    ) { Text("Speed") }
-                    Button(
-                        onClick = { currentTab = "Length" },
-                        colors = ButtonDefaults.buttonColors(containerColor = if (currentTab == "Length") MaterialTheme.colorScheme.primary.copy(alpha = 0.6f) else Color.Gray.copy(alpha = 0.4f)),
-                        modifier = Modifier.weight(1f),
-                        shape = MaterialTheme.shapes.extraSmall
-                    ) { Text("Length") }
+                    TabHeaderButton(
+                        text = "Speed", 
+                        selected = currentTab == "Speed", 
+                        onClick = { currentTab = "Speed" }, 
+                        modifier = Modifier.weight(1f)
+                    )
+                    TabHeaderButton(
+                        text = "Length", 
+                        selected = currentTab == "Length", 
+                        onClick = { currentTab = "Length" }, 
+                        modifier = Modifier.weight(1f)
+                    )
+                    TabHeaderButton(
+                        text = "CV Lab", 
+                        selected = currentTab == "CV Lab", 
+                        onClick = { currentTab = "CV Lab" }, 
+                        modifier = Modifier.weight(1f)
+                    )
                     IconButton(onClick = { onShare(vm.getExportData()) }) {
                         Icon(Icons.Default.Share, contentDescription = "Export", tint = Color.White)
                     }
                 }
 
-                // RECIPE BAR (Always visible below tabs)
-                Surface(
-                    color = Color.Black.copy(alpha = 0.5f),
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        Text(
-                            text = "Speeds: ${params.omega1}, ${params.omega2}, ${params.omega3}, ${params.omega4}" + 
-                                   (currentRatio?.let { 
-                                       "   (${it.petals} petals; ${String.format(Locale.US, "%.1f", it.shapeRatio)} sr)" 
-                                   } ?: ""),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color.Cyan
-                        )
-                        Text(
-                            text = "Lengths: ${String.format(Locale.US, "%.3f, %.3f, %.3f, %.3f", params.l1, params.l2, params.l3, params.l4)}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color.Cyan.copy(alpha = 0.8f)
-                        )
+                if (currentTab != "CV Lab") {
+                    // RECIPE BAR (Hidden for CV Lab)
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(8.dp)) {
+                            Text(
+                                text = "Speeds: ${params.omega1}, ${params.omega2}, ${params.omega3}, ${params.omega4}" + 
+                                       (currentRatio?.let { 
+                                           "   (${it.petals} petals; ${String.format(Locale.US, "%.1f", it.shapeRatio)} sr)" 
+                                       } ?: ""),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.Cyan
+                            )
+                            Text(
+                                text = "Lengths: ${String.format(Locale.US, "%.3f, %.3f, %.3f, %.3f", params.l1, params.l2, params.l3, params.l4)}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = Color.Cyan.copy(alpha = 0.8f)
+                            )
+                        }
                     }
                 }
 
@@ -285,64 +294,85 @@ class MainActivity : ComponentActivity() {
                             LengthSlider("Thickness", params.thickness, 0.001f..0.015f) { params = params.copy(thickness = it) }
                         }
                     }
-                }
-            }
-
-            // BOTTOM CONTROLS
-            val currentId = currentRatio?.id
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Prev Button
-                IconButton(
-                    onClick = goToPrev,
-                    enabled = currentIndex > 0
-                ) { Icon(Icons.Default.ArrowBack, contentDescription = "Prev", tint = Color.White) }
-
-                // Tag Buttons
-                if (currentId != null) {
-                    val currentTags = tags[currentId] ?: emptyList()
-                    Row(modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), MaterialTheme.shapes.medium)) {
-                        TagButton(icon = Icons.Default.Delete, label = "trash", active = "trash" in currentTags) { 
-                            vm.toggleTag(currentId, "trash")
-                            goToNext() 
-                        }
-                        TagButton(label = "1", active = "1" in currentTags) { 
-                            vm.toggleTag(currentId, "1")
-                            goToNext() 
-                        }
-                        TagButton(label = "2", active = "2" in currentTags) { 
-                            vm.toggleTag(currentId, "2")
-                            goToNext() 
-                        }
-                        TagButton(label = "3", active = "3" in currentTags) { 
-                            vm.toggleTag(currentId, "3")
-                            goToNext() 
-                        }
-                        TagButton(label = "OVAL", active = "oval" in currentTags) { 
-                            vm.toggleTag(currentId, "oval")
-                        }
-                        TagButton(label = "BRAID", active = "braid" in currentTags) { 
-                            vm.toggleTag(currentId, "braid")
-                        }
+                    "CV Lab" -> {
+                        CvLabScreen()
                     }
-                } else {
-                    Spacer(modifier = Modifier.weight(1f))
                 }
-
-                // Next Button
-                IconButton(
-                    onClick = goToNext,
-                    enabled = currentIndex < filteredRatios.size - 1
-                ) { Icon(Icons.Default.ArrowForward, contentDescription = "Next", tint = Color.White) }
             }
+
+            if (currentTab != "CV Lab") {
+                // BOTTOM CONTROLS (Hidden for CV Lab)
+                val currentId = currentRatio?.id
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Prev Button
+                    IconButton(
+                        onClick = goToPrev,
+                        enabled = currentIndex > 0
+                    ) { Icon(Icons.Default.ArrowBack, contentDescription = "Prev", tint = Color.White) }
+
+                    // Tag Buttons
+                    if (currentId != null) {
+                        val currentTags = tags[currentId] ?: emptyList()
+                        Row(modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), MaterialTheme.shapes.medium)) {
+                            TagButton(icon = Icons.Default.Delete, label = "trash", active = "trash" in currentTags) { 
+                                vm.toggleTag(currentId, "trash")
+                                goToNext() 
+                            }
+                            TagButton(label = "1", active = "1" in currentTags) { 
+                                vm.toggleTag(currentId, "1")
+                                goToNext() 
+                            }
+                            TagButton(label = "2", active = "2" in currentTags) { 
+                                vm.toggleTag(currentId, "2")
+                                goToNext() 
+                            }
+                            TagButton(label = "3", active = "3" in currentTags) { 
+                                vm.toggleTag(currentId, "3")
+                                goToNext() 
+                            }
+                            TagButton(label = "OVAL", active = "oval" in currentTags) { 
+                                vm.toggleTag(currentId, "oval")
+                            }
+                            TagButton(label = "BRAID", active = "braid" in currentTags) { 
+                                vm.toggleTag(currentId, "braid")
+                            }
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+
+                    // Next Button
+                    IconButton(
+                        onClick = goToNext,
+                        enabled = currentIndex < filteredRatios.size - 1
+                    ) { Icon(Icons.Default.ArrowForward, contentDescription = "Next", tint = Color.White) }
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun TabHeaderButton(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+        Button(
+            onClick = onClick,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) else Color.Gray.copy(alpha = 0.4f),
+                contentColor = Color.White
+            ),
+            modifier = modifier.padding(horizontal = 2.dp),
+            shape = MaterialTheme.shapes.extraSmall,
+            contentPadding = PaddingValues(4.dp)
+        ) {
+            Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White)
         }
     }
 

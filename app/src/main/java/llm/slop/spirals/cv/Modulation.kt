@@ -1,17 +1,12 @@
 package llm.slop.spirals.cv
 
 import llm.slop.spirals.cv.ui.CvHistoryBuffer
+import java.util.concurrent.CopyOnWriteArrayList
 
-/**
- * Defines how a CV signal interacts with a parameter.
- */
 enum class ModulationOperator {
     ADD, MUL
 }
 
-/**
- * Data class for a single modulation connection.
- */
 data class CvModulator(
     val sourceId: String,
     val operator: ModulationOperator = ModulationOperator.ADD,
@@ -20,27 +15,27 @@ data class CvModulator(
 
 /**
  * A parameter that can be controlled by a base value and multiple CV modulators.
- * Maintains its own history for visualization.
+ * Uses thread-safe collections for cross-thread access between UI and Renderer.
  */
 class ModulatableParameter(
     var baseValue: Float = 0.0f,
     val historySize: Int = 200
 ) {
-    val modulators = mutableListOf<CvModulator>()
+    // Thread-safe list for iteration in GL thread and modification in UI thread
+    val modulators = CopyOnWriteArrayList<CvModulator>()
     val history = CvHistoryBuffer(historySize)
     
-    // The most recently calculated value
     var value: Float = baseValue
         private set
 
     /**
-     * Calculates the final value based on base value and active modulators.
+     * Calculates the final value. Called at 120Hz from the Renderer.
      */
     fun evaluate(): Float {
         var result = baseValue
         
-        for (i in 0 until modulators.size) {
-            val mod = modulators[i]
+        // Concurrent-safe iteration
+        for (mod in modulators) {
             val cvValue = CvRegistry.get(mod.sourceId)
             val modAmount = cvValue * mod.weight
             

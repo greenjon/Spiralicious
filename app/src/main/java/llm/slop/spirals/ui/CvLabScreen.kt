@@ -28,12 +28,8 @@ import llm.slop.spirals.ui.components.OscilloscopeView
 import kotlinx.coroutines.delay
 
 @Composable
-fun CvLabScreen() {
+fun CvLabScreen(audioEngine: AudioEngine, sourceManager: AudioSourceManager) {
     val context = LocalContext.current
-    val amplitudeCv = remember { AmplitudeCv() }
-    val audioEngine = remember { AudioEngine(amplitudeCv) }
-    val sourceManager = remember { AudioSourceManager(context) }
-    
     var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
     var currentAudioRecord by remember { mutableStateOf<AudioRecord?>(null) }
     
@@ -106,10 +102,6 @@ fun CvLabScreen() {
                 else { audioEngine.stop() }
             }
         }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose { audioEngine.stop(); currentAudioRecord?.release() }
     }
 
     Column(

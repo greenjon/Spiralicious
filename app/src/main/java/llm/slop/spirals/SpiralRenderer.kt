@@ -17,6 +17,9 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     private val resolution = 2048 // 2048 points * 2 vertices per point for triangle strip
     
+    // New: Source of truth for visuals
+    var visualSource: MandalaVisualSource? = null
+
     @Volatile
     var params = MandalaParams(omega1 = 20, omega2 = 17, omega3 = 11, thickness = 0.005f)
     
@@ -48,7 +51,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         uTimeLocation = GLES30.glGetUniformLocation(program, "uTime")
         uThicknessLocation = GLES30.glGetUniformLocation(program, "uThickness")
 
-        // Interleaved buffer: [u, side, u, side, ...]
         val totalVertices = resolution * 2
         val vertexData = FloatArray(totalVertices * 2)
         for (i in 0 until resolution) {
@@ -74,16 +76,10 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glGenBuffers(1, vboArray, 0)
         vbo = vboArray[0]
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, vbo)
-        GLES30.glBufferData(
-            GLES30.GL_ARRAY_BUFFER,
-            vertexData.size * 4,
-            floatBuffer,
-            GLES30.GL_STATIC_DRAW
-        )
+        GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, vertexData.size * 4, floatBuffer, GLES30.GL_STATIC_DRAW)
 
         GLES30.glEnableVertexAttribArray(0)
         GLES30.glVertexAttribPointer(0, 1, GLES30.GL_FLOAT, false, 8, 0)
-        
         GLES30.glEnableVertexAttribArray(1)
         GLES30.glVertexAttribPointer(1, 1, GLES30.GL_FLOAT, false, 8, 4)
 
@@ -105,22 +101,38 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
         GLES30.glUseProgram(program)
 
-        val currentParams = params
+        // Sync from visualSource if available, else use legacy params
+        val source = visualSource
+        val p1: Float; val p2: Float; val p3: Float; val p4: Float
+        val o1: Int; val o2: Int; val o3: Int; val o4: Int
+        val thick: Float
+
+        if (source != null) {
+            source.update() // Update modulations at frame rate
+            p1 = source.parameters["L1"]?.value ?: 0f
+            p2 = source.parameters["L2"]?.value ?: 0f
+            p3 = source.parameters["L3"]?.value ?: 0f
+            p4 = source.parameters["L4"]?.value ?: 0f
+            o1 = source.recipe.a; o2 = source.recipe.b; o3 = source.recipe.c; o4 = source.recipe.d
+            thick = (source.parameters["Thickness"]?.value ?: 0f) * 0.02f // Scale to GL range
+        } else {
+            p1 = params.l1; p2 = params.l2; p3 = params.l3; p4 = params.l4
+            o1 = params.omega1; o2 = params.omega2; o3 = params.omega3; o4 = params.omega4
+            thick = params.thickness
+        }
+
         val period = (2.0 * PI).toFloat()
-        
-        GLES30.glUniform4f(uOmegaLocation, currentParams.omega1.toFloat(), currentParams.omega2.toFloat(), currentParams.omega3.toFloat(), currentParams.omega4.toFloat())
-        GLES30.glUniform4f(uLLocation, currentParams.l1, currentParams.l2, currentParams.l3, currentParams.l4)
-        GLES30.glUniform4f(uPhiLocation, currentParams.phi1, currentParams.phi2, currentParams.phi3, currentParams.phi4)
+        GLES30.glUniform4f(uOmegaLocation, o1.toFloat(), o2.toFloat(), o3.toFloat(), o4.toFloat())
+        GLES30.glUniform4f(uLLocation, p1, p2, p3, p4)
+        GLES30.glUniform4f(uPhiLocation, 0f, 0f, 0f, 0f)
         GLES30.glUniform1f(uTLocation, period)
-        GLES30.glUniform1f(uThicknessLocation, currentParams.thickness)
-        
+        GLES30.glUniform1f(uThicknessLocation, thick)
         GLES30.glUniform1f(uGlobalRotationLocation, 0.0f)
         GLES30.glUniform1f(uAspectRatioLocation, aspectRatio)
         GLES30.glUniform1f(uTimeLocation, 0.0f)
 
         GLES30.glBindVertexArray(vao)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, resolution * 2)
-        
         GLES30.glBindVertexArray(0)
     }
 }

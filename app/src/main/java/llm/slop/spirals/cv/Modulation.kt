@@ -28,16 +28,17 @@ class ModulatableParameter(
 ) {
     val modulators = mutableListOf<CvModulator>()
     val history = CvHistoryBuffer(historySize)
+    
+    // The most recently calculated value
+    var value: Float = baseValue
+        private set
 
     /**
      * Calculates the final value based on base value and active modulators.
-     * Constraint: No allocations in this method.
      */
     fun evaluate(): Float {
         var result = baseValue
         
-        // FinalValue = BaseValue + (CV * Weight * Operator)
-        // Interpreting this as: result = result [OPERATOR] (cvValue * weight)
         for (i in 0 until modulators.size) {
             val mod = modulators[i]
             val cvValue = CvRegistry.get(mod.sourceId)
@@ -49,9 +50,8 @@ class ModulatableParameter(
             }
         }
         
-        // All values are normalized 0.0 to 1.0
-        val finalValue = result.coerceIn(0f, 1f)
-        history.add(finalValue)
-        return finalValue
+        value = result.coerceIn(0f, 1f)
+        history.add(value)
+        return value
     }
 }

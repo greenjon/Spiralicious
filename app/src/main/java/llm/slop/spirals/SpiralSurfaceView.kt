@@ -25,4 +25,8 @@ class SpiralSurfaceView(context: Context, attrs: AttributeSet? = null) : GLSurfa
     fun setParams(params: MandalaParams) {
         renderer.params = params
     }
+
+    fun setVisualSource(source: MandalaVisualSource) {
+        renderer.visualSource = source
+    }
 }

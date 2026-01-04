@@ -41,8 +41,7 @@ class MainActivity : ComponentActivity() {
     private val visualSource = MandalaVisualSource()
     
     // Global Audio Engine components
-    private val amplitudeCv = AmplitudeCv()
-    private val audioEngine = AudioEngine(amplitudeCv)
+    private val audioEngine = AudioEngine()
     private var sourceManager: AudioSourceManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {

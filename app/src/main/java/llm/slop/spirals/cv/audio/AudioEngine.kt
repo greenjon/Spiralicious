@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.util.Log
-import llm.slop.spirals.cv.AmplitudeCv
 import llm.slop.spirals.cv.CvRegistry
 import llm.slop.spirals.cv.BeatClock
 import kotlinx.coroutines.*
@@ -13,8 +12,9 @@ import kotlin.math.max
 
 /**
  * The core analysis engine. Splits audio into bands and updates the CvRegistry.
+ * Decoupled from specific CV objects; writes directly to the Unified Registry.
  */
-class AudioEngine(private val masterAmplitudeCv: AmplitudeCv) {
+class AudioEngine {
     private val sampleRate = 44100
     private val channelConfig = AudioFormat.CHANNEL_IN_MONO
     private val audioFormat = AudioFormat.ENCODING_PCM_FLOAT
@@ -84,7 +84,6 @@ class AudioEngine(private val masterAmplitudeCv: AmplitudeCv) {
 
                         // 4. Update CvRegistry
                         debugLastRms = amp
-                        masterAmplitudeCv.update(amp)
                         
                         // Reference level 0.1 for normalization
                         val ref = 0.1f

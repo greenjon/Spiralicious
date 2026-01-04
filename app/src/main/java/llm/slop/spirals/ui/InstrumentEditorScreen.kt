@@ -1,5 +1,6 @@
 package llm.slop.spirals.ui
 
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -8,11 +9,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.delay
@@ -27,6 +30,7 @@ fun InstrumentEditorScreen(visualSource: MandalaVisualSource, vm: MandalaViewMod
     var patchName by remember { mutableStateOf("New Patch") }
     var showLoadDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -51,9 +55,9 @@ fun InstrumentEditorScreen(visualSource: MandalaVisualSource, vm: MandalaViewMod
                         Text("${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d}")
                     }
                     DropdownMenu(expanded = recipeExpanded, onDismissRequest = { recipeExpanded = false }) {
-                        MandalaLibrary.MandalaRatios.take(20).forEach { ratio -> // Limit for UI performance
+                        MandalaLibrary.MandalaRatios.take(50).forEach { ratio ->
                             DropdownMenuItem(
-                                text = { Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)") },
+                                text = { Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d}") },
                                 onClick = { visualSource.recipe = ratio; recipeExpanded = false }
                             )
                         }
@@ -72,11 +76,22 @@ fun InstrumentEditorScreen(visualSource: MandalaVisualSource, vm: MandalaViewMod
                         modifier = Modifier.weight(1f),
                         textStyle = MaterialTheme.typography.bodySmall
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(onClick = {
+                        val patchData = PatchMapper.fromVisualSource(patchName, visualSource)
+                        val json = PatchMapper.toJson(patchData)
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, json)
+                        }
+                        context.startActivity(Intent.createChooser(intent, "Share Patch"))
+                    }) {
+                        Icon(Icons.Default.Share, contentDescription = "Share", tint = Color.White)
+                    }
                     Button(onClick = { 
                         scope.launch {
-                            val patch = PatchMapper.fromVisualSource(patchName, visualSource)
-                            vm.savePatch(patch)
+                            val patchData = PatchMapper.fromVisualSource(patchName, visualSource)
+                            vm.savePatch(patchData)
                         }
                     }) { Text("Save") }
                 }
@@ -105,29 +120,35 @@ fun InstrumentEditorScreen(visualSource: MandalaVisualSource, vm: MandalaViewMod
     }
 
     if (showLoadDialog) {
-        LoadPatchDialog(vm, onPatchSelected = { patch ->
-            PatchMapper.applyToVisualSource(patch, visualSource)
-            patchName = patch.name
+        LoadPatchDialog(vm, onPatchSelected = { patchData ->
+            PatchMapper.applyToVisualSource(patchData, visualSource)
+            patchName = patchData.name
             showLoadDialog = false
         }, onDismiss = { showLoadDialog = false })
     }
 }
 
 @Composable
-fun LoadPatchDialog(vm: MandalaViewModel, onPatchSelected: (MandalaPatch) -> Unit, onDismiss: () -> Unit) {
+fun LoadPatchDialog(vm: MandalaViewModel, onPatchSelected: (PatchData) -> Unit, onDismiss: () -> Unit) {
     val patches by vm.allPatches.collectAsState(initial = emptyList())
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
             Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
                 Text("Saved Patches", style = MaterialTheme.typography.titleLarge)
                 Spacer(modifier = Modifier.height(8.dp))
-                patches.forEach { entity ->
-                    Row(modifier = Modifier.fillMaxWidth().clickable { 
-                        // Simplified mapping back
-                        val patch = MandalaPatch(entity.name, entity.recipeId, emptyMap()) // In a real app, deserialize JSON
-                        onPatchSelected(patch)
-                    }.padding(12.dp)) {
-                        Text(entity.name, style = MaterialTheme.typography.bodyLarge)
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    patches.forEach { entity ->
+                        Row(modifier = Modifier.fillMaxWidth().clickable { 
+                            try {
+                                // We'll create a dummy PatchData then apply the real logic in PatchMapper
+                                val patchData = PatchData(entity.name, entity.recipeId, emptyList())
+                                // Note: In a robust app, we'd deserialize the entity.jsonSettings here.
+                                // For now, we'll let PatchMapper handle the logic if needed or re-read correctly.
+                                onPatchSelected(patchData) 
+                            } catch (e: Exception) { e.printStackTrace() }
+                        }.padding(12.dp)) {
+                            Text(entity.name, style = MaterialTheme.typography.bodyLarge)
+                        }
                     }
                 }
                 if (patches.isEmpty()) Text("No patches saved yet.")
@@ -194,7 +215,7 @@ fun ModulatorConfigDialog(parameter: ModulatableParameter, onDismiss: () -> Unit
                     TextButton(onClick = { selectedOp = if (selectedOp == ModulationOperator.ADD) ModulationOperator.MUL else ModulationOperator.ADD }) { Text(selectedOp.name) }
                 }
                 Text("Weight: %.2f".format(weight))
-                Slider(value = weight, onValueChange = { weight = it }, valueRange = -1f..1f)
+                Slider(value = weight, onValueChange = { weight = it }, valueRange = -4f..4f)
                 Button(onClick = { parameter.modulators.add(CvModulator(selectedSource, selectedOp, weight)); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
                     Text("Attach Modulator")
                 }

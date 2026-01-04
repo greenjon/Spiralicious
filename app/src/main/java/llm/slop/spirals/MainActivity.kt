@@ -22,11 +22,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spirals.ui.CvLabScreen
+import llm.slop.spirals.ui.InstrumentEditorScreen
 import kotlinx.coroutines.launch
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private var spiralSurfaceView: SpiralSurfaceView? = null
+    // We'll keep a single visual source alive for patching
+    private val visualSource = MandalaVisualSource()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,6 +59,8 @@ class MainActivity : ComponentActivity() {
             )
         }
         var currentTab by remember { mutableStateOf("Speed") }
+        var isTabMenuExpanded by remember { mutableStateOf(false) }
+
         var selectedPetalFilter by remember { mutableStateOf<Int?>(null) }
         var showOnlyUntagged by remember { mutableStateOf(false) }
         var isPetalMenuExpanded by remember { mutableStateOf(false) }
@@ -116,6 +121,16 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Keep visual source in sync with params for now (legacy bridge)
+        LaunchedEffect(params) {
+            visualSource.recipe = allRatios.find { it.a == params.omega1 && it.b == params.omega2 } ?: allRatios.first()
+            visualSource.parameters["L1"]?.baseValue = params.l1
+            visualSource.parameters["L2"]?.baseValue = params.l2
+            visualSource.parameters["L3"]?.baseValue = params.l3
+            visualSource.parameters["L4"]?.baseValue = params.l4
+            visualSource.parameters["Thickness"]?.baseValue = params.thickness * 10f // Scale to 0-1
+        }
+
         Box(modifier = Modifier.fillMaxSize()) {
             AndroidView(
                 factory = { context -> SpiralSurfaceView(context).also { spiralSurfaceView = it } },
@@ -127,39 +142,42 @@ class MainActivity : ComponentActivity() {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .fillMaxHeight(if (currentTab == "CV Lab") 1.0f else 0.7f)
+                    .fillMaxHeight(if (currentTab == "CV Lab" || currentTab == "Patch Bay") 1.0f else 0.7f)
                     .align(Alignment.TopStart)
                     .statusBarsPadding()
                     .padding(16.dp)
                     .background(Color.Transparent)
             ) {
-                // Tab Header
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    TabHeaderButton(
-                        text = "Speed", 
-                        selected = currentTab == "Speed", 
-                        onClick = { currentTab = "Speed" }, 
-                        modifier = Modifier.weight(1f)
-                    )
-                    TabHeaderButton(
-                        text = "Length", 
-                        selected = currentTab == "Length", 
-                        onClick = { currentTab = "Length" }, 
-                        modifier = Modifier.weight(1f)
-                    )
-                    TabHeaderButton(
-                        text = "CV Lab", 
-                        selected = currentTab == "CV Lab", 
-                        onClick = { currentTab = "CV Lab" }, 
-                        modifier = Modifier.weight(1f)
-                    )
+                // Tab Header with Dropdown
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        Button(
+                            onClick = { isTabMenuExpanded = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.extraSmall
+                        ) {
+                            Text("MODE: $currentTab", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                        }
+                        DropdownMenu(expanded = isTabMenuExpanded, onDismissRequest = { isTabMenuExpanded = false }) {
+                            listOf("Speed", "Length", "CV Lab", "Patch Bay").forEach { tab ->
+                                DropdownMenuItem(
+                                    text = { Text(tab) },
+                                    onClick = { 
+                                        currentTab = tab
+                                        isTabMenuExpanded = false 
+                                    }
+                                )
+                            }
+                        }
+                    }
                     IconButton(onClick = { onShare(vm.getExportData()) }) {
                         Icon(Icons.Default.Share, contentDescription = "Export", tint = Color.White)
                     }
                 }
 
-                if (currentTab != "CV Lab") {
-                    // RECIPE BAR (Hidden for CV Lab)
+                if (currentTab != "CV Lab" && currentTab != "Patch Bay") {
+                    // RECIPE BAR
                     Surface(
                         color = Color.Black.copy(alpha = 0.5f),
                         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
@@ -297,11 +315,14 @@ class MainActivity : ComponentActivity() {
                     "CV Lab" -> {
                         CvLabScreen()
                     }
+                    "Patch Bay" -> {
+                        InstrumentEditorScreen(visualSource)
+                    }
                 }
             }
 
-            if (currentTab != "CV Lab") {
-                // BOTTOM CONTROLS (Hidden for CV Lab)
+            if (currentTab != "CV Lab" && currentTab != "Patch Bay") {
+                // BOTTOM CONTROLS
                 val currentId = currentRatio?.id
 
                 Row(
@@ -357,22 +378,6 @@ class MainActivity : ComponentActivity() {
                     ) { Icon(Icons.Default.ArrowForward, contentDescription = "Next", tint = Color.White) }
                 }
             }
-        }
-    }
-
-    @Composable
-    fun TabHeaderButton(text: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-        Button(
-            onClick = onClick,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) else Color.Gray.copy(alpha = 0.4f),
-                contentColor = Color.White
-            ),
-            modifier = modifier.padding(horizontal = 2.dp),
-            shape = MaterialTheme.shapes.extraSmall,
-            contentPadding = PaddingValues(4.dp)
-        ) {
-            Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White)
         }
     }
 

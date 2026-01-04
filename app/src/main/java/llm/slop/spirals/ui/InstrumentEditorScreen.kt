@@ -1,6 +1,7 @@
 package llm.slop.spirals.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -21,31 +22,43 @@ import llm.slop.spirals.cv.*
 @Composable
 fun InstrumentEditorScreen(visualSource: MandalaVisualSource) {
     val scrollState = rememberScrollState()
+    var isCollapsed by remember { mutableStateOf(false) }
     
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.6f))
-            .verticalScroll(scrollState)
+            .background(if (isCollapsed) Color.Transparent else Color.Black.copy(alpha = 0.6f))
             .padding(16.dp)
     ) {
-        Text("Visual Patch Bay", style = MaterialTheme.typography.headlineSmall, color = Color.White)
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Global Parameters
-        Text("Global Controls", style = MaterialTheme.typography.titleMedium, color = Color.Cyan)
-        ParameterStrip("Alpha", visualSource.globalAlpha)
-        ParameterStrip("Global Scale", visualSource.globalScale)
+        Text(
+            text = "Visual Patch Bay", 
+            style = MaterialTheme.typography.headlineSmall, 
+            color = Color.White,
+            modifier = Modifier
+                .clickable { isCollapsed = !isCollapsed }
+                .padding(bottom = 8.dp)
+        )
         
-        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = Color.DarkGray)
+        if (!isCollapsed) {
+            Column(modifier = Modifier.verticalScroll(scrollState)) {
+                Spacer(modifier = Modifier.height(8.dp))
 
-        // Geometry Parameters
-        Text("Geometry", style = MaterialTheme.typography.titleMedium, color = Color.Cyan)
-        visualSource.parameters.forEach { (name, param) ->
-            ParameterStrip(name, param)
+                // Global Parameters
+                Text("Global Controls", style = MaterialTheme.typography.titleMedium, color = Color.Cyan)
+                ParameterStrip("Alpha", visualSource.globalAlpha)
+                ParameterStrip("Global Scale", visualSource.globalScale)
+                
+                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = Color.DarkGray)
+
+                // Geometry Parameters
+                Text("Geometry", style = MaterialTheme.typography.titleMedium, color = Color.Cyan)
+                visualSource.parameters.forEach { (name, param) ->
+                    ParameterStrip(name, param)
+                }
+                
+                Spacer(modifier = Modifier.height(100.dp))
+            }
         }
-        
-        Spacer(modifier = Modifier.height(100.dp)) // Padding for bottom controls
     }
 }
 
@@ -58,7 +71,7 @@ fun ParameterStrip(name: String, parameter: ModulatableParameter) {
     var currentValue by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
         while(true) {
-            currentValue = parameter.history.getSamples().lastOrNull() ?: 0f
+            currentValue = parameter.value // Use the direct value property
             delay(16)
         }
     }

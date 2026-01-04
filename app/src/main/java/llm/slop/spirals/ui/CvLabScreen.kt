@@ -28,21 +28,21 @@ import llm.slop.spirals.ui.components.OscilloscopeView
 import kotlinx.coroutines.delay
 
 @Composable
-fun CvLabScreen(audioEngine: AudioEngine, sourceManager: AudioSourceManager) {
+fun CvLabScreen(
+    audioEngine: AudioEngine, 
+    sourceManager: AudioSourceManager,
+    audioSourceType: AudioSourceType,
+    onAudioSourceTypeChange: (AudioSourceType) -> Unit,
+    hasMicPermission: Boolean,
+    onMicPermissionGranted: () -> Unit,
+    onInternalAudioRecordCreated: (AudioRecord) -> Unit
+) {
     val context = LocalContext.current
-    var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
-    var currentAudioRecord by remember { mutableStateOf<AudioRecord?>(null) }
     
-    var hasMicPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-
     val micPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        hasMicPermission = isGranted
+        if (isGranted) onMicPermissionGranted()
     }
 
     val projectionLauncher = rememberLauncherForActivityResult(
@@ -58,7 +58,7 @@ fun CvLabScreen(audioEngine: AudioEngine, sourceManager: AudioSourceManager) {
                 AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT),
                 projection
             )
-            currentAudioRecord = record
+            if (record != null) onInternalAudioRecordCreated(record)
         }
     }
 
@@ -73,8 +73,6 @@ fun CvLabScreen(audioEngine: AudioEngine, sourceManager: AudioSourceManager) {
         )
     }
 
-    val scope = rememberCoroutineScope()
-    
     // CV Update & Debug Registry Sync
     LaunchedEffect(Unit) {
         while (true) {
@@ -82,25 +80,6 @@ fun CvLabScreen(audioEngine: AudioEngine, sourceManager: AudioSourceManager) {
                 entry.value.add(CvRegistry.get(entry.key))
             }
             delay(16)
-        }
-    }
-
-    // Audio Engine Lifecycle
-    LaunchedEffect(audioSourceType, hasMicPermission, currentAudioRecord) {
-        when (audioSourceType) {
-            AudioSourceType.MIC, AudioSourceType.UNPROCESSED -> {
-                if (hasMicPermission) {
-                    val record = sourceManager.buildAudioRecord(
-                        audioSourceType, 44100, AudioFormat.ENCODING_PCM_FLOAT, AudioFormat.CHANNEL_IN_MONO,
-                        AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT)
-                    )
-                    audioEngine.start(scope, record)
-                } else { audioEngine.stop() }
-            }
-            AudioSourceType.INTERNAL -> {
-                if (currentAudioRecord != null) { audioEngine.start(scope, currentAudioRecord) }
-                else { audioEngine.stop() }
-            }
         }
     }
 
@@ -127,9 +106,18 @@ fun CvLabScreen(audioEngine: AudioEngine, sourceManager: AudioSourceManager) {
                 },
                 onSelect = { selected ->
                     when (selected) {
-                        "Mic" -> { audioSourceType = AudioSourceType.MIC; if (!hasMicPermission) micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
-                        "Raw" -> { audioSourceType = AudioSourceType.UNPROCESSED; if (!hasMicPermission) micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
-                        "Internal" -> { audioSourceType = AudioSourceType.INTERNAL; projectionLauncher.launch(sourceManager.createProjectionIntent()) }
+                        "Mic" -> { 
+                            onAudioSourceTypeChange(AudioSourceType.MIC)
+                            if (!hasMicPermission) micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) 
+                        }
+                        "Raw" -> { 
+                            onAudioSourceTypeChange(AudioSourceType.UNPROCESSED)
+                            if (!hasMicPermission) micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) 
+                        }
+                        "Internal" -> { 
+                            onAudioSourceTypeChange(AudioSourceType.INTERNAL)
+                            projectionLauncher.launch(sourceManager.createProjectionIntent()) 
+                        }
                     }
                 }
             )

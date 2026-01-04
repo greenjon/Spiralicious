@@ -10,6 +10,7 @@ uniform float uT;
 uniform float uGlobalRotation;
 uniform float uAspectRatio;
 uniform float uThickness;
+uniform float uGlobalScale;
 
 vec2 getPos(float uVal) {
     float t = uVal * uT;
@@ -22,7 +23,7 @@ vec2 getPos(float uVal) {
               uL.y * sin(uOmega.y * t + uPhi.y) +
               uL.z * sin(uOmega.z * t + uPhi.z) +
               uL.w * sin(uOmega.w * t + uPhi.w); 
-    return vec2(x, y);
+    return vec2(x * uGlobalScale, y * uGlobalScale);
 }
 
 void main() {
@@ -33,7 +34,8 @@ void main() {
     vec2 tangent = normalize(posNext - pos);
     vec2 normal = vec2(-tangent.y, tangent.x);
 
-    vec2 finalPos = pos + normal * uThickness * side;
+    // Thickness also scaled by global scale to maintain proportion
+    vec2 finalPos = pos + normal * uThickness * side * uGlobalScale;
 
     float cosR = cos(uGlobalRotation);
     float sinR = sin(uGlobalRotation);
@@ -47,6 +49,5 @@ void main() {
         rotY *= uAspectRatio;
     }
 
-    // Offset center to lower 1/3 (approx -0.33 in NDC)
     gl_Position = vec4(rotX, rotY - 0.33, 0.0, 1.0);
 }

@@ -1,7 +1,7 @@
 #version 300 es
 precision highp float;
 
-uniform float uTime;
+uniform vec4 uColor; // (Hue, Sat, Val, Alpha) - though we'll use HSV->RGB here
 
 out vec4 fragColor;
 
@@ -13,11 +13,7 @@ vec3 hsv2rgb(vec3 c) {
 }
 
 void main() {
-    // Rotation and color cycling temporarily disabled by setting time to 0 in calculations
-    // But keeping the code as requested.
-    
-    // float hue = fract(uTime * 0.1);
-    float hue = 0.5; // Fixed cyan-ish color
-    vec3 color = hsv2rgb(vec3(hue, 0.8, 1.0));
-    fragColor = vec4(color, 1.0);
+    // uColor.x = Hue (0-1), uColor.y = Sat (0-1), uColor.z = Val (fixed 1.0), uColor.w = Alpha
+    vec3 rgb = hsv2rgb(vec3(uColor.x, uColor.y, 1.0));
+    fragColor = vec4(rgb, uColor.w);
 }

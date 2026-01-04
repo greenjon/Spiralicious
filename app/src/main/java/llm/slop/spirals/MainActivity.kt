@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.media.AudioFormat
+import android.media.AudioRecord
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -74,25 +76,48 @@ class MainActivity : ComponentActivity() {
         var currentTab by remember { mutableStateOf("Patch Bay") }
         var isTabMenuExpanded by remember { mutableStateOf(false) }
 
-        // Settings
-        var hideSpeedScreen by remember { mutableStateOf(false) }
-        var hideLengthScreen by remember { mutableStateOf(false) }
+        // Settings (Hiding speed and length by default)
+        var hideSpeedScreen by remember { mutableStateOf(true) }
+        var hideLengthScreen by remember { mutableStateOf(true) }
         var hideCvLab by remember { mutableStateOf(false) }
         var isSettingsMenuExpanded by remember { mutableStateOf(false) }
+
+        // Global Audio State
+        var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
+        var currentInternalAudioRecord by remember { mutableStateOf<AudioRecord?>(null) }
 
         val scope = rememberCoroutineScope()
         val tags by vm.tags.collectAsState()
         
-        // Start Audio automatically for performance mode
-        LaunchedEffect(Unit) {
-            val context = this@MainActivity
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                val record = sourceManager?.buildAudioRecord(
-                    AudioSourceType.MIC, 44100, android.media.AudioFormat.ENCODING_PCM_FLOAT, 
-                    android.media.AudioFormat.CHANNEL_IN_MONO, 
-                    android.media.AudioRecord.getMinBufferSize(44100, android.media.AudioFormat.CHANNEL_IN_MONO, android.media.AudioFormat.ENCODING_PCM_FLOAT)
-                )
-                audioEngine.start(scope, record)
+        val context = LocalContext.current
+        var hasMicPermission by remember {
+            mutableStateOf(
+                ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            )
+        }
+
+        // Global Audio Lifecycle
+        LaunchedEffect(audioSourceType, hasMicPermission, currentInternalAudioRecord) {
+            when (audioSourceType) {
+                AudioSourceType.MIC, AudioSourceType.UNPROCESSED -> {
+                    if (hasMicPermission) {
+                        val record = sourceManager?.buildAudioRecord(
+                            audioSourceType, 44100, AudioFormat.ENCODING_PCM_FLOAT, 
+                            AudioFormat.CHANNEL_IN_MONO, 
+                            AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT)
+                        )
+                        audioEngine.start(scope, record)
+                    } else {
+                        audioEngine.stop()
+                    }
+                }
+                AudioSourceType.INTERNAL -> {
+                    if (currentInternalAudioRecord != null) {
+                        audioEngine.start(scope, currentInternalAudioRecord)
+                    } else {
+                        audioEngine.stop()
+                    }
+                }
             }
         }
 
@@ -133,7 +158,10 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.extraSmall
                         ) {
-                            Text("MODE: $currentTab", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                            val displayTab = if ((currentTab == "Speed" && hideSpeedScreen) || 
+                                                (currentTab == "Length" && hideLengthScreen) || 
+                                                (currentTab == "CV Lab" && hideCvLab)) "Patch Bay" else currentTab
+                            Text("MODE: $displayTab", style = MaterialTheme.typography.labelLarge, color = Color.White)
                         }
                         DropdownMenu(expanded = isTabMenuExpanded, onDismissRequest = { isTabMenuExpanded = false }) {
                             if (!hideSpeedScreen) DropdownMenuItem(text = { Text("Speed") }, onClick = { currentTab = "Speed"; isTabMenuExpanded = false })
@@ -155,12 +183,34 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                if (currentTab == "Patch Bay") {
-                    InstrumentEditorScreen(visualSource)
-                } else if (currentTab == "CV Lab") {
-                    CvLabScreen(audioEngine, sourceManager!!)
+                when (currentTab) {
+                    "Patch Bay" -> {
+                        InstrumentEditorScreen(visualSource)
+                    }
+                    "CV Lab" -> {
+                        if (!hideCvLab) {
+                            CvLabScreen(
+                                audioEngine = audioEngine,
+                                sourceManager = sourceManager!!,
+                                audioSourceType = audioSourceType,
+                                onAudioSourceTypeChange = { audioSourceType = it },
+                                hasMicPermission = hasMicPermission,
+                                onMicPermissionGranted = { hasMicPermission = true },
+                                onInternalAudioRecordCreated = { currentInternalAudioRecord = it }
+                            )
+                        }
+                    }
+                    "Speed" -> {
+                        if (!hideSpeedScreen) {
+                            // ... Speed Screen UI (simplified for this write)
+                        }
+                    }
+                    "Length" -> {
+                        if (!hideLengthScreen) {
+                            // ... Length Screen UI (simplified for this write)
+                        }
+                    }
                 }
-                // ... rest of Speed/Length screens logic
             }
         }
     }

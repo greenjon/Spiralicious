@@ -11,27 +11,42 @@ import kotlinx.coroutines.launch
 
 class MandalaViewModel(application: Application) : AndroidViewModel(application) {
     private val db = MandalaDatabase.getDatabase(application)
-    private val dao = db.mandalaTagDao()
+    private val tagDao = db.mandalaTagDao()
+    private val patchDao = db.mandalaPatchDao()
 
-    val tags: StateFlow<Map<String, List<String>>> = dao.getAllTags()
-        .map { list -> 
-            list.groupBy({ it.id }, { it.tag })
-        }
+    val tags: StateFlow<Map<String, List<String>>> = tagDao.getAllTags()
+        .map { list -> list.groupBy({ it.id }, { it.tag }) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    val allPatches = patchDao.getAllPatches()
+
+    fun savePatch(patch: MandalaPatch) {
+        viewModelScope.launch {
+            // Simplified JSON serialization for now
+            val json = patch.parameterSettings.entries.joinToString("|") { (k, v) ->
+                val mods = v.modulators.joinToString(",") { "${it.sourceId}:${it.operator}:${it.weight}" }
+                "$k:${v.baseValue}:$mods"
+            }
+            patchDao.insertPatch(MandalaPatchEntity(patch.name, patch.recipeId, json))
+        }
+    }
+
+    fun deletePatch(name: String) {
+        viewModelScope.launch { patchDao.deleteByName(name) }
+    }
 
     fun toggleTag(id: String, tag: String) {
         viewModelScope.launch {
-            val allForId = dao.getAllTagsForId(id)
+            val allForId = tagDao.getAllTagsForId(id)
             val existing = allForId.find { it.tag == tag }
             if (existing != null) {
-                dao.deleteTag(existing)
+                tagDao.deleteTag(existing)
             } else {
-                // For "trash", "1", "2", "3", they are mutually exclusive ratings
                 val ratings = listOf("trash", "1", "2", "3")
                 if (tag in ratings) {
-                    allForId.filter { it.tag in ratings }.forEach { dao.deleteTag(it) }
+                    allForId.filter { it.tag in ratings }.forEach { tagDao.deleteTag(it) }
                 }
-                dao.insertTag(MandalaTag(id, tag))
+                tagDao.insertTag(MandalaTag(id, tag))
             }
         }
     }
@@ -39,11 +54,8 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     fun getExportData(): String {
         val currentTags = tags.value
         if (currentTags.isEmpty()) return "No tags recorded."
-        
         val sb = StringBuilder("ID,Tags\n")
-        currentTags.forEach { (id, tagsList) ->
-            sb.append("$id,${tagsList.joinToString("|")}\n")
-        }
+        currentTags.forEach { (id, tagsList) -> sb.append("$id,${tagsList.joinToString("|")}\n") }
         return sb.toString()
     }
 }

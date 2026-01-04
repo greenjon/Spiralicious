@@ -185,7 +185,7 @@ class MainActivity : ComponentActivity() {
 
                 when (currentTab) {
                     "Patch Bay" -> {
-                        InstrumentEditorScreen(visualSource)
+                        InstrumentEditorScreen(visualSource, vm)
                     }
                     "CV Lab" -> {
                         if (!hideCvLab) {

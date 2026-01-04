@@ -5,10 +5,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Central registry for all Control Voltage signals.
- * Optimized for high-speed access between Audio, Renderer, and UI threads.
  */
 object CvRegistry {
-    // Thread-safe map for Audio and Renderer threads
     private val signalData = ConcurrentHashMap<String, Float>().apply {
         put("amp", 0f)
         put("bass", 0f)
@@ -19,24 +17,18 @@ object CvRegistry {
         put("accent", 0f)
     }
 
-    // Compose-observable map for UI state
     val signals = mutableStateMapOf<String, Float>().apply {
         putAll(signalData)
     }
 
-    /**
-     * Updates a signal value. 
-     * Called from Audio Engine.
-     */
     fun update(name: String, value: Float) {
         signalData[name] = value
-        // Update the compose map for UI observation (Diagnostic Lab)
         signals[name] = value
     }
 
     /**
-     * Gets a signal value.
-     * Called from Renderer and Modulation logic.
+     * Gets a signal value. 
+     * Requirement: If a key is missing, return 0f rather than throwing or returning null.
      */
     fun get(name: String): Float = signalData[name] ?: 0f
 }

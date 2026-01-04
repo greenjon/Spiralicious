@@ -7,7 +7,8 @@ import llm.slop.spirals.cv.ModulationOperator
 data class PatchData(
     val name: String,
     val recipeId: String,
-    val parameters: List<ParameterData>
+    val parameters: List<ParameterData>,
+    val version: Int = 1 // Added versioning for future schema safety
 )
 
 @Serializable
@@ -20,6 +21,6 @@ data class ParameterData(
 @Serializable
 data class ModulatorData(
     val sourceId: String,
-    val operator: String, // ADD or MUL
+    val operator: String,
     val weight: Float
 )

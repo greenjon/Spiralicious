@@ -12,11 +12,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -34,7 +30,6 @@ import llm.slop.spirals.cv.audio.*
 import llm.slop.spirals.ui.CvLabScreen
 import llm.slop.spirals.ui.InstrumentEditorScreen
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private var spiralSurfaceView: SpiralSurfaceView? = null
@@ -64,20 +59,10 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     fun MandalaScreen(vm: MandalaViewModel = viewModel(), onShare: (String) -> Unit) {
-        val allRatios = MandalaLibrary.MandalaRatios
-        var params by remember { 
-            mutableStateOf(
-                allRatios.firstOrNull()?.let { 
-                    MandalaParams(omega1 = it.a, omega2 = it.b, omega3 = it.c, omega4 = it.d, l1 = 0.4f, l2 = 0.3f, l3 = 0.2f, l4 = 0.1f, thickness = 0.005f) 
-                } ?: MandalaParams(omega1 = 22, omega2 = 19, omega3 = 19, omega4 = 19, l1 = 0.4f, l2 = 0.3f, l3 = 0.2f, l4 = 0.1f, thickness = 0.005f)
-            )
-        }
         var currentTab by remember { mutableStateOf("Patch Bay") }
         var isTabMenuExpanded by remember { mutableStateOf(false) }
 
-        // Settings (Hiding speed and length by default)
-        var hideSpeedScreen by remember { mutableStateOf(true) }
-        var hideLengthScreen by remember { mutableStateOf(true) }
+        // Settings
         var hideCvLab by remember { mutableStateOf(false) }
         var isSettingsMenuExpanded by remember { mutableStateOf(false) }
 
@@ -86,8 +71,6 @@ class MainActivity : ComponentActivity() {
         var currentInternalAudioRecord by remember { mutableStateOf<AudioRecord?>(null) }
 
         val scope = rememberCoroutineScope()
-        val tags by vm.tags.collectAsState()
-        
         val context = LocalContext.current
         var hasMicPermission by remember {
             mutableStateOf(
@@ -120,16 +103,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Bridge to GL Visual Source
-        LaunchedEffect(params) {
-            visualSource.recipe = allRatios.find { it.a == params.omega1 && it.b == params.omega2 } ?: allRatios.first()
-            visualSource.parameters["L1"]?.baseValue = params.l1
-            visualSource.parameters["L2"]?.baseValue = params.l2
-            visualSource.parameters["L3"]?.baseValue = params.l3
-            visualSource.parameters["L4"]?.baseValue = params.l4
-            visualSource.parameters["Thickness"]?.baseValue = (params.thickness - 0.001f) / 0.014f
-        }
-
         Box(modifier = Modifier.fillMaxSize()) {
             AndroidView(
                 factory = { context -> 
@@ -138,17 +111,17 @@ class MainActivity : ComponentActivity() {
                         it.setVisualSource(visualSource)
                     } 
                 },
-                update = { view -> 
-                    if (currentTab != "Patch Bay") { view.setParams(params) }
-                },
+                update = { /* Renderer pulls from visualSource now */ },
                 modifier = Modifier.fillMaxSize()
             )
 
+            // UI Overlay
             Column(
                 modifier = Modifier.fillMaxWidth()
-                    .fillMaxHeight(if (currentTab == "CV Lab" || currentTab == "Patch Bay") 1.0f else 0.7f)
+                    .fillMaxHeight()
                     .align(Alignment.TopStart).statusBarsPadding().padding(16.dp).background(Color.Transparent)
             ) {
+                // Header
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Box(modifier = Modifier.weight(1f)) {
                         Button(
@@ -157,14 +130,9 @@ class MainActivity : ComponentActivity() {
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.extraSmall
                         ) {
-                            val displayTab = if ((currentTab == "Speed" && hideSpeedScreen) || 
-                                                (currentTab == "Length" && hideLengthScreen) || 
-                                                (currentTab == "CV Lab" && hideCvLab)) "Patch Bay" else currentTab
-                            Text("MODE: $displayTab", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                            Text("MODE: $currentTab", style = MaterialTheme.typography.labelLarge, color = Color.White)
                         }
                         DropdownMenu(expanded = isTabMenuExpanded, onDismissRequest = { isTabMenuExpanded = false }) {
-                            if (!hideSpeedScreen) DropdownMenuItem(text = { Text("Speed") }, onClick = { currentTab = "Speed"; isTabMenuExpanded = false })
-                            if (!hideLengthScreen) DropdownMenuItem(text = { Text("Length") }, onClick = { currentTab = "Length"; isTabMenuExpanded = false })
                             if (!hideCvLab) DropdownMenuItem(text = { Text("CV Lab") }, onClick = { currentTab = "CV Lab"; isTabMenuExpanded = false })
                             DropdownMenuItem(text = { Text("Patch Bay") }, onClick = { currentTab = "Patch Bay"; isTabMenuExpanded = false })
                         }
@@ -173,14 +141,20 @@ class MainActivity : ComponentActivity() {
                     Box {
                         IconButton(onClick = { isSettingsMenuExpanded = true }) { Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White) }
                         DropdownMenu(expanded = isSettingsMenuExpanded, onDismissRequest = { isSettingsMenuExpanded = false }) {
-                            DropdownMenuItem(text = { Text(if (hideSpeedScreen) "Show Speed Screen" else "Hide Speed Screen") }, onClick = { hideSpeedScreen = !hideSpeedScreen; isSettingsMenuExpanded = false })
-                            DropdownMenuItem(text = { Text(if (hideLengthScreen) "Show Length Screen" else "Hide Length Screen") }, onClick = { hideLengthScreen = !hideLengthScreen; isSettingsMenuExpanded = false })
-                            DropdownMenuItem(text = { Text(if (hideCvLab) "Show CV Lab" else "Hide CV Lab") }, onClick = { hideCvLab = !hideCvLab; isSettingsMenuExpanded = false })
+                            DropdownMenuItem(
+                                text = { Text(if (hideCvLab) "Show CV Lab" else "Hide CV Lab") },
+                                onClick = { hideCvLab = !hideCvLab; isSettingsMenuExpanded = false }
+                            )
                             HorizontalDivider()
-                            DropdownMenuItem(text = { Text("Export Tags") }, onClick = { onShare(vm.getExportData()); isSettingsMenuExpanded = false })
+                            DropdownMenuItem(
+                                text = { Text("Export Tags") },
+                                onClick = { onShare(vm.getExportData()); isSettingsMenuExpanded = false }
+                            )
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(8.dp))
 
                 when (currentTab) {
                     "Patch Bay" -> {
@@ -197,16 +171,8 @@ class MainActivity : ComponentActivity() {
                                 onMicPermissionGranted = { hasMicPermission = true },
                                 onInternalAudioRecordCreated = { currentInternalAudioRecord = it }
                             )
-                        }
-                    }
-                    "Speed" -> {
-                        if (!hideSpeedScreen) {
-                            // ... Speed Screen UI (simplified for this write)
-                        }
-                    }
-                    "Length" -> {
-                        if (!hideLengthScreen) {
-                            // ... Length Screen UI (simplified for this write)
+                        } else {
+                            currentTab = "Patch Bay"
                         }
                     }
                 }

@@ -8,7 +8,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * A VisualSource implementation that draws the 4-arm rotating mandala.
+ * Optimized VisualSource that avoids allocations in the render loop.
  */
 class MandalaVisualSource : VisualSource {
     override val parameters = mapOf(
@@ -26,29 +26,37 @@ class MandalaVisualSource : VisualSource {
     override val globalAlpha = ModulatableParameter(1.0f)
     override val globalScale = ModulatableParameter(1.0f)
 
-    // Current speeds from the selected Recipe
     var recipe: MandalaRatio = MandalaLibrary.MandalaRatios.first()
     
-    private var time: Double = 0.0
     private val paint = Paint().apply {
         isAntiAlias = true
         style = Paint.Style.STROKE
     }
 
+    // Pre-allocated buffers to avoid GC pressure
+    private val hsvBuffer = FloatArray(3)
+
     override fun render(canvas: Canvas, width: Int, height: Int) {
-        val l1 = parameters["L1"]!!.evaluate() * (width / 2f)
-        val l2 = parameters["L2"]!!.evaluate() * (width / 2f)
-        val l3 = parameters["L3"]!!.evaluate() * (width / 2f)
-        val l4 = parameters["L4"]!!.evaluate() * (width / 2f)
-        val spinRate = parameters["SpinRate"]!!.evaluate() * 5.0f
-        val scale = parameters["Scale"]!!.evaluate() * globalScale.evaluate()
-        val thickness = parameters["Thickness"]!!.evaluate() * 20f
-        val hue = parameters["Hue"]!!.evaluate() * 360f
-        val sat = parameters["Saturation"]!!.evaluate()
-        val alpha = globalAlpha.evaluate()
+        // Use the already-evaluated '.value' to avoid redundant math in draw thread
+        val l1 = parameters["L1"]!!.value * (width / 2f)
+        val l2 = parameters["L2"]!!.value * (width / 2f)
+        val l3 = parameters["L3"]!!.value * (width / 2f)
+        val l4 = parameters["L4"]!!.value * (width / 2f)
+        val spinRate = parameters["SpinRate"]!!.value * 5.0f
+        val scale = parameters["Scale"]!!.value * globalScale.value
+        val thickness = parameters["Thickness"]!!.value * 20f
+        val hue = parameters["Hue"]!!.value * 360f
+        val sat = parameters["Saturation"]!!.value
+        val alpha = globalAlpha.value
 
         paint.strokeWidth = thickness
-        val baseColor = Color.HSVToColor(floatArrayOf(hue, sat, 1f))
+        
+        // Populate pre-allocated buffer
+        hsvBuffer[0] = hue
+        hsvBuffer[1] = sat
+        hsvBuffer[2] = 1.0f
+        
+        val baseColor = Color.HSVToColor(hsvBuffer)
         paint.color = Color.argb(
             (alpha * 255).toInt(),
             Color.red(baseColor),
@@ -63,7 +71,6 @@ class MandalaVisualSource : VisualSource {
         canvas.translate(cx, cy)
         canvas.scale(scale, scale)
 
-        // Basic drawing logic
         var lastX = 0f
         var lastY = 0f
         
@@ -86,6 +93,5 @@ class MandalaVisualSource : VisualSource {
         }
 
         canvas.restore()
-        time += 0.016
     }
 }

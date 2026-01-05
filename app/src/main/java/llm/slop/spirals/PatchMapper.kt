@@ -65,6 +65,32 @@ object PatchMapper {
         }
     }
 
+    /**
+     * Checks if the visual source has unsaved changes relative to a reference patch.
+     */
+    fun isDirty(source: MandalaVisualSource, reference: PatchData?): Boolean {
+        if (reference == null) return true // Unsaved "New Patch" is dirty
+        
+        val currentData = fromVisualSource(reference.name, source)
+        // Compare recipe
+        if (currentData.recipeId != reference.recipeId) return true
+        
+        // Compare parameters (simplified check)
+        if (currentData.parameters.size != reference.parameters.size) return true
+        
+        val refMap = reference.parameters.associateBy { it.id }
+        for (param in currentData.parameters) {
+            val refParam = refMap[param.id] ?: return true
+            if (param.baseValue != refParam.baseValue) return true
+            if (param.modulators.size != refParam.modulators.size) return true
+            for (i in param.modulators.indices) {
+                if (param.modulators[i] != refParam.modulators[i]) return true
+            }
+        }
+        
+        return false
+    }
+
     fun toJson(patchData: PatchData): String = jsonConfiguration.encodeToString(patchData)
     
     fun fromJson(jsonStr: String?): PatchData? {

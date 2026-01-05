@@ -3,16 +3,19 @@ package llm.slop.spirals
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Bundle
 import android.media.AudioFormat
 import android.media.AudioRecord
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -20,22 +23,26 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spirals.cv.*
 import llm.slop.spirals.cv.audio.*
 import llm.slop.spirals.ui.CvLabScreen
 import llm.slop.spirals.ui.InstrumentEditorScreen
+import llm.slop.spirals.ui.components.ParameterMatrix
+import llm.slop.spirals.ui.components.OscilloscopeView
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private var spiralSurfaceView: SpiralSurfaceView? = null
     private val visualSource = MandalaVisualSource()
     
-    // Global Audio Engine components
     private val audioEngine = AudioEngine()
     private var sourceManager: AudioSourceManager? = null
 
@@ -60,7 +67,8 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun MandalaScreen(vm: MandalaViewModel = viewModel(), onShare: (String) -> Unit) {
         var currentTab by remember { mutableStateOf("Patch Bay") }
-        var isTabMenuExpanded by remember { mutableStateOf(false) }
+        var focusedParameterId by remember { mutableStateOf("L1") }
+        var lastLoadedPatch by remember { mutableStateOf<PatchData?>(null) }
 
         // Global Audio State
         var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
@@ -68,6 +76,9 @@ class MainActivity : ComponentActivity() {
 
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
+        val configuration = LocalConfiguration.current
+        val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
         var hasMicPermission by remember {
             mutableStateOf(
                 ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
@@ -85,73 +96,218 @@ class MainActivity : ComponentActivity() {
                             AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT)
                         )
                         audioEngine.start(scope, record)
-                    } else {
-                        audioEngine.stop()
-                    }
+                    } else { audioEngine.stop() }
                 }
                 AudioSourceType.INTERNAL -> {
                     if (currentInternalAudioRecord != null) {
                         audioEngine.start(scope, currentInternalAudioRecord)
-                    } else {
-                        audioEngine.stop()
-                    }
+                    } else { audioEngine.stop() }
                 }
             }
         }
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            AndroidView(
-                factory = { context -> 
-                    SpiralSurfaceView(context).also { 
-                        spiralSurfaceView = it
-                        it.setVisualSource(visualSource)
-                    } 
-                },
-                update = { /* Renderer pulls from visualSource now */ },
-                modifier = Modifier.fillMaxSize()
-            )
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            if (isLandscape) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        VisualWindow(visualSource, focusedParameterId, lastLoadedPatch, vm) { focusedParameterId = it }
+                    }
+                    Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        ControlWindow(currentTab, visualSource, vm, focusedParameterId, onFocusChange = { focusedParameterId = it }, onTabChange = { currentTab = it }, onPatchLoad = { lastLoadedPatch = it })
+                    }
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        VisualWindow(visualSource, focusedParameterId, lastLoadedPatch, vm) { focusedParameterId = it }
+                    }
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        ControlWindow(currentTab, visualSource, vm, focusedParameterId, onFocusChange = { focusedParameterId = it }, onTabChange = { currentTab = it }, onPatchLoad = { lastLoadedPatch = it })
+                    }
+                }
+            }
+        }
+    }
 
-            // UI Overlay
-            Column(
-                modifier = Modifier.fillMaxWidth()
-                    .fillMaxHeight()
-                    .align(Alignment.TopStart).statusBarsPadding().padding(16.dp).background(Color.Transparent)
+    @Composable
+    fun VisualWindow(source: MandalaVisualSource, focusedId: String, lastPatch: PatchData?, vm: MandalaViewModel, onFocusChange: (String) -> Unit) {
+        var isHeaderExpanded by remember { mutableStateOf(false) }
+        val isDirty = PatchMapper.isDirty(source, lastPatch)
+        val focusedParam = source.parameters[focusedId] ?: source.globalAlpha // Fallback
+        val scope = rememberCoroutineScope()
+        val context = LocalContext.current
+
+        Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+            // 1. Collapsible Header
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                shape = MaterialTheme.shapes.extraSmall
             ) {
-                // Header
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        Button(
-                            onClick = { isTabMenuExpanded = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)),
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.extraSmall
-                        ) {
-                            Text("MODE: $currentTab", style = MaterialTheme.typography.labelLarge, color = Color.White)
+                Column(modifier = Modifier.padding(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { isHeaderExpanded = !isHeaderExpanded }) {
+                        Text(
+                            text = "${lastPatch?.name ?: "New Patch"}${if (isDirty) " *" else ""}",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.weight(1f))
+                        Text(
+                            text = "${source.recipe.a}, ${source.recipe.b}, ${source.recipe.c}, ${source.recipe.d} (${source.recipe.petals}P)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.Cyan
+                        )
+                    }
+                    
+                    if (isHeaderExpanded) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Recipe Selector Overlay
+                        Text("Change Recipe", style = MaterialTheme.typography.labelLarge, color = Color.Cyan)
+                        var petalFilter by remember { mutableStateOf<Int?>(null) }
+                        var filterExpanded by remember { mutableStateOf(false) }
+                        
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box {
+                                TextButton(onClick = { filterExpanded = true }) {
+                                    Text(if (petalFilter == null) "All Petals" else "${petalFilter}P")
+                                }
+                                DropdownMenu(expanded = filterExpanded, onDismissRequest = { filterExpanded = false }) {
+                                    DropdownMenuItem(text = { Text("All") }, onClick = { petalFilter = null; filterExpanded = false })
+                                    listOf(3, 4, 5, 6, 7, 8, 9, 10, 12, 16).forEach { p ->
+                                        DropdownMenuItem(text = { Text("${p}P") }, onClick = { petalFilter = p; filterExpanded = false })
+                                    }
+                                }
+                            }
+                            
+                            var recipeExpanded by remember { mutableStateOf(false) }
+                            Box(modifier = Modifier.weight(1f)) {
+                                Button(onClick = { recipeExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                                    Text("Select Ratio...")
+                                }
+                                DropdownMenu(expanded = recipeExpanded, onDismissRequest = { recipeExpanded = false }) {
+                                    val filtered = MandalaLibrary.MandalaRatios.filter { petalFilter == null || it.petals == petalFilter }.take(100)
+                                    filtered.forEach { ratio ->
+                                        DropdownMenuItem(
+                                            text = { Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)") },
+                                            onClick = { source.recipe = ratio; recipeExpanded = false; isHeaderExpanded = false }
+                                        )
+                                    }
+                                }
+                            }
                         }
-                        DropdownMenu(expanded = isTabMenuExpanded, onDismissRequest = { isTabMenuExpanded = false }) {
-                            DropdownMenuItem(text = { Text("CV Lab") }, onClick = { currentTab = "CV Lab"; isTabMenuExpanded = false })
-                            DropdownMenuItem(text = { Text("Patch Bay") }, onClick = { currentTab = "Patch Bay"; isTabMenuExpanded = false })
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.DarkGray)
+
+                        // Patch Management
+                        Text("Patch Management", style = MaterialTheme.typography.labelLarge, color = Color.Cyan)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            var nameInput by remember { mutableStateOf(lastPatch?.name ?: "New Patch") }
+                            OutlinedTextField(
+                                value = nameInput,
+                                onValueChange = { nameInput = it },
+                                modifier = Modifier.weight(1f),
+                                label = { Text("Name") },
+                                textStyle = MaterialTheme.typography.bodySmall
+                            )
+                            IconButton(onClick = {
+                                val data = PatchMapper.fromVisualSource(nameInput, source)
+                                val json = PatchMapper.toJson(data)
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, json)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Share Patch"))
+                            }) { Icon(Icons.Default.Share, contentDescription = null, tint = Color.White) }
+                            Button(onClick = { 
+                                scope.launch {
+                                    val data = PatchMapper.fromVisualSource(nameInput, source)
+                                    vm.savePatch(data)
+                                    isHeaderExpanded = false
+                                }
+                            }) { Text("Save") }
                         }
                     }
                 }
+            }
 
-                Spacer(modifier = Modifier.height(8.dp))
+            // 2. Arm Length Matrix
+            ParameterMatrix(
+                labels = listOf("L1", "L2", "L3", "L4"),
+                parameters = listOf(source.parameters["L1"]!!, source.parameters["L2"]!!, source.parameters["L3"]!!, source.parameters["L4"]!!),
+                focusedParameterId = focusedId,
+                onFocusRequest = onFocusChange
+            )
 
-                when (currentTab) {
-                    "Patch Bay" -> {
-                        InstrumentEditorScreen(visualSource, vm)
-                    }
-                    "CV Lab" -> {
-                        CvLabScreen(
-                            audioEngine = audioEngine,
-                            sourceManager = sourceManager!!,
-                            audioSourceType = audioSourceType,
-                            onAudioSourceTypeChange = { audioSourceType = it },
-                            hasMicPermission = hasMicPermission,
-                            onMicPermissionGranted = { hasMicPermission = true },
-                            onInternalAudioRecordCreated = { currentInternalAudioRecord = it }
-                        )
-                    }
+            // 3. Contextual O-scope
+            var focusedSamples by remember { mutableStateOf(floatArrayOf()) }
+            LaunchedEffect(focusedId) {
+                while(true) {
+                    focusedSamples = focusedParam.history.getSamples()
+                    delay(16)
+                }
+            }
+            
+            Text("Monitor: $focusedId", style = MaterialTheme.typography.labelSmall, color = Color.Cyan, modifier = Modifier.padding(top = 4.dp))
+            OscilloscopeView(
+                samples = focusedSamples, 
+                modifier = Modifier.weight(1f).minHeight(60.dp).padding(vertical = 4.dp)
+            )
+
+            // 4. Mandala Preview (16:9)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16/9f)
+                    .background(Color.Black)
+                    .border(1.dp, Color.DarkGray)
+            ) {
+                AndroidView(
+                    factory = { context -> 
+                        SpiralSurfaceView(context).also { 
+                            spiralSurfaceView = it
+                            it.setVisualSource(source)
+                        } 
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+    }
+
+    @Composable
+    fun ControlWindow(
+        tab: String, 
+        source: MandalaVisualSource, 
+        vm: MandalaViewModel, 
+        focusedId: String, 
+        onFocusChange: (String) -> Unit,
+        onTabChange: (String) -> Unit,
+        onPatchLoad: (PatchData) -> Unit
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            TabRow(selectedTabIndex = if (tab == "Patch Bay") 0 else 1) {
+                Tab(selected = tab == "Patch Bay", onClick = { onTabChange("Patch Bay") }) {
+                    Text("PATCH", modifier = Modifier.padding(8.dp))
+                }
+                Tab(selected = tab == "CV Lab", onClick = { onTabChange("CV Lab") }) {
+                    Text("DIAG", modifier = Modifier.padding(8.dp))
+                }
+            }
+            
+            Box(modifier = Modifier.weight(1f)) {
+                if (tab == "Patch Bay") {
+                    InstrumentEditorScreen(source, vm, focusedId, onFocusChange) 
+                } else {
+                    CvLabScreen(
+                        audioEngine = audioEngine,
+                        sourceManager = sourceManager!!,
+                        audioSourceType = AudioSourceType.MIC,
+                        onAudioSourceTypeChange = {},
+                        hasMicPermission = true,
+                        onMicPermissionGranted = {},
+                        onInternalAudioRecordCreated = {}
+                    )
                 }
             }
         }
@@ -160,3 +316,5 @@ class MainActivity : ComponentActivity() {
     override fun onPause() { super.onPause(); spiralSurfaceView?.onPause(); audioEngine.stop() }
     override fun onResume() { super.onResume(); spiralSurfaceView?.onResume() }
 }
+
+fun Modifier.minHeight(height: androidx.compose.ui.unit.Dp) = this.defaultMinSize(minHeight = height)

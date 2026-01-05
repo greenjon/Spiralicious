@@ -20,14 +20,10 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
 
     val allPatches = patchDao.getAllPatches()
 
-    fun savePatch(patch: MandalaPatch) {
+    fun savePatch(patchData: PatchData) {
         viewModelScope.launch {
-            // Simplified JSON serialization for now
-            val json = patch.parameterSettings.entries.joinToString("|") { (k, v) ->
-                val mods = v.modulators.joinToString(",") { "${it.sourceId}:${it.operator}:${it.weight}" }
-                "$k:${v.baseValue}:$mods"
-            }
-            patchDao.insertPatch(MandalaPatchEntity(patch.name, patch.recipeId, json))
+            val json = PatchMapper.toJson(patchData)
+            patchDao.insertPatch(MandalaPatchEntity(patchData.name, patchData.recipeId, json))
         }
     }
 

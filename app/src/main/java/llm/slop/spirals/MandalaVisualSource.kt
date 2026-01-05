@@ -6,9 +6,11 @@ import android.graphics.Paint
 import llm.slop.spirals.cv.ModulatableParameter
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.PI
 
 /**
  * Optimized VisualSource that avoids allocations in the render loop.
+ * Renders exactly one complete closed loop based on integer frequencies.
  */
 class MandalaVisualSource : VisualSource {
     override val parameters = mapOf(
@@ -16,8 +18,7 @@ class MandalaVisualSource : VisualSource {
         "L2" to ModulatableParameter(0.3f),
         "L3" to ModulatableParameter(0.2f),
         "L4" to ModulatableParameter(0.1f),
-        "SpinRate" to ModulatableParameter(0.5f),
-        "Scale" to ModulatableParameter(0.8f),
+        "Scale" to ModulatableParameter(0.125f), // Default 0.125 * 8x = 1.0 Unity
         "Thickness" to ModulatableParameter(0.1f),
         "Hue" to ModulatableParameter(0.0f),
         "Saturation" to ModulatableParameter(1.0f)
@@ -37,21 +38,20 @@ class MandalaVisualSource : VisualSource {
     private val hsvBuffer = FloatArray(3)
 
     override fun render(canvas: Canvas, width: Int, height: Int) {
-        // Use the already-evaluated '.value' to avoid redundant math in draw thread
         val l1 = parameters["L1"]!!.value * (width / 2f)
         val l2 = parameters["L2"]!!.value * (width / 2f)
         val l3 = parameters["L3"]!!.value * (width / 2f)
         val l4 = parameters["L4"]!!.value * (width / 2f)
-        val spinRate = parameters["SpinRate"]!!.value * 5.0f
-        val scale = parameters["Scale"]!!.value * globalScale.value
+        
+        // Match the 8x scaling logic from the OpenGL renderer
+        val scale = parameters["Scale"]!!.value * globalScale.value * 8.0f
+        
         val thickness = parameters["Thickness"]!!.value * 20f
         val hue = parameters["Hue"]!!.value * 360f
         val sat = parameters["Saturation"]!!.value
         val alpha = globalAlpha.value
 
         paint.strokeWidth = thickness
-        
-        // Populate pre-allocated buffer
         hsvBuffer[0] = hue
         hsvBuffer[1] = sat
         hsvBuffer[2] = 1.0f
@@ -74,13 +74,17 @@ class MandalaVisualSource : VisualSource {
         var lastX = 0f
         var lastY = 0f
         
-        val dt = 0.01
-        for (i in 0..1000) {
+        // Total points for the loop. 
+        // 2048 matches the OpenGL resolution for consistency.
+        val points = 2048
+        val dt = (2.0 * PI) / points
+        
+        for (i in 0..points) {
             val t = i * dt
-            val angle1 = t * recipe.a * spinRate
-            val angle2 = t * recipe.b * spinRate
-            val angle3 = t * recipe.c * spinRate
-            val angle4 = t * recipe.d * spinRate
+            val angle1 = t * recipe.a
+            val angle2 = t * recipe.b
+            val angle3 = t * recipe.c
+            val angle4 = t * recipe.d
 
             val x = (l1 * cos(angle1) + l2 * cos(angle2) + l3 * cos(angle3) + l4 * cos(angle4)).toFloat()
             val y = (l1 * sin(angle1) + l2 * sin(angle2) + l3 * sin(angle3) + l4 * sin(angle4)).toFloat()

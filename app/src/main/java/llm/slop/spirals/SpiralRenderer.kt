@@ -98,9 +98,9 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
         val source = visualSource
         val p1: Float; val p2: Float; val p3: Float; val p4: Float
-        val o1: Int; val o2: Int; val o3: Int; val o4: Int
+        val o1: Float; val o2: Float; val o3: Float; val o4: Float
         val thick: Float
-        val scale: Float
+        val finalScale: Float
         val hue: Float; val sat: Float; val alpha: Float
 
         if (source != null) {
@@ -109,25 +109,33 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             p2 = source.parameters["L2"]?.value ?: 0f
             p3 = source.parameters["L3"]?.value ?: 0f
             p4 = source.parameters["L4"]?.value ?: 0f
-            o1 = source.recipe.a; o2 = source.recipe.b; o3 = source.recipe.c; o4 = source.recipe.d
+            
+            // Frequencies are now truthful integers from the recipe
+            o1 = source.recipe.a.toFloat()
+            o2 = source.recipe.b.toFloat()
+            o3 = source.recipe.c.toFloat()
+            o4 = source.recipe.d.toFloat()
+            
             thick = (source.parameters["Thickness"]?.value ?: 0f) * 0.02f
-            scale = source.globalScale.value
+            val localScale = source.parameters["Scale"]?.value ?: 0.125f
+            finalScale = localScale * source.globalScale.value * 8.0f
+            
             hue = source.parameters["Hue"]?.value ?: 0f
             sat = source.parameters["Saturation"]?.value ?: 1f
             alpha = source.globalAlpha.value
         } else {
             p1 = params.l1; p2 = params.l2; p3 = params.l3; p4 = params.l4
-            o1 = params.omega1; o2 = params.omega2; o3 = params.omega3; o4 = params.omega4
+            o1 = params.omega1.toFloat(); o2 = params.omega2.toFloat(); o3 = params.omega3.toFloat(); o4 = params.omega4.toFloat()
             thick = params.thickness
-            scale = 1.0f
+            finalScale = 1.0f
             hue = 0.5f; sat = 0.8f; alpha = 1.0f
         }
 
-        GLES30.glUniform4f(uOmegaLocation, o1.toFloat(), o2.toFloat(), o3.toFloat(), o4.toFloat())
+        GLES30.glUniform4f(uOmegaLocation, o1, o2, o3, o4)
         GLES30.glUniform4f(uLLocation, p1, p2, p3, p4)
         GLES30.glUniform1f(uTLocation, (2.0 * PI).toFloat())
         GLES30.glUniform1f(uThicknessLocation, thick)
-        GLES30.glUniform1f(uGlobalScaleLocation, scale)
+        GLES30.glUniform1f(uGlobalScaleLocation, finalScale)
         GLES30.glUniform4f(uColorLocation, hue, sat, 1.0f, alpha)
         GLES30.glUniform1f(uAspectRatioLocation, aspectRatio)
 

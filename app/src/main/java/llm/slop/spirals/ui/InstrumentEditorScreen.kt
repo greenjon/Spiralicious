@@ -32,6 +32,16 @@ fun InstrumentEditorScreen(visualSource: MandalaVisualSource, vm: MandalaViewMod
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    // Petal Filtering State
+    var selectedPetalFilter by remember { mutableStateOf<Int?>(null) }
+    var petalMenuExpanded by remember { mutableStateOf(false) }
+    
+    val filteredRatios = remember(selectedPetalFilter) {
+        val all = MandalaLibrary.MandalaRatios
+        if (selectedPetalFilter == null) all.take(400) // Increased to 400 as requested
+        else all.filter { it.petals == selectedPetalFilter }.take(400)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -47,19 +57,36 @@ fun InstrumentEditorScreen(visualSource: MandalaVisualSource, vm: MandalaViewMod
         
         if (!isCollapsed) {
             Column(modifier = Modifier.verticalScroll(scrollState)) {
-                // 1. Recipe Selection
+                // 1. Recipe Selection & Filtering
                 Text("Mandala Recipe", style = MaterialTheme.typography.titleMedium, color = Color.Cyan)
-                var recipeExpanded by remember { mutableStateOf(false) }
-                Box {
-                    OutlinedButton(onClick = { recipeExpanded = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text("${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d}")
+                
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    // Petal Filter Button
+                    Box(modifier = Modifier.weight(0.4f).padding(end = 4.dp)) {
+                        OutlinedButton(onClick = { petalMenuExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text(if (selectedPetalFilter == null) "All" else "${selectedPetalFilter}P")
+                        }
+                        DropdownMenu(expanded = petalMenuExpanded, onDismissRequest = { petalMenuExpanded = false }) {
+                            DropdownMenuItem(text = { Text("All Petals") }, onClick = { selectedPetalFilter = null; petalMenuExpanded = false })
+                            listOf(3, 4, 5, 6, 7, 8, 9, 10, 12, 16).forEach { p ->
+                                DropdownMenuItem(text = { Text("${p} Petals") }, onClick = { selectedPetalFilter = p; petalMenuExpanded = false })
+                            }
+                        }
                     }
-                    DropdownMenu(expanded = recipeExpanded, onDismissRequest = { recipeExpanded = false }) {
-                        MandalaLibrary.MandalaRatios.take(50).forEach { ratio ->
-                            DropdownMenuItem(
-                                text = { Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d}") },
-                                onClick = { visualSource.recipe = ratio; recipeExpanded = false }
-                            )
+
+                    // Recipe Dropdown Button
+                    var recipeExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(onClick = { recipeExpanded = true }, modifier = Modifier.fillMaxWidth()) {
+                            Text("${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)")
+                        }
+                        DropdownMenu(expanded = recipeExpanded, onDismissRequest = { recipeExpanded = false }) {
+                            filteredRatios.forEach { ratio ->
+                                DropdownMenuItem(
+                                    text = { Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)") },
+                                    onClick = { visualSource.recipe = ratio; recipeExpanded = false }
+                                )
+                            }
                         }
                     }
                 }
@@ -140,10 +167,7 @@ fun LoadPatchDialog(vm: MandalaViewModel, onPatchSelected: (PatchData) -> Unit, 
                     patches.forEach { entity ->
                         Row(modifier = Modifier.fillMaxWidth().clickable { 
                             try {
-                                // We'll create a dummy PatchData then apply the real logic in PatchMapper
                                 val patchData = PatchData(entity.name, entity.recipeId, emptyList())
-                                // Note: In a robust app, we'd deserialize the entity.jsonSettings here.
-                                // For now, we'll let PatchMapper handle the logic if needed or re-read correctly.
                                 onPatchSelected(patchData) 
                             } catch (e: Exception) { e.printStackTrace() }
                         }.padding(12.dp)) {

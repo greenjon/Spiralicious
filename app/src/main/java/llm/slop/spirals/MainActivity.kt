@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
         var focusedParameterId by remember { mutableStateOf("L1") }
         var lastLoadedPatch by remember { mutableStateOf<PatchData?>(null) }
 
-        // Global Audio State
+        // Global Audio State (Hoisted for consistent behavior across tabs)
         var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
         var currentInternalAudioRecord by remember { mutableStateOf<AudioRecord?>(null) }
 
@@ -85,7 +85,12 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        // Global Audio Lifecycle
+        // Initialize Registry Sync
+        LaunchedEffect(Unit) {
+            CvRegistry.startSync(scope)
+        }
+
+        // Global Audio Lifecycle - This keeps the engine running in background
         LaunchedEffect(audioSourceType, hasMicPermission, currentInternalAudioRecord) {
             when (audioSourceType) {
                 AudioSourceType.MIC, AudioSourceType.UNPROCESSED -> {
@@ -113,7 +118,20 @@ class MainActivity : ComponentActivity() {
                         VisualWindow(visualSource, focusedParameterId, lastLoadedPatch, vm) { focusedParameterId = it }
                     }
                     Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                        ControlWindow(currentTab, visualSource, vm, focusedParameterId, onFocusChange = { focusedParameterId = it }, onTabChange = { currentTab = it }, onPatchLoad = { lastLoadedPatch = it })
+                        ControlWindow(
+                            tab = currentTab,
+                            source = visualSource,
+                            vm = vm,
+                            focusedId = focusedParameterId,
+                            audioSourceType = audioSourceType,
+                            hasMicPermission = hasMicPermission,
+                            onFocusChange = { focusedParameterId = it },
+                            onTabChange = { currentTab = it },
+                            onAudioSourceTypeChange = { audioSourceType = it },
+                            onMicPermissionGranted = { hasMicPermission = true },
+                            onInternalAudioRecordCreated = { currentInternalAudioRecord = it },
+                            onPatchLoad = { lastLoadedPatch = it }
+                        )
                     }
                 }
             } else {
@@ -122,7 +140,20 @@ class MainActivity : ComponentActivity() {
                         VisualWindow(visualSource, focusedParameterId, lastLoadedPatch, vm) { focusedParameterId = it }
                     }
                     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        ControlWindow(currentTab, visualSource, vm, focusedParameterId, onFocusChange = { focusedParameterId = it }, onTabChange = { currentTab = it }, onPatchLoad = { lastLoadedPatch = it })
+                        ControlWindow(
+                            tab = currentTab,
+                            source = visualSource,
+                            vm = vm,
+                            focusedId = focusedParameterId,
+                            audioSourceType = audioSourceType,
+                            hasMicPermission = hasMicPermission,
+                            onFocusChange = { focusedParameterId = it },
+                            onTabChange = { currentTab = it },
+                            onAudioSourceTypeChange = { audioSourceType = it },
+                            onMicPermissionGranted = { hasMicPermission = true },
+                            onInternalAudioRecordCreated = { currentInternalAudioRecord = it },
+                            onPatchLoad = { lastLoadedPatch = it }
+                        )
                     }
                 }
             }
@@ -133,12 +164,11 @@ class MainActivity : ComponentActivity() {
     fun VisualWindow(source: MandalaVisualSource, focusedId: String, lastPatch: PatchData?, vm: MandalaViewModel, onFocusChange: (String) -> Unit) {
         var isHeaderExpanded by remember { mutableStateOf(false) }
         val isDirty = PatchMapper.isDirty(source, lastPatch)
-        val focusedParam = source.parameters[focusedId] ?: source.globalAlpha // Fallback
+        val focusedParam = source.parameters[focusedId] ?: source.globalAlpha 
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
 
         Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-            // 1. Collapsible Header
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
@@ -161,8 +191,6 @@ class MainActivity : ComponentActivity() {
                     
                     if (isHeaderExpanded) {
                         Spacer(modifier = Modifier.height(16.dp))
-                        
-                        // Recipe Selector Overlay
                         Text("Change Recipe", style = MaterialTheme.typography.labelLarge, color = Color.Cyan)
                         var petalFilter by remember { mutableStateOf<Int?>(null) }
                         var filterExpanded by remember { mutableStateOf(false) }
@@ -198,8 +226,6 @@ class MainActivity : ComponentActivity() {
                         }
 
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.DarkGray)
-
-                        // Patch Management
                         Text("Patch Management", style = MaterialTheme.typography.labelLarge, color = Color.Cyan)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             var nameInput by remember { mutableStateOf(lastPatch?.name ?: "New Patch") }
@@ -231,7 +257,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // 2. Arm Length Matrix
             ParameterMatrix(
                 labels = listOf("L1", "L2", "L3", "L4"),
                 parameters = listOf(source.parameters["L1"]!!, source.parameters["L2"]!!, source.parameters["L3"]!!, source.parameters["L4"]!!),
@@ -239,7 +264,6 @@ class MainActivity : ComponentActivity() {
                 onFocusRequest = onFocusChange
             )
 
-            // 3. Contextual O-scope
             var focusedSamples by remember { mutableStateOf(floatArrayOf()) }
             LaunchedEffect(focusedId) {
                 while(true) {
@@ -254,7 +278,6 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.weight(1f).minHeight(60.dp).padding(vertical = 4.dp)
             )
 
-            // 4. Mandala Preview (16:9)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -281,8 +304,13 @@ class MainActivity : ComponentActivity() {
         source: MandalaVisualSource, 
         vm: MandalaViewModel, 
         focusedId: String, 
+        audioSourceType: AudioSourceType,
+        hasMicPermission: Boolean,
         onFocusChange: (String) -> Unit,
         onTabChange: (String) -> Unit,
+        onAudioSourceTypeChange: (AudioSourceType) -> Unit,
+        onMicPermissionGranted: () -> Unit,
+        onInternalAudioRecordCreated: (AudioRecord) -> Unit,
         onPatchLoad: (PatchData) -> Unit
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -302,11 +330,11 @@ class MainActivity : ComponentActivity() {
                     CvLabScreen(
                         audioEngine = audioEngine,
                         sourceManager = sourceManager!!,
-                        audioSourceType = AudioSourceType.MIC,
-                        onAudioSourceTypeChange = {},
-                        hasMicPermission = true,
-                        onMicPermissionGranted = {},
-                        onInternalAudioRecordCreated = {}
+                        audioSourceType = audioSourceType,
+                        onAudioSourceTypeChange = onAudioSourceTypeChange,
+                        hasMicPermission = hasMicPermission,
+                        onMicPermissionGranted = onMicPermissionGranted,
+                        onInternalAudioRecordCreated = onInternalAudioRecordCreated
                     )
                 }
             }

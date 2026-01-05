@@ -62,10 +62,6 @@ class MainActivity : ComponentActivity() {
         var currentTab by remember { mutableStateOf("Patch Bay") }
         var isTabMenuExpanded by remember { mutableStateOf(false) }
 
-        // Settings
-        var hideCvLab by remember { mutableStateOf(false) }
-        var isSettingsMenuExpanded by remember { mutableStateOf(false) }
-
         // Global Audio State
         var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
         var currentInternalAudioRecord by remember { mutableStateOf<AudioRecord?>(null) }
@@ -133,23 +129,8 @@ class MainActivity : ComponentActivity() {
                             Text("MODE: $currentTab", style = MaterialTheme.typography.labelLarge, color = Color.White)
                         }
                         DropdownMenu(expanded = isTabMenuExpanded, onDismissRequest = { isTabMenuExpanded = false }) {
-                            if (!hideCvLab) DropdownMenuItem(text = { Text("CV Lab") }, onClick = { currentTab = "CV Lab"; isTabMenuExpanded = false })
+                            DropdownMenuItem(text = { Text("CV Lab") }, onClick = { currentTab = "CV Lab"; isTabMenuExpanded = false })
                             DropdownMenuItem(text = { Text("Patch Bay") }, onClick = { currentTab = "Patch Bay"; isTabMenuExpanded = false })
-                        }
-                    }
-                    
-                    Box {
-                        IconButton(onClick = { isSettingsMenuExpanded = true }) { Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White) }
-                        DropdownMenu(expanded = isSettingsMenuExpanded, onDismissRequest = { isSettingsMenuExpanded = false }) {
-                            DropdownMenuItem(
-                                text = { Text(if (hideCvLab) "Show CV Lab" else "Hide CV Lab") },
-                                onClick = { hideCvLab = !hideCvLab; isSettingsMenuExpanded = false }
-                            )
-                            HorizontalDivider()
-                            DropdownMenuItem(
-                                text = { Text("Export Tags") },
-                                onClick = { onShare(vm.getExportData()); isSettingsMenuExpanded = false }
-                            )
                         }
                     }
                 }
@@ -161,19 +142,15 @@ class MainActivity : ComponentActivity() {
                         InstrumentEditorScreen(visualSource, vm)
                     }
                     "CV Lab" -> {
-                        if (!hideCvLab) {
-                            CvLabScreen(
-                                audioEngine = audioEngine,
-                                sourceManager = sourceManager!!,
-                                audioSourceType = audioSourceType,
-                                onAudioSourceTypeChange = { audioSourceType = it },
-                                hasMicPermission = hasMicPermission,
-                                onMicPermissionGranted = { hasMicPermission = true },
-                                onInternalAudioRecordCreated = { currentInternalAudioRecord = it }
-                            )
-                        } else {
-                            currentTab = "Patch Bay"
-                        }
+                        CvLabScreen(
+                            audioEngine = audioEngine,
+                            sourceManager = sourceManager!!,
+                            audioSourceType = audioSourceType,
+                            onAudioSourceTypeChange = { audioSourceType = it },
+                            hasMicPermission = hasMicPermission,
+                            onMicPermissionGranted = { hasMicPermission = true },
+                            onInternalAudioRecordCreated = { currentInternalAudioRecord = it }
+                        )
                     }
                 }
             }

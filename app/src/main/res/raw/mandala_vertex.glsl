@@ -49,5 +49,6 @@ void main() {
         rotY *= uAspectRatio;
     }
 
-    gl_Position = vec4(rotX, rotY - 0.33, 0.0, 1.0);
+    // Centered at (0,0) for the new 16:9 preview window
+    gl_Position = vec4(rotX, rotY, 0.0, 1.0);
 }

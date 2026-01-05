@@ -169,6 +169,7 @@ class MainActivity : ComponentActivity() {
         val context = LocalContext.current
 
         Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+            // 1. Collapsible Header
             Surface(
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
@@ -191,6 +192,8 @@ class MainActivity : ComponentActivity() {
                     
                     if (isHeaderExpanded) {
                         Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Recipe Selector Overlay
                         Text("Change Recipe", style = MaterialTheme.typography.labelLarge, color = Color.Cyan)
                         var petalFilter by remember { mutableStateOf<Int?>(null) }
                         var filterExpanded by remember { mutableStateOf(false) }
@@ -226,6 +229,8 @@ class MainActivity : ComponentActivity() {
                         }
 
                         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.DarkGray)
+
+                        // Patch Management
                         Text("Patch Management", style = MaterialTheme.typography.labelLarge, color = Color.Cyan)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             var nameInput by remember { mutableStateOf(lastPatch?.name ?: "New Patch") }
@@ -257,6 +262,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+            // 2. Arm Length Matrix
             ParameterMatrix(
                 labels = listOf("L1", "L2", "L3", "L4"),
                 parameters = listOf(source.parameters["L1"]!!, source.parameters["L2"]!!, source.parameters["L3"]!!, source.parameters["L4"]!!),
@@ -264,6 +270,7 @@ class MainActivity : ComponentActivity() {
                 onFocusRequest = onFocusChange
             )
 
+            // 3. Contextual O-scope with Border
             var focusedSamples by remember { mutableStateOf(floatArrayOf()) }
             LaunchedEffect(focusedId) {
                 while(true) {
@@ -273,11 +280,14 @@ class MainActivity : ComponentActivity() {
             }
             
             Text("Monitor: $focusedId", style = MaterialTheme.typography.labelSmall, color = Color.Cyan, modifier = Modifier.padding(top = 4.dp))
-            OscilloscopeView(
-                samples = focusedSamples, 
-                modifier = Modifier.weight(1f).minHeight(60.dp).padding(vertical = 4.dp)
-            )
+            Box(modifier = Modifier.weight(1f).minHeight(60.dp).padding(vertical = 4.dp).border(1.dp, Color.DarkGray)) {
+                OscilloscopeView(
+                    samples = focusedSamples, 
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
 
+            // 4. Mandala Preview (16:9) with Border
             Box(
                 modifier = Modifier
                     .fillMaxWidth()

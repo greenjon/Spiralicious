@@ -10,18 +10,17 @@ enum class ModulationOperator {
 data class CvModulator(
     val sourceId: String,
     val operator: ModulationOperator = ModulationOperator.ADD,
-    val weight: Float = 0.0f
+    val weight: Float = 0.0f,
+    val bypassed: Boolean = false // Added bypass support
 )
 
 /**
  * A parameter that can be controlled by a base value and multiple CV modulators.
- * Uses thread-safe collections for cross-thread access between UI and Renderer.
  */
 class ModulatableParameter(
     var baseValue: Float = 0.0f,
     val historySize: Int = 200
 ) {
-    // Thread-safe list for iteration in GL thread and modification in UI thread
     val modulators = CopyOnWriteArrayList<CvModulator>()
     val history = CvHistoryBuffer(historySize)
     
@@ -34,8 +33,9 @@ class ModulatableParameter(
     fun evaluate(): Float {
         var result = baseValue
         
-        // Concurrent-safe iteration
         for (mod in modulators) {
+            if (mod.bypassed) continue // Respect bypass flag
+            
             val cvValue = CvRegistry.get(mod.sourceId)
             val modAmount = cvValue * mod.weight
             

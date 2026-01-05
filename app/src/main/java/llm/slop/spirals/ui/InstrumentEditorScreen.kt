@@ -14,8 +14,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import llm.slop.spirals.MandalaVisualSource
 import llm.slop.spirals.MandalaViewModel
 import llm.slop.spirals.cv.*
@@ -63,6 +65,7 @@ fun InstrumentEditorScreen(
 
         Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
             if (!isArmLength) {
+                // Use local state for base value to ensure smooth dragging
                 var baseVal by remember(focusedId) { mutableFloatStateOf(focusedParam.baseValue) }
                 Text("Base Value: ${"%.2f".format(baseVal)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 Slider(
@@ -84,7 +87,6 @@ fun InstrumentEditorScreen(
                         mod = mod,
                         onUpdate = { updatedMod ->
                             focusedParam.modulators[index] = updatedMod
-                            // Don't refresh whole list on drag, only on structural change
                         },
                         onRemove = { 
                             focusedParam.modulators.removeAt(index)
@@ -94,6 +96,7 @@ fun InstrumentEditorScreen(
                     HorizontalDivider(color = Color.DarkGray.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
                 }
 
+                // Empty row for adding new modulators
                 ModulatorRow(
                     mod = null,
                     onUpdate = { newMod ->
@@ -119,7 +122,9 @@ fun ModulatorRow(
     var sourceId by remember(mod) { mutableStateOf(mod?.sourceId ?: "none") }
     var operator by remember(mod) { mutableStateOf(mod?.operator ?: ModulationOperator.ADD) }
     var weight by remember(mod) { mutableFloatStateOf(mod?.weight ?: 0f) }
+    var bypassed by remember(mod) { mutableStateOf(mod?.bypassed ?: false) }
     
+    // Pulse Line State
     var pulseValue by remember { mutableFloatStateOf(0f) }
     
     LaunchedEffect(sourceId) {
@@ -133,19 +138,46 @@ fun ModulatorRow(
         }
     }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .then(if (bypassed) Modifier.alpha(0.5f) else Modifier)
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            // Bypass [B] Toggle
+            if (!isNew) {
+                Surface(
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .size(24.dp)
+                        .clickable { 
+                            bypassed = !bypassed
+                            onUpdate(CvModulator(sourceId, operator, weight, bypassed))
+                        },
+                    color = if (bypassed) Color.DarkGray else Color.Gray,
+                    shape = MaterialTheme.shapes.extraSmall,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (bypassed) Color.Gray else Color.Cyan)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text("B", color = if (bypassed) Color.Gray else Color.White, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+
+            // Operator Toggle
             TextButton(
                 onClick = { 
                     val newOp = if (operator == ModulationOperator.ADD) ModulationOperator.MUL else ModulationOperator.ADD
                     operator = newOp
-                    if (!isNew) onUpdate(CvModulator(sourceId, newOp, weight))
+                    if (!isNew) onUpdate(CvModulator(sourceId, newOp, weight, bypassed))
                 },
                 modifier = Modifier.width(48.dp)
             ) {
                 Text(if (operator == ModulationOperator.ADD) "+" else "X", color = Color.Cyan)
             }
 
+            // Source Dropdown
             var sourceExpanded by remember { mutableStateOf(false) }
             Box(modifier = Modifier.weight(1f)) {
                 Text(
@@ -158,13 +190,14 @@ fun ModulatorRow(
                     listOf("none", "amp", "bass", "mid", "high", "accent", "beatPhase").forEach { s ->
                         DropdownMenuItem(text = { Text(s.uppercase()) }, onClick = { 
                             sourceId = s
-                            if (s != "none") onUpdate(CvModulator(s, operator, weight))
+                            if (s != "none") onUpdate(CvModulator(s, operator, weight, bypassed))
                             sourceExpanded = false
                         })
                     }
                 }
             }
 
+            // Weight Value Readout
             Text(
                 text = "W: ${"%.2f".format(weight)}",
                 style = MaterialTheme.typography.labelSmall,
@@ -172,6 +205,7 @@ fun ModulatorRow(
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
 
+            // Remove Button
             if (!isNew) {
                 IconButton(onClick = onRemove) {
                     Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color.LightGray, modifier = Modifier.size(16.dp))
@@ -179,19 +213,19 @@ fun ModulatorRow(
             }
         }
 
+        // Weight Slider
         if (sourceId != "none") {
             Slider(
                 value = weight,
                 onValueChange = { 
                     weight = it
-                    // Update the underlying data immediately for the renderer
-                    // but don't trigger parent recomposition here
-                    onUpdate(CvModulator(sourceId, operator, it))
+                    onUpdate(CvModulator(sourceId, operator, it, bypassed))
                 },
                 valueRange = -4f..4f,
                 modifier = Modifier.height(24.dp)
             )
             
+            // Pulse Line
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color.DarkGray)) {
                 Box(
                     modifier = Modifier

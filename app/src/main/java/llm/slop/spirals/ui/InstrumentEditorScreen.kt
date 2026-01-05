@@ -38,7 +38,7 @@ fun InstrumentEditorScreen(visualSource: MandalaVisualSource, vm: MandalaViewMod
     
     val filteredRatios = remember(selectedPetalFilter) {
         val all = MandalaLibrary.MandalaRatios
-        if (selectedPetalFilter == null) all.take(400) // Increased to 400 as requested
+        if (selectedPetalFilter == null) all.take(400)
         else all.filter { it.petals == selectedPetalFilter }.take(400)
     }
 
@@ -128,14 +128,7 @@ fun InstrumentEditorScreen(visualSource: MandalaVisualSource, vm: MandalaViewMod
 
                 HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = Color.DarkGray)
 
-                // 3. Global Parameters
-                Text("Global Controls", style = MaterialTheme.typography.titleMedium, color = Color.Cyan)
-                ParameterStrip("Alpha", visualSource.globalAlpha)
-                ParameterStrip("Global Scale", visualSource.globalScale)
-                
-                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = Color.DarkGray)
-
-                // 4. Geometry Parameters
+                // 3. Geometry Parameters
                 Text("Geometry", style = MaterialTheme.typography.titleMedium, color = Color.Cyan)
                 visualSource.parameters.forEach { (name, param) ->
                     ParameterStrip(name, param)

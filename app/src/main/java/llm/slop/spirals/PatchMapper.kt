@@ -6,14 +6,11 @@ import llm.slop.spirals.cv.*
 
 /**
  * Robust mapper to handle serialization and deserialization of patches.
- * Implements a "Default and Fallback" strategy to prevent crashes on schema changes.
+ * Excludes global mixing parameters (Alpha/Scale) to allow for higher-level mixing later.
  */
 object PatchMapper {
-    private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
+    private val jsonConfiguration = Json { ignoreUnknownKeys = true; prettyPrint = true }
 
-    /**
-     * Map of legacy parameter names to current ones to support migration.
-     */
     private val legacyMigrations = mapOf(
         "arm1" to "L1",
         "arm2" to "L2",
@@ -24,6 +21,7 @@ object PatchMapper {
     fun fromVisualSource(name: String, source: MandalaVisualSource): PatchData {
         val parameters = mutableListOf<ParameterData>()
         
+        // Only include internal geometry and color parameters in the individual patch
         source.parameters.forEach { (id, param) ->
             parameters.add(ParameterData(
                 id = id,
@@ -32,9 +30,6 @@ object PatchMapper {
             ))
         }
         
-        parameters.add(ParameterData("globalAlpha", source.globalAlpha.baseValue, source.globalAlpha.modulators.map { ModulatorData(it.sourceId, it.operator.name, it.weight) }))
-        parameters.add(ParameterData("globalScale", source.globalScale.baseValue, source.globalScale.modulators.map { ModulatorData(it.sourceId, it.operator.name, it.weight) }))
-
         return PatchData(name, source.recipe.id, parameters)
     }
 
@@ -43,28 +38,24 @@ object PatchMapper {
         if (ratio != null) source.recipe = ratio
 
         patchData.parameters.forEach { paramData ->
-            // Resolve current ID, checking migrations for backward compatibility
             val currentId = legacyMigrations[paramData.id] ?: paramData.id
             
-            val param = if (currentId == "globalAlpha") source.globalAlpha 
-                       else if (currentId == "globalScale") source.globalScale
-                       else source.parameters[currentId]
+            // We ignore globalAlpha and globalScale here so they aren't overwritten by individual patches
+            val param = source.parameters[currentId]
             
             param?.apply {
-                // Graceful fallback: only update if data is valid
                 baseValue = paramData.baseValue
                 
-                // Clear and rebuild modulators carefully
                 val validModulators = mutableListOf<CvModulator>()
                 paramData.modulators.forEach { modData ->
                     try {
                         val op = when(modData.operator.uppercase()) {
                             "MUL" -> ModulationOperator.MUL
-                            else -> ModulationOperator.ADD // Default to ADD for unknown strings
+                            else -> ModulationOperator.ADD
                         }
                         validModulators.add(CvModulator(modData.sourceId, op, modData.weight))
                     } catch (e: Exception) {
-                        // Log and skip invalid modulator data
+                        // Suppress or log exception
                     }
                 }
                 
@@ -74,16 +65,16 @@ object PatchMapper {
         }
     }
 
-    fun toJson(patchData: PatchData): String = json.encodeToString(patchData)
+    fun toJson(patchData: PatchData): String = jsonConfiguration.encodeToString(patchData)
     
     fun fromJson(jsonStr: String?): PatchData? {
         if (jsonStr == null) return null
         return try {
-            json.decodeFromString<PatchData>(jsonStr)
+            jsonConfiguration.decodeFromString<PatchData>(jsonStr)
         } catch (e: Exception) {
             null
         }
     }
 
-    fun allToJson(patches: List<PatchData>): String = json.encodeToString(patches)
+    fun allToJson(patches: List<PatchData>): String = jsonConfiguration.encodeToString(patches)
 }

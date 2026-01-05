@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import llm.slop.spirals.MandalaVisualSource
 import llm.slop.spirals.MandalaViewModel
 import llm.slop.spirals.cv.*
+import kotlinx.coroutines.delay
 
 @Composable
 fun InstrumentEditorScreen(
@@ -30,6 +31,8 @@ fun InstrumentEditorScreen(
     val scrollState = rememberScrollState()
     val focusedParam = source.parameters[focusedId] ?: source.globalAlpha
     val isArmLength = focusedId.startsWith("L") && focusedId.length == 2
+    
+    var refreshCount by remember { mutableIntStateOf(0) }
 
     Column(
         modifier = Modifier
@@ -52,49 +55,54 @@ fun InstrumentEditorScreen(
                 }
             }
             DropdownMenu(expanded = selectorExpanded, onDismissRequest = { selectorExpanded = false }) {
-                val allIds = source.parameters.keys.sorted()
-                allIds.forEach { id ->
+                source.parameters.keys.sorted().forEach { id ->
                     DropdownMenuItem(text = { Text(id) }, onClick = { onFocusChange(id); selectorExpanded = false })
                 }
             }
         }
 
         Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
-            // 2. Base Slider (Hidden for Arm Lengths since they are in Top Window)
             if (!isArmLength) {
                 var baseVal by remember(focusedId) { mutableFloatStateOf(focusedParam.baseValue) }
                 Text("Base Value: ${"%.2f".format(baseVal)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 Slider(
                     value = baseVal,
-                    onValueChange = { baseVal = it; focusedParam.baseValue = it },
+                    onValueChange = { 
+                        baseVal = it
+                        focusedParam.baseValue = it 
+                    },
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
             }
 
-            // 3. Modulator List
             Text("Modulation Matrix", style = MaterialTheme.typography.titleSmall, color = Color.Cyan)
             Spacer(modifier = Modifier.height(8.dp))
 
-            focusedParam.modulators.forEachIndexed { index, mod ->
-                ModulatorRow(
-                    mod = mod,
-                    onUpdate = { updatedMod ->
-                        // Concurrent replacement
-                        focusedParam.modulators[index] = updatedMod
-                    },
-                    onRemove = { focusedParam.modulators.removeAt(index) }
-                )
-                HorizontalDivider(color = Color.DarkGray.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
-            }
+            key(focusedId, refreshCount) {
+                focusedParam.modulators.forEachIndexed { index, mod ->
+                    ModulatorRow(
+                        mod = mod,
+                        onUpdate = { updatedMod ->
+                            focusedParam.modulators[index] = updatedMod
+                            // Don't refresh whole list on drag, only on structural change
+                        },
+                        onRemove = { 
+                            focusedParam.modulators.removeAt(index)
+                            refreshCount++
+                        }
+                    )
+                    HorizontalDivider(color = Color.DarkGray.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
+                }
 
-            // 4. "Always one empty row" logic
-            ModulatorRow(
-                mod = null,
-                onUpdate = { newMod ->
-                    focusedParam.modulators.add(newMod)
-                },
-                onRemove = {}
-            )
+                ModulatorRow(
+                    mod = null,
+                    onUpdate = { newMod ->
+                        focusedParam.modulators.add(newMod)
+                        refreshCount++
+                    },
+                    onRemove = {}
+                )
+            }
             
             Spacer(modifier = Modifier.height(100.dp))
         }
@@ -112,20 +120,21 @@ fun ModulatorRow(
     var operator by remember(mod) { mutableStateOf(mod?.operator ?: ModulationOperator.ADD) }
     var weight by remember(mod) { mutableFloatStateOf(mod?.weight ?: 0f) }
     
-    // Pulse Line State
     var pulseValue by remember { mutableFloatStateOf(0f) }
-    if (sourceId != "none") {
-        LaunchedEffect(sourceId) {
+    
+    LaunchedEffect(sourceId) {
+        if (sourceId != "none") {
             while(true) {
                 pulseValue = CvRegistry.get(sourceId)
-                kotlinx.coroutines.delay(16)
+                delay(16)
             }
+        } else {
+            pulseValue = 0f
         }
     }
 
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            // Operator Toggle
             TextButton(
                 onClick = { 
                     val newOp = if (operator == ModulationOperator.ADD) ModulationOperator.MUL else ModulationOperator.ADD
@@ -137,7 +146,6 @@ fun ModulatorRow(
                 Text(if (operator == ModulationOperator.ADD) "+" else "X", color = Color.Cyan)
             }
 
-            // Source Dropdown
             var sourceExpanded by remember { mutableStateOf(false) }
             Box(modifier = Modifier.weight(1f)) {
                 Text(
@@ -157,7 +165,6 @@ fun ModulatorRow(
                 }
             }
 
-            // Weight Value Readout
             Text(
                 text = "W: ${"%.2f".format(weight)}",
                 style = MaterialTheme.typography.labelSmall,
@@ -165,27 +172,26 @@ fun ModulatorRow(
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
 
-            // Remove Button
             if (!isNew) {
                 IconButton(onClick = onRemove) {
-                    Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color.DarkGray, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color.LightGray, modifier = Modifier.size(16.dp))
                 }
             }
         }
 
-        // Weight Slider
         if (sourceId != "none") {
             Slider(
                 value = weight,
                 onValueChange = { 
                     weight = it
+                    // Update the underlying data immediately for the renderer
+                    // but don't trigger parent recomposition here
                     onUpdate(CvModulator(sourceId, operator, it))
                 },
                 valueRange = -4f..4f,
                 modifier = Modifier.height(24.dp)
             )
             
-            // Pulse Line
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color.DarkGray)) {
                 Box(
                     modifier = Modifier

@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -27,8 +27,12 @@ fun ParameterMatrix(
                     val index = row * 2 + col
                     if (index < parameters.size) {
                         val id = labels[index]
+                        val param = parameters[index]
                         val isFocused = id == focusedParameterId
                         
+                        // Use local state for smooth interaction
+                        var sliderValue by remember(param) { mutableFloatStateOf(param.baseValue) }
+
                         Box(
                             modifier = Modifier
                                 .weight(1f)
@@ -47,9 +51,10 @@ fun ParameterMatrix(
                                     color = if (isFocused) Color.Cyan else Color.Gray
                                 )
                                 Slider(
-                                    value = parameters[index].baseValue,
+                                    value = sliderValue,
                                     onValueChange = { 
-                                        parameters[index].baseValue = it
+                                        sliderValue = it
+                                        param.baseValue = it
                                         onFocusRequest(id)
                                     },
                                     modifier = Modifier.height(24.dp)

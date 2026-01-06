@@ -65,10 +65,12 @@ fun CvLabScreen(
     val historyBuffers = remember { 
         mapOf<String, CvHistoryBuffer>(
             "amp" to CvHistoryBuffer(200),
+            "accent" to CvHistoryBuffer(200),
+            "onset" to CvHistoryBuffer(200),
+            "bassFlux" to CvHistoryBuffer(200),
             "bass" to CvHistoryBuffer(200),
             "mid" to CvHistoryBuffer(200),
             "high" to CvHistoryBuffer(200),
-            "accent" to CvHistoryBuffer(200),
             "beatPhase" to CvHistoryBuffer(200)
         )
     }
@@ -126,12 +128,14 @@ fun CvLabScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Monitor all registry signals
-        DiagnosticScope("AMP (Master)", historyBuffers["amp"]!!)
-        DiagnosticScope("BASS (Low)", historyBuffers["bass"]!!)
-        DiagnosticScope("MID", historyBuffers["mid"]!!)
-        DiagnosticScope("HIGH", historyBuffers["high"]!!)
-        DiagnosticScope("ACCENT (Transient)", historyBuffers["accent"]!!)
-        DiagnosticScope("BEAT PHASE", historyBuffers["beatPhase"]!!)
+        DiagnosticScope("ACCENT (Weighted Flux + Decay)", historyBuffers["accent"]!!)
+        DiagnosticScope("ONSET (Raw Multi-band Flux)", historyBuffers["onset"]!!)
+        
+        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.DarkGray)
+        
+        DiagnosticScope("AMP (Master Envelope)", historyBuffers["amp"]!!)
+        DiagnosticScope("BASS FLUX (Friend 1)", historyBuffers["bassFlux"]!!)
+        DiagnosticScope("BEAT PHASE (Flywheel)", historyBuffers["beatPhase"]!!)
 
         Spacer(modifier = Modifier.height(100.dp))
     }

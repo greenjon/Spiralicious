@@ -15,6 +15,8 @@ object CvRegistry {
         put("bass", 0f)
         put("mid", 0f)
         put("high", 0f)
+        put("bassFlux", 0f)
+        put("onset", 0f)
         put("beatPhase", 0f)
         put("bpm", 120f)
         put("accent", 0f)
@@ -37,7 +39,6 @@ object CvRegistry {
             while (isActive) {
                 // Throttled sync to UI thread (60Hz)
                 rawSignalData.forEach { (k, v) ->
-                    // Only update Compose state if the value has actually changed
                     if (signals[k] != v) {
                         signals[k] = v
                     }
@@ -47,15 +48,9 @@ object CvRegistry {
         }
     }
 
-    /**
-     * High-speed update from Audio Engine thread.
-     */
     fun update(name: String, value: Float) {
         rawSignalData[name] = value
     }
 
-    /**
-     * High-speed read from Renderer/Modulation thread.
-     */
     fun get(name: String): Float = rawSignalData[name] ?: 0f
 }

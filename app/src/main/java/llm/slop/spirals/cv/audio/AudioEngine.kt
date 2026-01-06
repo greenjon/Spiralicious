@@ -5,12 +5,12 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.util.Log
 import llm.slop.spirals.cv.CvRegistry
-import llm.slop.spirals.cv.BeatClock
 import kotlinx.coroutines.*
 import kotlin.math.max
 
 /**
  * The core analysis engine. Splits audio into bands and updates the CvRegistry.
+ * Implements Spectral Flux (onset detection) and Automatic BPM Detection.
  */
 class AudioEngine {
     private val sampleRate = 44100
@@ -29,6 +29,14 @@ class AudioEngine {
     // Master Clock State
     private var lastFrameTime = System.nanoTime()
     private var masterPhase = 0f
+    private var estimatedBpm = 120f
+
+    // BPM Estimation State
+    private var lastBeatTime = 0L
+    private val beatIntervals = mutableListOf<Long>()
+    private val maxIntervals = 8
+    private val minIntervalNs = 300_000_000L // 200 BPM max
+    private val maxIntervalNs = 1_500_000_000L // 40 BPM min
 
     @Volatile
     var debugLastRms: Float = 0f
@@ -53,43 +61,84 @@ class AudioEngine {
                 val midData = FloatArray(readBufferSize)
                 val highData = FloatArray(readBufferSize)
 
+                var prevBass = 0f
+                var prevMid = 0f
+                var prevHigh = 0f
+                var accentLevel = 0f
+                var beatThreshold = 0.5f 
+                var lastOnsetNormalized = 0f
+
                 while (isActive && audioRecord?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
                     val read = audioRecord?.read(audioData, 0, audioData.size, AudioRecord.READ_BLOCKING) ?: 0
                     if (read > 0) {
-                        // 1. Multiband Filtering
                         for (i in 0 until read) {
                             lowData[i] = lowPass.process(audioData[i])
                             midData[i] = midPass.process(audioData[i])
                             highData[i] = highPass.process(audioData[i])
                         }
 
-                        // 2. Analysis
                         val amp = extractor.calculateRms(audioData.copyOfRange(0, read))
                         val bass = extractor.calculateRms(lowData.copyOfRange(0, read))
                         val mid = extractor.calculateRms(midData.copyOfRange(0, read))
                         val high = extractor.calculateRms(highData.copyOfRange(0, read))
 
-                        // 3. BPM Flywheel (Master Clock)
+                        val bassFlux = max(0f, bass - prevBass)
+                        val midFlux = max(0f, mid - prevMid)
+                        val highFlux = max(0f, high - prevHigh)
+                        val onsetRaw = (bassFlux * 1.0f) + (midFlux * 0.6f) + (highFlux * 0.3f)
+
+                        prevBass = bass
+                        prevMid = mid
+                        prevHigh = high
+
+                        val onsetNormalized = (onsetRaw / 0.05f).coerceIn(0f, 2f)
+                        if (onsetNormalized > accentLevel) {
+                            accentLevel = onsetNormalized
+                        } else {
+                            accentLevel *= 0.88f
+                        }
+
+                        // Automatic BPM & Phase Sync
                         val currentTime = System.nanoTime()
+                        if (onsetNormalized > beatThreshold && lastOnsetNormalized <= beatThreshold) {
+                            val interval = currentTime - lastBeatTime
+                            if (interval in minIntervalNs..maxIntervalNs) {
+                                beatIntervals.add(interval)
+                                if (beatIntervals.size > maxIntervals) beatIntervals.removeAt(0)
+                                val medianInterval = beatIntervals.sorted()[beatIntervals.size / 2]
+                                estimatedBpm = 60_000_000_000f / medianInterval
+                                
+                                // SMART SYNC: Only force reset if it's a "Strong" transient 
+                                // AND we are significantly out of phase (> 10%)
+                                if (onsetNormalized > 1.4f) {
+                                    val isNearBeat = masterPhase < 0.1f || masterPhase > 0.9f
+                                    if (!isNearBeat) {
+                                        masterPhase = 0f // Force re-alignment
+                                    }
+                                }
+                            }
+                            lastBeatTime = currentTime
+                        }
+                        
+                        beatThreshold = (beatThreshold * 0.99f) + (onsetNormalized * 0.01f).coerceAtLeast(0.3f)
+                        lastOnsetNormalized = onsetNormalized
+
+                        // Flywheel
                         val deltaTimeSec = (currentTime - lastFrameTime) / 1_000_000_000f
                         lastFrameTime = currentTime
-                        
-                        val bpm = CvRegistry.get("bpm").coerceAtLeast(1f)
-                        val bps = bpm / 60f
-                        masterPhase = (masterPhase + deltaTimeSec * bps) % 1.0f
+                        masterPhase = (masterPhase + deltaTimeSec * (estimatedBpm / 60f)) % 1.0f
 
-                        // 4. Update Registry
-                        debugLastRms = amp
+                        // Update Registry
                         val ref = 0.1f
                         CvRegistry.update("amp", (amp / ref).coerceIn(0f, 2f))
                         CvRegistry.update("bass", (bass / ref).coerceIn(0f, 2f))
                         CvRegistry.update("mid", (mid / ref).coerceIn(0f, 2f))
                         CvRegistry.update("high", (high / ref).coerceIn(0f, 2f))
-                        
-                        // We still push raw phase to beatPhase for legacy or DIAG scopes
+                        CvRegistry.update("bassFlux", (bassFlux / 0.05f).coerceIn(0f, 2f))
+                        CvRegistry.update("onset", onsetNormalized)
+                        CvRegistry.update("accent", accentLevel)
+                        CvRegistry.update("bpm", estimatedBpm)
                         CvRegistry.update("beatPhase", masterPhase)
-                        // Dedicated high-res phase for modulators
-                        CvRegistry.update("masterPhase", masterPhase)
                     }
                 }
             }

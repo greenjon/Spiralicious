@@ -13,6 +13,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spirals.cv.*
@@ -104,16 +107,17 @@ class MainActivity : ComponentActivity() {
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            // TOP MONITOR AREA (Fixed)
+            // TOP MONITOR AREA (Fixed size parts, Header can push everything down)
             Column(
                 modifier = Modifier
-                    .weight(1.2f) // Give more space to the monitor area
+                    .wrapContentHeight()
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
-                // 1. Collapsible Header
+                // 1. Collapsible Header & Patch Management
                 var isHeaderExpanded by remember { mutableStateOf(false) }
                 val isDirty = PatchMapper.isDirty(visualSource, lastLoadedPatch)
+                var showOpenDialog by remember { mutableStateOf(false) }
                 
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -152,31 +156,37 @@ class MainActivity : ComponentActivity() {
                             }
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.DarkGray)
                             Text("Patch Management", style = MaterialTheme.typography.labelLarge, color = Color.Cyan)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                var nameInput by remember { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
-                                OutlinedTextField(value = nameInput, onValueChange = { nameInput = it }, modifier = Modifier.weight(1f), label = { Text("Name") }, textStyle = MaterialTheme.typography.bodySmall)
-                                IconButton(onClick = {
-                                    val data = PatchMapper.fromVisualSource(nameInput, visualSource)
-                                    val intent = Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) }
-                                    context.startActivity(Intent.createChooser(intent, "Share Patch"))
-                                }) { Icon(Icons.Default.Share, contentDescription = null, tint = Color.White) }
-                                Button(onClick = { scope.launch { 
-                                    val data = PatchMapper.fromVisualSource(nameInput, visualSource)
-                                    vm.savePatch(data)
-                                    lastLoadedPatch = data
-                                    isHeaderExpanded = false 
-                                } }) { Text("Save") }
+                            var nameInput by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
+                            OutlinedTextField(value = nameInput, onValueChange = { nameInput = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Patch Name") }, textStyle = MaterialTheme.typography.bodySmall)
+                            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Row {
+                                    Button(onClick = { scope.launch { val data = PatchMapper.fromVisualSource(nameInput, visualSource); vm.savePatch(data); lastLoadedPatch = data; isHeaderExpanded = false } }) { Text("Save") }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    IconButton(onClick = { val data = PatchMapper.fromVisualSource(nameInput, visualSource); context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) }, "Share Patch")) }) { Icon(Icons.Default.Share, contentDescription = null, tint = Color.White) }
+                                }
+                                Row {
+                                    Button(onClick = { showOpenDialog = true }) { Text("Open") }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Button(onClick = { scope.launch { val data = PatchMapper.fromVisualSource("$nameInput CLONE", visualSource); vm.savePatch(data); lastLoadedPatch = data; isHeaderExpanded = false } }) { Text("Clone") }
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    IconButton(onClick = { lastLoadedPatch?.let { vm.deletePatch(it.name); lastLoadedPatch = null; isHeaderExpanded = false } }) { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) }
+                                }
                             }
                         }
                     }
                 }
 
-                // 2. Mandala Preview (Full Width, Weight-limited to prevent pushing others)
+                if (showOpenDialog) {
+                    OpenPatchDialog(vm, onPatchSelected = { PatchMapper.applyToVisualSource(it, visualSource); lastLoadedPatch = it; showOpenDialog = false; isHeaderExpanded = false }, onDismiss = { showOpenDialog = false })
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // 2. Mandala Preview (Fixed Ratio, Full Width)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
-                        .aspectRatio(16/9f, matchHeightConstraintsFirst = true)
+                        .aspectRatio(16 / 9f)
                         .background(Color.Black)
                         .border(1.dp, Color.DarkGray),
                     contentAlignment = Alignment.Center
@@ -186,16 +196,10 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // 3. Monitor Row (O-scope with Floating Label)
+                // 3. Monitor (Full Width O-scope with Floating Label)
                 val focusedParam = visualSource.parameters[focusedParameterId] ?: visualSource.globalAlpha
                 var focusedSamples by remember(focusedParameterId) { mutableStateOf(floatArrayOf()) }
-                LaunchedEffect(focusedParameterId) {
-                    while(true) {
-                        focusedSamples = focusedParam.history.getSamples()
-                        delay(16)
-                    }
-                }
-                
+                LaunchedEffect(focusedParameterId) { while (true) { focusedSamples = focusedParam.history.getSamples(); delay(16) } }
                 Box(modifier = Modifier.fillMaxWidth().height(60.dp).border(1.dp, Color.DarkGray)) {
                     OscilloscopeView(samples = focusedSamples, modifier = Modifier.fillMaxSize())
                     Surface(
@@ -222,13 +226,12 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            // BOTTOM CONTROL AREA (Workbench)
+            // 5. BOTTOM CONTROL AREA (Takes remaining space)
             Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 TabRow(selectedTabIndex = if (currentTab == "Patch Bay") 0 else 1) {
                     Tab(selected = currentTab == "Patch Bay", onClick = { currentTab = "Patch Bay" }) { Text("PATCH", modifier = Modifier.padding(8.dp)) }
                     Tab(selected = currentTab == "CV Lab", onClick = { currentTab = "CV Lab" }) { Text("DIAG", modifier = Modifier.padding(8.dp)) }
                 }
-                
                 Box(modifier = Modifier.fillMaxSize()) {
                     if (currentTab == "Patch Bay") {
                         InstrumentEditorScreen(visualSource, vm, focusedParameterId, onFocusChange = { focusedParameterId = it }) 
@@ -243,6 +246,30 @@ class MainActivity : ComponentActivity() {
                             onInternalAudioRecordCreated = { currentInternalAudioRecord = it }
                         )
                     }
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun OpenPatchDialog(vm: MandalaViewModel, onPatchSelected: (PatchData) -> Unit, onDismiss: () -> Unit) {
+        val patches by vm.allPatches.collectAsState(initial = emptyList())
+        Dialog(onDismissRequest = onDismiss) {
+            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
+                    Text("Saved Patches", style = MaterialTheme.typography.titleLarge)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        patches.forEach { entity ->
+                            Row(modifier = Modifier.fillMaxWidth().clickable { 
+                                val patchData = PatchMapper.fromJson(entity.jsonSettings)
+                                if (patchData != null) onPatchSelected(patchData) 
+                            }.padding(12.dp)) {
+                                Text(entity.name, style = MaterialTheme.typography.bodyLarge)
+                            }
+                        }
+                    }
+                    if (patches.isEmpty()) Text("No patches saved yet.")
                 }
             }
         }

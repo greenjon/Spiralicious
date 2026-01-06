@@ -6,6 +6,8 @@ package llm.slop.spirals.cv.ui
  */
 class CvHistoryBuffer(val size: Int) {
     private val buffer = FloatArray(size)
+    
+    @Volatile
     private var index = 0
 
     fun add(value: Float) {
@@ -25,8 +27,9 @@ class CvHistoryBuffer(val size: Int) {
      */
     fun copyTo(target: FloatArray) {
         val count = size.coerceAtMost(target.size)
+        val currentIndex = index // Read once
         for (i in 0 until count) {
-            target[i] = buffer[(index + i) % size]
+            target[i] = buffer[(currentIndex + i) % size]
         }
     }
 

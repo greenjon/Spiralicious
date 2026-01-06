@@ -3,11 +3,9 @@ package llm.slop.spirals.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -25,12 +23,23 @@ fun OscilloscopeView(
     val localSamples = remember(historySize) { FloatArray(historySize) }
     val sharedPath = remember { Path() }
 
+    // Use a frame clock to trigger redraws at the display refresh rate
+    var frameTime by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos { frameTime = it }
+        }
+    }
+
     // Use Spacer with drawBehind for zero-allocation rendering
     Spacer(
         modifier = modifier
             .fillMaxWidth()
             .background(Color.Black)
             .drawBehind {
+                // Read frameTime to invalidate the draw scope every frame
+                val _trigger = frameTime
+                
                 val width = size.width
                 val height = size.height
                 
@@ -56,8 +65,11 @@ fun OscilloscopeView(
                     val x = i * stepX
                     val sample = localSamples[i]
                     
+                    // Handle values that might exceed the 0-1 range (like audio peaks)
                     val displayValue = if (sample > 1.0f) {
                         0.5f + (sample / 16.0f) 
+                    } else if (sample < 0f && isUnipolar) {
+                        0f
                     } else {
                         sample
                     }

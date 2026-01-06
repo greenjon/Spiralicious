@@ -107,14 +107,14 @@ class MainActivity : ComponentActivity() {
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            // TOP MONITOR AREA (Fixed size parts, Header can push everything down)
+            // 1. TOP MONITOR AREA (Fixed size parts, Header can push everything down)
             Column(
                 modifier = Modifier
                     .wrapContentHeight()
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
-                // 1. Collapsible Header & Patch Management
+                // Collapsible Header
                 var isHeaderExpanded by remember { mutableStateOf(false) }
                 val isDirty = PatchMapper.isDirty(visualSource, lastLoadedPatch)
                 var showOpenDialog by remember { mutableStateOf(false) }
@@ -196,12 +196,11 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // 3. Monitor (Full Width O-scope with Floating Label)
+                // 3. Monitor Row
                 val focusedParam = visualSource.parameters[focusedParameterId] ?: visualSource.globalAlpha
-                var focusedSamples by remember(focusedParameterId) { mutableStateOf(floatArrayOf()) }
-                LaunchedEffect(focusedParameterId) { while (true) { focusedSamples = focusedParam.history.getSamples(); delay(16) } }
+                
                 Box(modifier = Modifier.fillMaxWidth().height(60.dp).border(1.dp, Color.DarkGray)) {
-                    OscilloscopeView(samples = focusedSamples, modifier = Modifier.fillMaxSize())
+                    OscilloscopeView(history = focusedParam.history, modifier = Modifier.fillMaxSize())
                     Surface(
                         color = Color.Black.copy(alpha = 0.5f),
                         modifier = Modifier.align(Alignment.TopStart).padding(4.dp),

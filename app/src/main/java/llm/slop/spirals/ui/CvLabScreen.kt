@@ -139,17 +139,9 @@ fun CvLabScreen(
 
 @Composable
 fun DiagnosticScope(label: String, buffer: CvHistoryBuffer) {
-    var samples by remember { mutableStateOf(floatArrayOf()) }
-    LaunchedEffect(Unit) {
-        while(true) {
-            samples = buffer.getSamples()
-            delay(32)
-        }
-    }
-    
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
         Text(label, color = Color.Cyan, style = MaterialTheme.typography.labelSmall)
-        OscilloscopeView(samples = samples, modifier = Modifier.height(60.dp))
+        OscilloscopeView(history = buffer, modifier = Modifier.height(60.dp))
     }
 }
 

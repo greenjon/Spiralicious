@@ -11,15 +11,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import llm.slop.spirals.cv.ui.CvHistoryBuffer
 
 @Composable
 fun OscilloscopeView(
-    samples: FloatArray,
+    history: CvHistoryBuffer,
     isUnipolar: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-    // Pre-allocate the Path object to avoid GC pressure in the draw loop
     val sharedPath = remember { Path() }
+    val historySize = history.size
+    val localSamples = remember(historySize) { FloatArray(historySize) }
 
     Canvas(
         modifier = modifier
@@ -29,7 +31,8 @@ fun OscilloscopeView(
         val width = size.width
         val height = size.height
         
-        // Draw baseline
+        history.copyTo(localSamples)
+
         val baselineY = if (isUnipolar) height - 2f else height / 2f
         drawLine(
             color = Color.DarkGray,
@@ -38,20 +41,16 @@ fun OscilloscopeView(
             strokeWidth = 1f
         )
 
-        if (samples.isEmpty()) return@Canvas
+        if (localSamples.isEmpty()) return@Canvas
 
-        // Reuse the same Path instance
         sharedPath.reset()
-        val stepX = width / (samples.size - 1)
+        val stepX = width / (localSamples.size - 1)
 
-        for (i in samples.indices) {
+        for (i in localSamples.indices) {
             val x = i * stepX
-            val sample = samples[i]
+            val sample = localSamples[i]
             
-            // Perceptual scaling for parameters that exceed 1.0 (like Scale/Gain)
-            // We'll normalize them to fit in the window while keeping them visible
             val displayValue = if (sample > 1.0f) {
-                // Map 1.0 -> 8.0 down to a visible upper range
                 0.5f + (sample / 16.0f) 
             } else {
                 sample

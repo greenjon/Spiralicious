@@ -13,13 +13,23 @@ class CvHistoryBuffer(val size: Int) {
     }
 
     /**
+     * Copies the samples in chronological order (oldest to newest) into the target array.
+     * Prevents allocation in the draw loop.
+     */
+    fun copyTo(target: FloatArray) {
+        val count = size.coerceAtMost(target.size)
+        for (i in 0 until count) {
+            target[i] = buffer[(index + i) % size]
+        }
+    }
+
+    /**
      * Returns the samples in chronological order (oldest to newest).
+     * Warning: This allocates a new array. Use copyTo() for real-time loops.
      */
     fun getSamples(): FloatArray {
         val result = FloatArray(size)
-        for (i in 0 until size) {
-            result[i] = buffer[(index + i) % size]
-        }
+        copyTo(result)
         return result
     }
 }

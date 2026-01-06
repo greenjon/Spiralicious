@@ -29,6 +29,7 @@ class AudioEngine {
     // Master Clock State
     private var lastFrameTime = System.nanoTime()
     private var masterPhase = 0f
+    private var totalBeats = 0f
     private var estimatedBpm = 120f
 
     // BPM Estimation State
@@ -111,9 +112,11 @@ class AudioEngine {
                                 // SMART SYNC: Only force reset if it's a "Strong" transient 
                                 // AND we are significantly out of phase (> 10%)
                                 if (onsetNormalized > 1.4f) {
-                                    val isNearBeat = masterPhase < 0.1f || masterPhase > 0.9f
+                                    val currentPhase = totalBeats % 1.0f
+                                    val isNearBeat = currentPhase < 0.1f || currentPhase > 0.9f
                                     if (!isNearBeat) {
-                                        masterPhase = 0f // Force re-alignment
+                                        // Align totalBeats to the nearest integer
+                                        totalBeats = Math.round(totalBeats).toFloat()
                                     }
                                 }
                             }
@@ -126,7 +129,9 @@ class AudioEngine {
                         // Flywheel
                         val deltaTimeSec = (currentTime - lastFrameTime) / 1_000_000_000f
                         lastFrameTime = currentTime
-                        masterPhase = (masterPhase + deltaTimeSec * (estimatedBpm / 60f)) % 1.0f
+                        val beatDelta = deltaTimeSec * (estimatedBpm / 60f)
+                        totalBeats += beatDelta
+                        masterPhase = totalBeats % 1.0f
 
                         // Update Registry
                         val ref = 0.1f
@@ -139,6 +144,7 @@ class AudioEngine {
                         CvRegistry.update("accent", accentLevel)
                         CvRegistry.update("bpm", estimatedBpm)
                         CvRegistry.update("beatPhase", masterPhase)
+                        CvRegistry.update("totalBeats", totalBeats)
                     }
                 }
             }

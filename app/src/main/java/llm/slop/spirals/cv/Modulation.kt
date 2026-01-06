@@ -11,7 +11,7 @@ enum class ModulationOperator {
 }
 
 enum class Waveform {
-    SINE, TRIANGLE, SQUARE, SAW
+    SINE, TRIANGLE, SQUARE
 }
 
 @Serializable
@@ -53,17 +53,23 @@ class ModulatableParameter(
             
             // Advanced BEAT logic
             val finalCv = if (mod.sourceId == "beatPhase") {
-                val masterPhase = CvRegistry.get("masterPhase")
-                val localPhase = (masterPhase / mod.subdivision + mod.phaseOffset) % 1.0f
+                // Use totalBeats for proper subdivisions > 1 beat
+                val beats = CvRegistry.get("totalBeats")
+                val localPhase = ((beats / mod.subdivision) + mod.phaseOffset) % 1.0f
+                
+                // Ensure positive phase for % 1.0f
+                val positivePhase = if (localPhase < 0) localPhase + 1.0f else localPhase
                 
                 when(mod.waveform) {
-                    Waveform.SINE -> (sin(localPhase * 2.0 * PI).toFloat() * 0.5f) + 0.5f
+                    Waveform.SINE -> (sin(positivePhase * 2.0 * PI).toFloat() * 0.5f) + 0.5f
                     Waveform.TRIANGLE -> {
-                        if (localPhase < mod.slope) localPhase / mod.slope
-                        else (1.0f - localPhase) / (1.0f - mod.slope)
+                        if (positivePhase < mod.slope) {
+                            if (mod.slope > 0f) positivePhase / mod.slope else 1f
+                        } else {
+                            if (mod.slope < 1f) (1.0f - positivePhase) / (1.0f - mod.slope) else 1f
+                        }
                     }
-                    Waveform.SQUARE -> if (localPhase < mod.slope) 1.0f else 0.0f
-                    Waveform.SAW -> localPhase
+                    Waveform.SQUARE -> if (positivePhase < mod.slope) 1.0f else 0.0f
                 }
             } else {
                 rawCv

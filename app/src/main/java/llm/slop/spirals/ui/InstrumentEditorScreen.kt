@@ -14,10 +14,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import llm.slop.spirals.MandalaVisualSource
 import llm.slop.spirals.MandalaViewModel
 import llm.slop.spirals.cv.*
+import llm.slop.spirals.R
 import kotlinx.coroutines.delay
 
 @Composable
@@ -200,12 +202,11 @@ fun ModulatorRow(
                     onInteractionFinished()
                 }) {
                     Icon(
-                        imageVector = when(waveform) {
-                            Waveform.SINE -> Icons.Default.Add // Placeholder for sine icon
-                            Waveform.TRIANGLE -> Icons.Default.PlayArrow // Placeholder for triangle
-                            Waveform.SQUARE -> Icons.Default.Menu // Placeholder for square
-                            Waveform.SAW -> Icons.Default.List // Placeholder for saw
-                        },
+                        painter = painterResource(id = when(waveform) {
+                            Waveform.SINE -> R.drawable.ic_wave_sine
+                            Waveform.TRIANGLE -> R.drawable.ic_wave_triangle
+                            Waveform.SQUARE -> R.drawable.ic_wave_square
+                        }),
                         contentDescription = "Waveform",
                         tint = Color.Cyan,
                         modifier = Modifier.size(20.dp)

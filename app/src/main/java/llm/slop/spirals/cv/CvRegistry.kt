@@ -18,6 +18,7 @@ object CvRegistry {
         put("onset", 0f)
         put("accent", 0f)
         put("beatPhase", 0f)
+        put("totalBeats", 0f)
         put("bpm", 120f)
     }
 

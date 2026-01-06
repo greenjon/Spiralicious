@@ -2,16 +2,29 @@ package llm.slop.spirals.cv
 
 import llm.slop.spirals.cv.ui.CvHistoryBuffer
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.math.PI
+import kotlin.math.sin
+import kotlinx.serialization.Serializable
 
 enum class ModulationOperator {
     ADD, MUL
 }
 
+enum class Waveform {
+    SINE, TRIANGLE, SQUARE, SAW
+}
+
+@Serializable
 data class CvModulator(
     val sourceId: String,
     val operator: ModulationOperator = ModulationOperator.ADD,
     val weight: Float = 0.0f,
-    val bypassed: Boolean = false // Added bypass support
+    val bypassed: Boolean = false,
+    // Beat expansion fields
+    val waveform: Waveform = Waveform.SINE,
+    val subdivision: Float = 1.0f,
+    val phaseOffset: Float = 0.0f,
+    val slope: Float = 0.5f
 )
 
 /**
@@ -34,10 +47,29 @@ class ModulatableParameter(
         var result = baseValue
         
         for (mod in modulators) {
-            if (mod.bypassed) continue // Respect bypass flag
+            if (mod.bypassed) continue
             
-            val cvValue = CvRegistry.get(mod.sourceId)
-            val modAmount = cvValue * mod.weight
+            val rawCv = CvRegistry.get(mod.sourceId)
+            
+            // Advanced BEAT logic
+            val finalCv = if (mod.sourceId == "beatPhase") {
+                val masterPhase = CvRegistry.get("masterPhase")
+                val localPhase = (masterPhase / mod.subdivision + mod.phaseOffset) % 1.0f
+                
+                when(mod.waveform) {
+                    Waveform.SINE -> (sin(localPhase * 2.0 * PI).toFloat() * 0.5f) + 0.5f
+                    Waveform.TRIANGLE -> {
+                        if (localPhase < mod.slope) localPhase / mod.slope
+                        else (1.0f - localPhase) / (1.0f - mod.slope)
+                    }
+                    Waveform.SQUARE -> if (localPhase < mod.slope) 1.0f else 0.0f
+                    Waveform.SAW -> localPhase
+                }
+            } else {
+                rawCv
+            }
+            
+            val modAmount = finalCv * mod.weight
             
             result = when (mod.operator) {
                 ModulationOperator.ADD -> result + modAmount

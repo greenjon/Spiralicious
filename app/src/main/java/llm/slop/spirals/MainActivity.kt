@@ -70,6 +70,8 @@ class MainActivity : ComponentActivity() {
         var currentTab by remember { mutableStateOf("Patch Bay") }
         var focusedParameterId by remember { mutableStateOf("L1") }
         var lastLoadedPatch by remember { mutableStateOf<PatchData?>(null) }
+        var manualChangeTrigger by remember { mutableIntStateOf(0) }
+        var isDirty by remember { mutableStateOf(false) }
 
         // Audio State
         var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
@@ -80,6 +82,12 @@ class MainActivity : ComponentActivity() {
 
         // Global Lifecycle
         LaunchedEffect(Unit) { CvRegistry.startSync(scope) }
+        
+        // Throttled Dirty Check
+        LaunchedEffect(lastLoadedPatch, manualChangeTrigger) {
+            isDirty = PatchMapper.isDirty(visualSource, lastLoadedPatch)
+        }
+
         LaunchedEffect(audioSourceType, hasMicPermission, currentInternalAudioRecord) {
             when (audioSourceType) {
                 AudioSourceType.MIC, AudioSourceType.UNPROCESSED -> {
@@ -114,9 +122,8 @@ class MainActivity : ComponentActivity() {
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
-                // Collapsible Header
+                // Collapsible Header & Patch Management
                 var isHeaderExpanded by remember { mutableStateOf(false) }
-                val isDirty = PatchMapper.isDirty(visualSource, lastLoadedPatch)
                 var showOpenDialog by remember { mutableStateOf(false) }
                 
                 Surface(
@@ -149,7 +156,12 @@ class MainActivity : ComponentActivity() {
                                     DropdownMenu(expanded = recipeExpanded, onDismissRequest = { recipeExpanded = false }) {
                                         val filtered = MandalaLibrary.MandalaRatios.filter { petalFilter == null || it.petals == petalFilter }.take(100)
                                         filtered.forEach { ratio ->
-                                            DropdownMenuItem(text = { Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)") }, onClick = { visualSource.recipe = ratio; recipeExpanded = false; isHeaderExpanded = false } )
+                                            DropdownMenuItem(text = { Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)") }, onClick = { 
+                                                visualSource.recipe = ratio
+                                                manualChangeTrigger++
+                                                recipeExpanded = false
+                                                isHeaderExpanded = false 
+                                            } )
                                         }
                                     }
                                 }
@@ -182,7 +194,7 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // 2. Mandala Preview (Fixed Ratio, Full Width)
+                // 2. Mandala Preview (Height determined by aspect ratio)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -198,7 +210,6 @@ class MainActivity : ComponentActivity() {
 
                 // 3. Monitor Row
                 val focusedParam = visualSource.parameters[focusedParameterId] ?: visualSource.globalAlpha
-                
                 Box(modifier = Modifier.fillMaxWidth().height(60.dp).border(1.dp, Color.DarkGray)) {
                     OscilloscopeView(history = focusedParam.history, modifier = Modifier.fillMaxSize())
                     Surface(
@@ -221,11 +232,13 @@ class MainActivity : ComponentActivity() {
                 ParameterMatrix(
                     labels = listOf("L1", "L2", "L3", "L4"),
                     parameters = listOf(visualSource.parameters["L1"]!!, visualSource.parameters["L2"]!!, visualSource.parameters["L3"]!!, visualSource.parameters["L4"]!!),
-                    focusedParameterId = focusedParameterId, onFocusRequest = { focusedParameterId = it }
+                    focusedParameterId = focusedParameterId, 
+                    onFocusRequest = { focusedParameterId = it },
+                    onInteractionFinished = { manualChangeTrigger++ }
                 )
             }
 
-            // 5. BOTTOM CONTROL AREA (Takes remaining space)
+            // 5. BOTTOM CONTROL AREA (Takes up remaining space)
             Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 TabRow(selectedTabIndex = if (currentTab == "Patch Bay") 0 else 1) {
                     Tab(selected = currentTab == "Patch Bay", onClick = { currentTab = "Patch Bay" }) { Text("PATCH", modifier = Modifier.padding(8.dp)) }
@@ -233,7 +246,13 @@ class MainActivity : ComponentActivity() {
                 }
                 Box(modifier = Modifier.fillMaxSize()) {
                     if (currentTab == "Patch Bay") {
-                        InstrumentEditorScreen(visualSource, vm, focusedParameterId, onFocusChange = { focusedParameterId = it }) 
+                        InstrumentEditorScreen(
+                            source = visualSource, 
+                            vm = vm, 
+                            focusedId = focusedParameterId, 
+                            onFocusChange = { focusedParameterId = it },
+                            onInteractionFinished = { manualChangeTrigger++ }
+                        ) 
                     } else {
                         CvLabScreen(
                             audioEngine = audioEngine,

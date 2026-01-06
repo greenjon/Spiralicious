@@ -18,6 +18,7 @@ fun ParameterMatrix(
     parameters: List<ModulatableParameter>,
     focusedParameterId: String?,
     onFocusRequest: (String) -> Unit,
+    onInteractionFinished: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
@@ -30,7 +31,6 @@ fun ParameterMatrix(
                         val param = parameters[index]
                         val isFocused = id == focusedParameterId
                         
-                        // Use local state for smooth interaction
                         var sliderValue by remember(param) { mutableFloatStateOf(param.baseValue) }
 
                         Box(
@@ -57,6 +57,7 @@ fun ParameterMatrix(
                                         param.baseValue = it
                                         onFocusRequest(id)
                                     },
+                                    onValueChangeFinished = onInteractionFinished,
                                     modifier = Modifier.height(24.dp)
                                 )
                             }

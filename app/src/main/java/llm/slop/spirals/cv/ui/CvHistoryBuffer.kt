@@ -2,6 +2,7 @@ package llm.slop.spirals.cv.ui
 
 /**
  * A ring buffer to store the last N samples of a CV signal.
+ * Optimized for zero-allocation access in the draw loop.
  */
 class CvHistoryBuffer(val size: Int) {
     private val buffer = FloatArray(size)
@@ -13,8 +14,14 @@ class CvHistoryBuffer(val size: Int) {
     }
 
     /**
-     * Copies the samples in chronological order (oldest to newest) into the target array.
-     * Prevents allocation in the draw loop.
+     * Gets a sample at a specific chronological index (0 = oldest, size-1 = newest).
+     */
+    fun getAt(i: Int): Float {
+        return buffer[(index + i) % size]
+    }
+
+    /**
+     * Copies the samples in chronological order into the target array.
      */
     fun copyTo(target: FloatArray) {
         val count = size.coerceAtMost(target.size)
@@ -24,8 +31,8 @@ class CvHistoryBuffer(val size: Int) {
     }
 
     /**
-     * Returns the samples in chronological order (oldest to newest).
-     * Warning: This allocates a new array. Use copyTo() for real-time loops.
+     * Returns the samples in chronological order.
+     * Warning: This allocates a new array.
      */
     fun getSamples(): FloatArray {
         val result = FloatArray(size)

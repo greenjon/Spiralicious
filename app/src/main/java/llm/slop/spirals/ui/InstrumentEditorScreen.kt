@@ -28,7 +28,8 @@ fun InstrumentEditorScreen(
     source: MandalaVisualSource,
     vm: MandalaViewModel,
     focusedId: String,
-    onFocusChange: (String) -> Unit
+    onFocusChange: (String) -> Unit,
+    onInteractionFinished: () -> Unit
 ) {
     val scrollState = rememberScrollState()
     val focusedParam = source.parameters[focusedId] ?: source.globalAlpha
@@ -74,6 +75,7 @@ fun InstrumentEditorScreen(
                         baseVal = it
                         focusedParam.baseValue = it 
                     },
+                    onValueChangeFinished = onInteractionFinished,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
             }
@@ -88,9 +90,11 @@ fun InstrumentEditorScreen(
                         onUpdate = { updatedMod ->
                             focusedParam.modulators[index] = updatedMod
                         },
+                        onInteractionFinished = onInteractionFinished,
                         onRemove = { 
                             focusedParam.modulators.removeAt(index)
                             refreshCount++
+                            onInteractionFinished()
                         }
                     )
                     HorizontalDivider(color = Color.DarkGray.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
@@ -102,7 +106,9 @@ fun InstrumentEditorScreen(
                     onUpdate = { newMod ->
                         focusedParam.modulators.add(newMod)
                         refreshCount++
+                        onInteractionFinished()
                     },
+                    onInteractionFinished = onInteractionFinished,
                     onRemove = {}
                 )
             }
@@ -116,6 +122,7 @@ fun InstrumentEditorScreen(
 fun ModulatorRow(
     mod: CvModulator?,
     onUpdate: (CvModulator) -> Unit,
+    onInteractionFinished: () -> Unit,
     onRemove: () -> Unit
 ) {
     val isNew = mod == null
@@ -124,7 +131,6 @@ fun ModulatorRow(
     var weight by remember(mod) { mutableFloatStateOf(mod?.weight ?: 0f) }
     var bypassed by remember(mod) { mutableStateOf(mod?.bypassed ?: false) }
     
-    // Pulse Line State
     var pulseValue by remember { mutableFloatStateOf(0f) }
     
     LaunchedEffect(sourceId) {
@@ -154,6 +160,7 @@ fun ModulatorRow(
                         .clickable { 
                             bypassed = !bypassed
                             onUpdate(CvModulator(sourceId, operator, weight, bypassed))
+                            onInteractionFinished()
                         },
                     color = if (bypassed) Color.DarkGray else Color.Gray,
                     shape = MaterialTheme.shapes.extraSmall,
@@ -170,14 +177,16 @@ fun ModulatorRow(
                 onClick = { 
                     val newOp = if (operator == ModulationOperator.ADD) ModulationOperator.MUL else ModulationOperator.ADD
                     operator = newOp
-                    if (!isNew) onUpdate(CvModulator(sourceId, newOp, weight, bypassed))
+                    if (!isNew) {
+                        onUpdate(CvModulator(sourceId, newOp, weight, bypassed))
+                        onInteractionFinished()
+                    }
                 },
                 modifier = Modifier.width(48.dp)
             ) {
                 Text(if (operator == ModulationOperator.ADD) "+" else "X", color = Color.Cyan)
             }
 
-            // Source Dropdown
             var sourceExpanded by remember { mutableStateOf(false) }
             Box(modifier = Modifier.weight(1f)) {
                 Text(
@@ -190,14 +199,16 @@ fun ModulatorRow(
                     listOf("none", "amp", "bass", "mid", "high", "accent", "beatPhase").forEach { s ->
                         DropdownMenuItem(text = { Text(s.uppercase()) }, onClick = { 
                             sourceId = s
-                            if (s != "none") onUpdate(CvModulator(s, operator, weight, bypassed))
+                            if (s != "none") {
+                                onUpdate(CvModulator(s, operator, weight, bypassed))
+                                onInteractionFinished()
+                            }
                             sourceExpanded = false
                         })
                     }
                 }
             }
 
-            // Weight Value Readout
             Text(
                 text = "W: ${"%.2f".format(weight)}",
                 style = MaterialTheme.typography.labelSmall,
@@ -205,7 +216,6 @@ fun ModulatorRow(
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
 
-            // Remove Button
             if (!isNew) {
                 IconButton(onClick = onRemove) {
                     Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color.LightGray, modifier = Modifier.size(16.dp))
@@ -213,7 +223,6 @@ fun ModulatorRow(
             }
         }
 
-        // Weight Slider
         if (sourceId != "none") {
             Slider(
                 value = weight,
@@ -221,11 +230,11 @@ fun ModulatorRow(
                     weight = it
                     onUpdate(CvModulator(sourceId, operator, it, bypassed))
                 },
+                onValueChangeFinished = onInteractionFinished,
                 valueRange = -4f..4f,
                 modifier = Modifier.height(24.dp)
             )
             
-            // Pulse Line
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color.DarkGray)) {
                 Box(
                     modifier = Modifier

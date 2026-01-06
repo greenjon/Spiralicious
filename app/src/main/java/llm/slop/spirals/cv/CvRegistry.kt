@@ -29,15 +29,18 @@ object CvRegistry {
 
     /**
      * Starts a background job to sync raw data to the UI state at a steady rate.
-     * This prevents high-frequency audio updates from choking the Compose Main thread.
+     * Implements an equality check to prevent redundant UI recompositions.
      */
     fun startSync(scope: CoroutineScope) {
         if (syncJob != null) return
         syncJob = scope.launch(Dispatchers.Main) {
             while (isActive) {
-                // Throttled sync to UI thread (60Hz is plenty for display)
+                // Throttled sync to UI thread (60Hz)
                 rawSignalData.forEach { (k, v) ->
-                    signals[k] = v
+                    // Only update Compose state if the value has actually changed
+                    if (signals[k] != v) {
+                        signals[k] = v
+                    }
                 }
                 delay(16) 
             }

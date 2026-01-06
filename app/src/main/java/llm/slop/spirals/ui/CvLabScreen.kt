@@ -2,7 +2,6 @@ package llm.slop.spirals.ui
 
 import android.Manifest
 import android.app.Activity
-import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -16,9 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import llm.slop.spirals.cv.*
 import llm.slop.spirals.cv.audio.AudioEngine
 import llm.slop.spirals.cv.audio.AudioSourceManager
@@ -37,8 +34,6 @@ fun CvLabScreen(
     onMicPermissionGranted: () -> Unit,
     onInternalAudioRecordCreated: (AudioRecord) -> Unit
 ) {
-    val context = LocalContext.current
-    
     val micPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -62,25 +57,11 @@ fun CvLabScreen(
         }
     }
 
-    val historyBuffers = remember { 
-        mapOf<String, CvHistoryBuffer>(
-            "amp" to CvHistoryBuffer(200),
-            "accent" to CvHistoryBuffer(200),
-            "onset" to CvHistoryBuffer(200),
-            "bassFlux" to CvHistoryBuffer(200),
-            "bass" to CvHistoryBuffer(200),
-            "mid" to CvHistoryBuffer(200),
-            "high" to CvHistoryBuffer(200),
-            "beatPhase" to CvHistoryBuffer(200)
-        )
-    }
-
-    // CV Update & Debug Registry Sync
+    // A simple tick that forces the UI to recompose at 60Hz so the scopes update
+    var frameTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
-            historyBuffers.forEach { entry ->
-                entry.value.add(CvRegistry.get(entry.key))
-            }
+            frameTick++
             delay(16)
         }
     }
@@ -127,15 +108,18 @@ fun CvLabScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Monitor all registry signals
-        DiagnosticScope("ACCENT (Weighted Flux + Decay)", historyBuffers["accent"]!!)
-        DiagnosticScope("ONSET (Raw Multi-band Flux)", historyBuffers["onset"]!!)
-        
-        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.DarkGray)
-        
-        DiagnosticScope("AMP (Master Envelope)", historyBuffers["amp"]!!)
-        DiagnosticScope("BASS FLUX (Friend 1)", historyBuffers["bassFlux"]!!)
-        DiagnosticScope("BEAT PHASE (Flywheel)", historyBuffers["beatPhase"]!!)
+        // Monitor all registry signals using the centralized history
+        // The frameTick key forces these to redraw even though the buffer object reference doesn't change
+        key(frameTick) {
+            DiagnosticScope("ACCENT (Weighted Flux + Decay)", CvRegistry.history["accent"]!!)
+            DiagnosticScope("ONSET (Raw Spikes)", CvRegistry.history["onset"]!!)
+            
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.DarkGray)
+            
+            DiagnosticScope("AMP (Master Envelope)", CvRegistry.history["amp"]!!)
+            DiagnosticScope("BASS FLUX", CvRegistry.history["bassFlux"]!!)
+            DiagnosticScope("BEAT PHASE", CvRegistry.history["beatPhase"]!!)
+        }
 
         Spacer(modifier = Modifier.height(100.dp))
     }

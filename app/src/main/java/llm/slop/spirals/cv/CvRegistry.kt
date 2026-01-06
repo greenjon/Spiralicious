@@ -1,15 +1,14 @@
 package llm.slop.spirals.cv
 
 import androidx.compose.runtime.mutableStateMapOf
+import llm.slop.spirals.cv.ui.CvHistoryBuffer
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.*
 
 /**
  * Central registry for all Control Voltage signals.
- * Optimized for high-speed access between Audio, Renderer, and UI threads.
  */
 object CvRegistry {
-    // High-performance thread-safe map for Audio and Renderer math
     private val rawSignalData = ConcurrentHashMap<String, Float>().apply {
         put("amp", 0f)
         put("bass", 0f)
@@ -17,12 +16,16 @@ object CvRegistry {
         put("high", 0f)
         put("bassFlux", 0f)
         put("onset", 0f)
+        put("accent", 0f)
         put("beatPhase", 0f)
         put("bpm", 120f)
-        put("accent", 0f)
     }
 
-    // Compose-observable map for UI state (Diagnostic Lab)
+    // Diagnostic History Buffers (Accessible anywhere)
+    val history = ConcurrentHashMap<String, CvHistoryBuffer>().apply {
+        rawSignalData.keys.forEach { put(it, CvHistoryBuffer(200)) }
+    }
+
     val signals = mutableStateMapOf<String, Float>().apply {
         putAll(rawSignalData)
     }
@@ -30,20 +33,31 @@ object CvRegistry {
     private var syncJob: Job? = null
 
     /**
-     * Starts a background job to sync raw data to the UI state at a steady rate.
-     * Implements an equality check to prevent redundant UI recompositions.
+     * Starts background sync for both UI state and Diagnostic history.
      */
     fun startSync(scope: CoroutineScope) {
         if (syncJob != null) return
-        syncJob = scope.launch(Dispatchers.Main) {
+        syncJob = scope.launch(Dispatchers.Default) {
             while (isActive) {
-                // Throttled sync to UI thread (60Hz)
+                val start = System.currentTimeMillis()
+                
+                // 1. Update History (Always running)
                 rawSignalData.forEach { (k, v) ->
-                    if (signals[k] != v) {
-                        signals[k] = v
+                    history[k]?.add(v)
+                }
+
+                // 2. Sync to UI State (Main Thread)
+                withContext(Dispatchers.Main) {
+                    rawSignalData.forEach { (k, v) ->
+                        if (signals[k] != v) {
+                            signals[k] = v
+                        }
                     }
                 }
-                delay(16) 
+
+                // Aim for ~60Hz (16ms)
+                val elapsed = System.currentTimeMillis() - start
+                delay((16 - elapsed).coerceAtLeast(1))
             }
         }
     }

@@ -101,6 +101,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         val o1: Float; val o2: Float; val o3: Float; val o4: Float
         val thick: Float
         val finalScale: Float
+        val rotation: Float
         val hue: Float; val sat: Float; val alpha: Float
 
         if (source != null) {
@@ -120,6 +121,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             val localScale = source.parameters["Scale"]?.value ?: 0.125f
             finalScale = localScale * source.globalScale.value * 8.0f
             
+            rotation = (source.parameters["Rotation"]?.value ?: 0f) * 2.0f * PI.toFloat()
+            
             hue = source.parameters["Hue"]?.value ?: 0f
             sat = source.parameters["Saturation"]?.value ?: 1f
             alpha = source.globalAlpha.value
@@ -128,6 +131,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             o1 = params.omega1.toFloat(); o2 = params.omega2.toFloat(); o3 = params.omega3.toFloat(); o4 = params.omega4.toFloat()
             thick = params.thickness
             finalScale = 1.0f
+            rotation = 0f
             hue = 0.5f; sat = 0.8f; alpha = 1.0f
         }
 
@@ -136,6 +140,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glUniform1f(uTLocation, (2.0 * PI).toFloat())
         GLES30.glUniform1f(uThicknessLocation, thick)
         GLES30.glUniform1f(uGlobalScaleLocation, finalScale)
+        GLES30.glUniform1f(uGlobalRotationLocation, rotation)
         GLES30.glUniform4f(uColorLocation, hue, sat, 1.0f, alpha)
         GLES30.glUniform1f(uAspectRatioLocation, aspectRatio)
 

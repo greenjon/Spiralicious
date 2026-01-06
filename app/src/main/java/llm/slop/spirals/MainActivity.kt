@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spirals.cv.*
@@ -142,26 +143,64 @@ class MainActivity : ComponentActivity() {
                             Text("Change Recipe", style = MaterialTheme.typography.labelLarge, color = Color.Cyan)
                             var petalFilter by remember { mutableStateOf<Int?>(null) }
                             var filterExpanded by remember { mutableStateOf(false) }
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
                                 Box {
                                     TextButton(onClick = { filterExpanded = true }) { Text(if (petalFilter == null) "All Petals" else "${petalFilter}P") }
-                                    DropdownMenu(expanded = filterExpanded, onDismissRequest = { filterExpanded = false }) {
-                                        DropdownMenuItem(text = { Text("All") }, onClick = { petalFilter = null; filterExpanded = false })
-                                        listOf(3, 4, 5, 6, 7, 8, 9, 10, 12, 16).forEach { p -> DropdownMenuItem(text = { Text("${p}P") }, onClick = { petalFilter = p; filterExpanded = false }) }
+                                    DropdownMenu(
+                                        expanded = filterExpanded, 
+                                        onDismissRequest = { filterExpanded = false },
+                                        containerColor = Color(0x66121212), // Highly transparent
+                                        tonalElevation = 0.dp
+                                    ) {
+                                        DropdownMenuItem(
+                                            text = { Text("All") }, 
+                                            onClick = { petalFilter = null; filterExpanded = false },
+                                            colors = MenuDefaults.itemColors(textColor = Color.White)
+                                        )
+                                        listOf(3, 4, 5, 6, 7, 8, 9, 10, 12, 16).forEach { p -> 
+                                            DropdownMenuItem(
+                                                text = { Text("${p}P") }, 
+                                                onClick = { petalFilter = p; filterExpanded = false },
+                                                colors = MenuDefaults.itemColors(textColor = Color.White)
+                                            ) 
+                                        }
                                     }
                                 }
+                                
+                                Spacer(modifier = Modifier.weight(1f))
+                                
                                 var recipeExpanded by remember { mutableStateOf(false) }
-                                Box(modifier = Modifier.weight(1f)) {
-                                    Button(onClick = { recipeExpanded = true }, modifier = Modifier.fillMaxWidth()) { Text("Select Ratio...") }
-                                    DropdownMenu(expanded = recipeExpanded, onDismissRequest = { recipeExpanded = false }) {
+                                Box {
+                                    Button(
+                                        onClick = { recipeExpanded = true }, 
+                                        contentPadding = PaddingValues(horizontal = 12.dp),
+                                        shape = MaterialTheme.shapes.extraSmall
+                                    ) { 
+                                        Text("Recipe") 
+                                    }
+                                    DropdownMenu(
+                                        expanded = recipeExpanded, 
+                                        onDismissRequest = { recipeExpanded = false },
+                                        containerColor = Color(0x66121212), // Highly transparent
+                                        tonalElevation = 0.dp,
+                                        properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true),
+                                        modifier = Modifier.widthIn(max = 240.dp)
+                                    ) {
                                         val filtered = MandalaLibrary.MandalaRatios.filter { petalFilter == null || it.petals == petalFilter }.take(100)
                                         filtered.forEach { ratio ->
-                                            DropdownMenuItem(text = { Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)") }, onClick = { 
-                                                visualSource.recipe = ratio
-                                                manualChangeTrigger++
-                                                recipeExpanded = false
-                                                isHeaderExpanded = false 
-                                            } )
+                                            DropdownMenuItem(
+                                                contentPadding = PaddingValues(horizontal = 12.dp),
+                                                text = { 
+                                                    Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)", color = Color.White) 
+                                                }, 
+                                                onClick = { 
+                                                    visualSource.recipe = ratio
+                                                    manualChangeTrigger++
+                                                }
+                                            )
                                         }
                                     }
                                 }

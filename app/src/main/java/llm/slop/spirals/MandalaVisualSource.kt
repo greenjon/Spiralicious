@@ -21,7 +21,8 @@ class MandalaVisualSource : VisualSource {
         "Scale" to ModulatableParameter(0.125f), // Default 0.125 * 8x = 1.0 Unity
         "Thickness" to ModulatableParameter(0.1f),
         "Hue" to ModulatableParameter(0.0f),
-        "Saturation" to ModulatableParameter(1.0f)
+        "Saturation" to ModulatableParameter(1.0f),
+        "Rotation" to ModulatableParameter(0.0f)
     )
 
     override val globalAlpha = ModulatableParameter(1.0f)
@@ -50,6 +51,7 @@ class MandalaVisualSource : VisualSource {
         val hue = parameters["Hue"]!!.value * 360f
         val sat = parameters["Saturation"]!!.value
         val alpha = globalAlpha.value
+        val rotationDegrees = parameters["Rotation"]!!.value * 360f
 
         paint.strokeWidth = thickness
         hsvBuffer[0] = hue
@@ -69,6 +71,7 @@ class MandalaVisualSource : VisualSource {
 
         canvas.save()
         canvas.translate(cx, cy)
+        canvas.rotate(rotationDegrees)
         canvas.scale(scale, scale)
 
         var lastX = 0f

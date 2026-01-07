@@ -22,6 +22,7 @@ import llm.slop.spirals.cv.*
 import llm.slop.spirals.R
 import llm.slop.spirals.ui.components.KnobConfig
 import llm.slop.spirals.ui.components.knobInput
+import llm.slop.spirals.ui.components.KnobView
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -69,34 +70,23 @@ fun InstrumentEditorScreen(
         Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
             if (!isArmLength) {
                 var baseVal by remember(focusedId) { mutableFloatStateOf(focusedParam.baseValue) }
-                Text("Base Value: ${(baseVal * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                
-                Box(
-                    modifier = Modifier
-                        .padding(bottom = 8.dp)
-                        .padding(horizontal = 24.dp)
-                        .height(32.dp)
-                        .fillMaxWidth()
-                        .background(Color.DarkGray.copy(alpha = 0.3f), MaterialTheme.shapes.extraSmall)
-                        .knobInput(
-                            value = baseVal,
-                            config = KnobConfig(isBipolar = false),
-                            onValueChange = { newValue ->
-                                baseVal = newValue
-                                focusedParam.baseValue = newValue
-                            },
-                            onInteractionFinished = onInteractionFinished
-                        ),
-                    contentAlignment = Alignment.CenterStart
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(baseVal.coerceIn(0f, 1f))
-                            .background(Color.Cyan.copy(alpha = 0.4f))
+                    Text("Base: ${(baseVal * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray, modifier = Modifier.width(60.dp))
+                    KnobView(
+                        value = baseVal,
+                        onValueChange = { newValue ->
+                            baseVal = newValue
+                            focusedParam.baseValue = newValue
+                        },
+                        onInteractionFinished = onInteractionFinished,
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        isBipolar = false,
+                        focused = true
                     )
                 }
-                
                 HorizontalDivider(color = Color.DarkGray.copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 16.dp))
             }
 
@@ -289,96 +279,57 @@ fun ModulatorRow(
         }
 
         if (sourceId != "none") {
-            Text("Weight: ${(weight * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-            
-            Box(
-                modifier = Modifier
-                    .padding(horizontal = 24.dp)
-                    .height(32.dp)
-                    .fillMaxWidth()
-                    .background(Color.DarkGray.copy(alpha = 0.3f), MaterialTheme.shapes.extraSmall)
-                    .knobInput(
-                        value = weight,
-                        config = KnobConfig(isBipolar = true),
-                        onValueChange = { newValue ->
-                            weight = newValue
-                            onUpdate(CvModulator(sourceId, operator, newValue, bypassed, waveform, subdivision, phaseOffset, slope))
-                        },
-                        onInteractionFinished = onInteractionFinished
-                    ),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                // Visual for Bipolar: Bar from center
-                val visualPos = (weight + 1f) / 2f
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(visualPos.coerceIn(0f, 1f))
-                        .background(Color.Cyan.copy(alpha = 0.4f))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Weight: ${(weight * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray, modifier = Modifier.width(70.dp))
+                KnobView(
+                    value = weight,
+                    onValueChange = { newValue ->
+                        weight = newValue
+                        onUpdate(CvModulator(sourceId, operator, newValue, bypassed, waveform, subdivision, phaseOffset, slope))
+                    },
+                    onInteractionFinished = onInteractionFinished,
+                    isBipolar = true,
+                    focused = true,
+                    modifier = Modifier.padding(horizontal = 8.dp)
                 )
             }
             
             if (isBeat) {
-                Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     val hasSecondSlider = waveform == Waveform.TRIANGLE || waveform == Waveform.SQUARE
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Phase: ${(phaseOffset * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                        Box(
-                            modifier = Modifier
-                                .padding(
-                                    start = 24.dp, 
-                                    end = if (hasSecondSlider) 4.dp else 24.dp
-                                )
-                                .height(32.dp)
-                                .fillMaxWidth()
-                                .background(Color.DarkGray.copy(alpha = 0.3f), MaterialTheme.shapes.extraSmall)
-                                .knobInput(
-                                    value = phaseOffset,
-                                    config = KnobConfig(isBipolar = false),
-                                    onValueChange = { newValue ->
-                                        phaseOffset = newValue
-                                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope))
-                                    },
-                                    onInteractionFinished = onInteractionFinished
-                                ),
-                            contentAlignment = Alignment.CenterStart
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth(phaseOffset.coerceIn(0f, 1f))
-                                    .background(Color.Cyan.copy(alpha = 0.4f))
-                            )
-                        }
-                    }
+                    
+                    Text("Phase: ${(phaseOffset * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray, modifier = Modifier.width(60.dp))
+                    KnobView(
+                        value = phaseOffset,
+                        onValueChange = { newValue ->
+                            phaseOffset = newValue
+                            onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope))
+                        },
+                        onInteractionFinished = onInteractionFinished,
+                        isBipolar = false,
+                        focused = true,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+
                     if (hasSecondSlider) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(if (waveform == Waveform.TRIANGLE) "Slope: ${(slope * 100).roundToInt()}" else "Duty: ${(slope * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                            Box(
-                                modifier = Modifier
-                                    .padding(start = 4.dp, end = 24.dp)
-                                    .height(32.dp)
-                                    .fillMaxWidth()
-                                    .background(Color.DarkGray.copy(alpha = 0.3f), MaterialTheme.shapes.extraSmall)
-                                    .knobInput(
-                                        value = slope,
-                                        config = KnobConfig(isBipolar = false),
-                                        onValueChange = { newValue ->
-                                            slope = newValue
-                                            onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, newValue))
-                                        },
-                                        onInteractionFinished = onInteractionFinished
-                                    ),
-                                contentAlignment = Alignment.CenterStart
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxHeight()
-                                        .fillMaxWidth(slope.coerceIn(0f, 1f))
-                                        .background(Color.Cyan.copy(alpha = 0.4f))
-                                )
-                            }
-                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = if (waveform == Waveform.TRIANGLE) "Slope: ${(slope * 100).roundToInt()}" else "Duty: ${(slope * 100).roundToInt()}",
+                            style = MaterialTheme.typography.labelSmall, 
+                            color = Color.Gray,
+                            modifier = Modifier.width(60.dp)
+                        )
+                        KnobView(
+                            value = slope,
+                            onValueChange = { newValue ->
+                                slope = newValue
+                                onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, newValue))
+                            },
+                            onInteractionFinished = onInteractionFinished,
+                            isBipolar = false,
+                            focused = true,
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        )
                     }
                 }
             }

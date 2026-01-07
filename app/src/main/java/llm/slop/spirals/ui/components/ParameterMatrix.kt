@@ -1,6 +1,5 @@
 package llm.slop.spirals.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -62,34 +61,18 @@ fun ParameterMatrix(
                                     color = if (isFocused) Color.Cyan else Color.Gray
                                 )
                                 
-                                // High-resolution Knob UI Component (Visual only for now)
-                                Box(
-                                    modifier = Modifier
-                                        .padding(vertical = 4.dp)
-                                        .height(32.dp)
-                                        .fillMaxWidth()
-                                        .background(Color.DarkGray.copy(alpha = 0.3f), MaterialTheme.shapes.extraSmall)
-                                        .knobInput(
-                                            value = currentValue,
-                                            config = KnobConfig(isBipolar = false),
-                                            onValueChange = { newValue ->
-                                                currentValue = newValue
-                                                param.baseValue = newValue
-                                                onFocusRequest(id)
-                                            },
-                                            onInteractionFinished = onInteractionFinished
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    // Simple visual indicator: a bar that grows with value
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .fillMaxWidth(currentValue)
-                                            .background(if (isFocused) Color.Cyan.copy(alpha = 0.4f) else Color.Gray.copy(alpha = 0.2f))
-                                            .align(Alignment.CenterStart)
-                                    )
-                                }
+                                KnobView(
+                                    value = currentValue,
+                                    onValueChange = { newValue ->
+                                        currentValue = newValue
+                                        param.baseValue = newValue
+                                        onFocusRequest(id)
+                                    },
+                                    onInteractionFinished = onInteractionFinished,
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                    isBipolar = false,
+                                    focused = isFocused
+                                )
                             }
                         }
                     } else {

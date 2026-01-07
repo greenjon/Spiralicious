@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import llm.slop.spirals.MandalaVisualSource
 import llm.slop.spirals.MandalaViewModel
 import llm.slop.spirals.cv.*
@@ -46,8 +47,32 @@ fun InstrumentEditorScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(AppBackground)
-            .padding(8.dp)
+            .padding(horizontal = 8.dp)
     ) {
+        // Grid Header
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val headerStyle = MaterialTheme.typography.labelSmall.copy(
+                fontSize = 9.sp, 
+                color = AppText.copy(alpha = 0.5f)
+            )
+            val items = listOf("CV", "+/X", "Weight", "Wave", "BEAT", "Phase", "Mod")
+            items.forEach { text ->
+                Text(
+                    text = text,
+                    style = headerStyle,
+                    modifier = Modifier.weight(1f),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        }
+        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+
         Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
             key(focusedId, refreshCount) {
                 focusedParam.modulators.forEachIndexed { index, mod ->
@@ -63,7 +88,7 @@ fun InstrumentEditorScreen(
                             onInteractionFinished()
                         }
                     )
-                    HorizontalDivider(color = AppText, modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(color = AppText.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
                 }
 
                 ModulatorRow(

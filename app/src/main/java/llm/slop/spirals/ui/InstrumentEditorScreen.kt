@@ -76,7 +76,7 @@ fun InstrumentEditorScreen(
                 ) {
                     Text("Base: ${(baseVal * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray, modifier = Modifier.width(60.dp))
                     KnobView(
-                        value = baseVal,
+                        currentValue = baseVal,
                         onValueChange = { newValue ->
                             baseVal = newValue
                             focusedParam.baseValue = newValue
@@ -84,7 +84,8 @@ fun InstrumentEditorScreen(
                         onInteractionFinished = onInteractionFinished,
                         modifier = Modifier.padding(horizontal = 8.dp),
                         isBipolar = false,
-                        focused = true
+                        focused = true,
+                        knobSize = 32.dp
                     )
                 }
                 HorizontalDivider(color = Color.DarkGray.copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 16.dp))
@@ -282,7 +283,7 @@ fun ModulatorRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Weight: ${(weight * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray, modifier = Modifier.width(70.dp))
                 KnobView(
-                    value = weight,
+                    currentValue = weight,
                     onValueChange = { newValue ->
                         weight = newValue
                         onUpdate(CvModulator(sourceId, operator, newValue, bypassed, waveform, subdivision, phaseOffset, slope))
@@ -290,7 +291,8 @@ fun ModulatorRow(
                     onInteractionFinished = onInteractionFinished,
                     isBipolar = true,
                     focused = true,
-                    modifier = Modifier.padding(horizontal = 8.dp)
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    knobSize = 32.dp
                 )
             }
             
@@ -300,7 +302,7 @@ fun ModulatorRow(
                     
                     Text("Phase: ${(phaseOffset * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray, modifier = Modifier.width(60.dp))
                     KnobView(
-                        value = phaseOffset,
+                        currentValue = phaseOffset,
                         onValueChange = { newValue ->
                             phaseOffset = newValue
                             onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope))
@@ -308,7 +310,8 @@ fun ModulatorRow(
                         onInteractionFinished = onInteractionFinished,
                         isBipolar = false,
                         focused = true,
-                        modifier = Modifier.padding(horizontal = 8.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        knobSize = 32.dp
                     )
 
                     if (hasSecondSlider) {
@@ -320,7 +323,7 @@ fun ModulatorRow(
                             modifier = Modifier.width(60.dp)
                         )
                         KnobView(
-                            value = slope,
+                            currentValue = slope,
                             onValueChange = { newValue ->
                                 slope = newValue
                                 onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, newValue))
@@ -328,7 +331,8 @@ fun ModulatorRow(
                             onInteractionFinished = onInteractionFinished,
                             isBipolar = false,
                             focused = true,
-                            modifier = Modifier.padding(horizontal = 8.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                            knobSize = 32.dp
                         )
                     }
                 }

@@ -22,6 +22,26 @@ object CvRegistry {
         put("bpm", 120f)
     }
 
+    // Anchor State for Precision Clock
+    private var anchorBeats = 0.0
+    private var anchorBpm = 120f
+    private var anchorTimeNs = System.nanoTime()
+
+    fun updateBeatAnchor(beats: Double, bpm: Float, timeNs: Long) {
+        anchorBeats = beats
+        anchorBpm = bpm
+        anchorTimeNs = timeNs
+        update("totalBeats", beats.toFloat())
+        update("bpm", bpm)
+    }
+
+    fun getSynchronizedTotalBeats(): Double {
+        val now = System.nanoTime()
+        val elapsedSec = (now - anchorTimeNs) / 1_000_000_000.0
+        val beatDelta = elapsedSec * (anchorBpm / 60.0)
+        return anchorBeats + beatDelta
+    }
+
     // Diagnostic History Buffers (Accessible anywhere)
     val history = ConcurrentHashMap<String, CvHistoryBuffer>().apply {
         rawSignalData.keys.forEach { put(it, CvHistoryBuffer(200)) }

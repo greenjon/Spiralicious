@@ -28,8 +28,7 @@ class AudioEngine {
     
     // Master Clock State
     private var lastFrameTime = System.nanoTime()
-    private var masterPhase = 0f
-    private var totalBeats = 0f
+    private var totalBeats = 0.0 // Use Double for precision
     private var estimatedBpm = 120f
 
     // BPM Estimation State
@@ -112,11 +111,11 @@ class AudioEngine {
                                 // SMART SYNC: Only force reset if it's a "Strong" transient 
                                 // AND we are significantly out of phase (> 10%)
                                 if (onsetNormalized > 1.4f) {
-                                    val currentPhase = totalBeats % 1.0f
-                                    val isNearBeat = currentPhase < 0.1f || currentPhase > 0.9f
+                                    val currentPhase = totalBeats % 1.0
+                                    val isNearBeat = currentPhase < 0.1 || currentPhase > 0.9
                                     if (!isNearBeat) {
                                         // Align totalBeats to the nearest integer
-                                        totalBeats = Math.round(totalBeats).toFloat()
+                                        totalBeats = Math.round(totalBeats).toDouble()
                                     }
                                 }
                             }
@@ -127,13 +126,15 @@ class AudioEngine {
                         lastOnsetNormalized = onsetNormalized
 
                         // Flywheel
-                        val deltaTimeSec = (currentTime - lastFrameTime) / 1_000_000_000f
+                        val deltaTimeSec = (currentTime - lastFrameTime) / 1_000_000_000.0
                         lastFrameTime = currentTime
-                        val beatDelta = deltaTimeSec * (estimatedBpm / 60f)
+                        val beatDelta = deltaTimeSec * (estimatedBpm / 60.0)
                         totalBeats += beatDelta
-                        masterPhase = totalBeats % 1.0f
 
-                        // Update Registry
+                        // Update Registry with the Anchor point
+                        // This provides the source of truth for high-precision interpolation in the renderer
+                        CvRegistry.updateBeatAnchor(totalBeats, estimatedBpm, currentTime)
+
                         val ref = 0.1f
                         CvRegistry.update("amp", (amp / ref).coerceIn(0f, 2f))
                         CvRegistry.update("bass", (bass / ref).coerceIn(0f, 2f))
@@ -142,9 +143,7 @@ class AudioEngine {
                         CvRegistry.update("bassFlux", (bassFlux / 0.05f).coerceIn(0f, 2f))
                         CvRegistry.update("onset", onsetNormalized)
                         CvRegistry.update("accent", accentLevel)
-                        CvRegistry.update("bpm", estimatedBpm)
-                        CvRegistry.update("beatPhase", masterPhase)
-                        CvRegistry.update("totalBeats", totalBeats)
+                        // Note: beatPhase is no longer updated here to prevent conflicts with the precision clock
                     }
                 }
             }

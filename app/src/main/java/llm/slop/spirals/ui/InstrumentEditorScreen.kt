@@ -253,7 +253,7 @@ fun ModulatorRow(
 
         if (sourceId != "none") {
             Text("Weight: ${"%.2f".format(weight)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-            Slider(value = weight, onValueChange = { weight = it; onUpdate(CvModulator(sourceId, operator, it, bypassed, waveform, subdivision, phaseOffset, slope)) }, onValueChangeFinished = onInteractionFinished, valueRange = -4f..4f, modifier = Modifier.height(24.dp))
+            Slider(value = weight, onValueChange = { weight = it; onUpdate(CvModulator(sourceId, operator, it, bypassed, waveform, subdivision, phaseOffset, slope)) }, onValueChangeFinished = onInteractionFinished, valueRange = -1f..1f, modifier = Modifier.height(24.dp))
             
             if (isBeat) {
                 Row(modifier = Modifier.fillMaxWidth()) {

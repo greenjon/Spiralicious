@@ -49,30 +49,37 @@ class ModulatableParameter(
         for (mod in modulators) {
             if (mod.bypassed) continue
             
-            val rawCv = CvRegistry.get(mod.sourceId)
-            
-            // Advanced BEAT logic
+            // Advanced BEAT logic - checks for "beatPhase" or "none" (if subdivision is set)
+            // But specifically, we use sourceId "beatPhase" as the trigger for the precision clock.
             val finalCv = if (mod.sourceId == "beatPhase") {
-                // Use totalBeats for proper subdivisions > 1 beat
-                val beats = CvRegistry.get("totalBeats")
-                val localPhase = ((beats / mod.subdivision) + mod.phaseOffset) % 1.0f
+                // Use Synchronized precision clock (Predictive Interpolation)
+                val beats = CvRegistry.getSynchronizedTotalBeats()
+                val localPhase = ((beats / mod.subdivision) + mod.phaseOffset) % 1.0
                 
-                // Ensure positive phase for % 1.0f
-                val positivePhase = if (localPhase < 0) localPhase + 1.0f else localPhase
+                // Ensure positive phase for % 1.0
+                val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
                 
                 when(mod.waveform) {
-                    Waveform.SINE -> (sin(positivePhase * 2.0 * PI).toFloat() * 0.5f) + 0.5f
+                    Waveform.SINE -> (sin(positivePhase * 2.0 * Math.PI).toFloat() * 0.5f) + 0.5f
                     Waveform.TRIANGLE -> {
-                        if (positivePhase < mod.slope) {
-                            if (mod.slope > 0f) positivePhase / mod.slope else 1f
+                        // Edge-snapping: If slope is effectively 0 or 1, treat as saw
+                        val s = mod.slope.toDouble()
+                        if (s <= 0.001) {
+                            (1.0 - positivePhase).toFloat() // Falling Saw
+                        } else if (s >= 0.999) {
+                            positivePhase.toFloat() // Rising Saw
                         } else {
-                            if (mod.slope < 1f) (1.0f - positivePhase) / (1.0f - mod.slope) else 1f
+                            if (positivePhase < s) {
+                                (positivePhase / s).toFloat()
+                            } else {
+                                ((1.0 - positivePhase) / (1.0 - s)).toFloat()
+                            }
                         }
                     }
                     Waveform.SQUARE -> if (positivePhase < mod.slope) 1.0f else 0.0f
                 }
             } else {
-                rawCv
+                CvRegistry.get(mod.sourceId)
             }
             
             val modAmount = finalCv * mod.weight

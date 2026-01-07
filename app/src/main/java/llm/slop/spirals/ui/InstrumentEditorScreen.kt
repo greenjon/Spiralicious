@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import llm.slop.spirals.MandalaVisualSource
@@ -49,30 +50,6 @@ fun InstrumentEditorScreen(
             .background(AppBackground)
             .padding(horizontal = 8.dp)
     ) {
-        // Grid Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val headerStyle = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 9.sp, 
-                color = AppText.copy(alpha = 0.5f)
-            )
-            val items = listOf("CV", "+/X", "Weight", "Wave", "BEAT", "Phase", "Mod")
-            items.forEach { text ->
-                Text(
-                    text = text,
-                    style = headerStyle,
-                    modifier = Modifier.weight(1f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-            }
-        }
-        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-
         Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
             key(focusedId, refreshCount) {
                 focusedParam.modulators.forEachIndexed { index, mod ->
@@ -128,6 +105,7 @@ fun ModulatorRow(
     var slope by remember(mod) { mutableFloatStateOf(mod?.slope ?: 0.5f) }
 
     val isBeat = sourceId == "beatPhase"
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     
     var pulseValue by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(sourceId) {
@@ -145,191 +123,260 @@ fun ModulatorRow(
         }
     }
 
-    Column(
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Remove Modulator", color = AppText) },
+            text = { Text("Are you sure you want to remove this modulation source?", color = AppText) },
+            confirmButton = {
+                TextButton(onClick = { 
+                    showDeleteConfirm = false
+                    onRemove() 
+                }) {
+                    Text("Remove", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel", color = AppText)
+                }
+            },
+            containerColor = AppBackground
+        )
+    }
+
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .then(if (bypassed) Modifier.alpha(0.5f) else Modifier)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (!isNew) {
-                Surface(
-                    modifier = Modifier
-                        .padding(end = 8.dp)
-                        .height(24.dp)
-                        .width(36.dp)
-                        .clickable { 
-                            bypassed = !bypassed
-                            onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope))
-                            onInteractionFinished() 
-                        },
-                    color = AppBackground,
-                    shape = MaterialTheme.shapes.extraSmall,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, if (bypassed) AppText else AppAccent)
-                ) {
-                    Box(contentAlignment = Alignment.Center) { 
-                        Text(
-                            text = if (bypassed) "OFF" else "ON", 
-                            color = if (bypassed) AppText else AppText, 
-                            style = MaterialTheme.typography.labelSmall
-                        ) 
-                    }
-                }
-            } else {
-                Spacer(modifier = Modifier.width(44.dp))
-            }
-
-            var sourceExpanded by remember { mutableStateOf(false) }
-            Box(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = if (isBeat) "BEAT" else sourceId.uppercase(),
-                    modifier = Modifier.clickable { sourceExpanded = true }.padding(8.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AppText
-                )
-                DropdownMenu(expanded = sourceExpanded, onDismissRequest = { sourceExpanded = false }) {
-                    listOf("none", "amp", "bass", "mid", "high", "accent", "beatPhase").forEach { s ->
-                        DropdownMenuItem(text = { Text(if (s == "beatPhase") "BEAT" else s.uppercase()) }, onClick = { 
-                            sourceId = s
-                            if (s != "none") { onUpdate(CvModulator(s, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope)); onInteractionFinished() }
-                            sourceExpanded = false
-                        })
-                    }
-                }
-            }
-
-            if (sourceId != "none") {
-                TextButton(
-                    onClick = { 
-                        val newOp = if (operator == ModulationOperator.ADD) ModulationOperator.MUL else ModulationOperator.ADD
-                        operator = newOp
-                        if (!isNew) { onUpdate(CvModulator(sourceId, newOp, weight, bypassed, waveform, subdivision, phaseOffset, slope)); onInteractionFinished() }
-                    },
-                    modifier = Modifier.width(52.dp)
-                ) { Text(if (operator == ModulationOperator.ADD) "ADD" else "MUL", color = AppAccent, style = MaterialTheme.typography.labelSmall) }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Weight:", style = MaterialTheme.typography.labelSmall, color = AppText)
-                    KnobView(
-                        currentValue = weight,
-                        onValueChange = { newValue ->
-                            weight = newValue
-                            onUpdate(CvModulator(sourceId, operator, newValue, bypassed, waveform, subdivision, phaseOffset, slope))
-                        },
-                        onInteractionFinished = onInteractionFinished,
-                        isBipolar = true,
-                        focused = true,
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                        knobSize = 40.dp,
-                        showValue = true
-                    )
-                }
-            }
-
-            if (!isNew) {
-                IconButton(onClick = onRemove) { Icon(Icons.Default.Delete, contentDescription = "Remove", tint = AppText, modifier = Modifier.size(16.dp)) }
-            }
-        }
-
-        if (sourceId == "beatPhase") {
-            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Spacer(modifier = Modifier.width(44.dp))
-                
-                IconButton(onClick = {
-                    val nextWave = Waveform.values()[(waveform.ordinal + 1) % Waveform.values().size]
-                    waveform = nextWave
-                    onUpdate(CvModulator(sourceId, operator, weight, bypassed, nextWave, subdivision, phaseOffset, slope))
-                    onInteractionFinished()
-                }) {
-                    Icon(
-                        painter = painterResource(id = when(waveform) {
-                            Waveform.SINE -> R.drawable.ic_wave_sine
-                            Waveform.TRIANGLE -> R.drawable.ic_wave_triangle
-                            Waveform.SQUARE -> R.drawable.ic_wave_square
-                        }),
-                        contentDescription = "Waveform",
-                        tint = AppAccent,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                
-                var subExpanded by remember { mutableStateOf(false) }
-                Box {
-                    TextButton(onClick = { subExpanded = true }) {
-                        val subText = when(subdivision) {
-                            0.0625f -> "1/16"
-                            0.125f -> "1/8"
-                            0.25f -> "1/4"
-                            0.5f -> "1/2"
-                            else -> subdivision.toInt().toString()
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // LEFT PART: CV Name + Controls Below + Wave/Beat
+                Column(modifier = Modifier.weight(1.8f)) {
+                    // Top Row: CV Name + Add/Mul
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        var sourceExpanded by remember { mutableStateOf(false) }
+                        Box(modifier = Modifier.width(64.dp)) {
+                            Text(
+                                text = if (isBeat) "BEAT" else sourceId.uppercase(),
+                                modifier = Modifier.clickable { sourceExpanded = true }.padding(vertical = 4.dp, horizontal = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppText,
+                                maxLines = 1
+                            )
+                            DropdownMenu(expanded = sourceExpanded, onDismissRequest = { sourceExpanded = false }) {
+                                listOf("none", "amp", "bass", "mid", "high", "accent", "beatPhase").forEach { s ->
+                                    DropdownMenuItem(text = { Text(if (s == "beatPhase") "BEAT" else s.uppercase()) }, onClick = { 
+                                        sourceId = s
+                                        if (s != "none") { onUpdate(CvModulator(s, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope)); onInteractionFinished() }
+                                        sourceExpanded = false
+                                    })
+                                }
+                            }
                         }
-                        Text(subText, color = AppAccent)
+
+                        if (sourceId != "none") {
+                            TextButton(
+                                onClick = { 
+                                    val newOp = if (operator == ModulationOperator.ADD) ModulationOperator.MUL else ModulationOperator.ADD
+                                    operator = newOp
+                                    if (!isNew) { onUpdate(CvModulator(sourceId, newOp, weight, bypassed, waveform, subdivision, phaseOffset, slope)); onInteractionFinished() }
+                                },
+                                modifier = Modifier.height(32.dp).padding(horizontal = 4.dp),
+                                contentPadding = PaddingValues(0.dp)
+                            ) { 
+                                Text(if (operator == ModulationOperator.ADD) "ADD" else "MUL", color = AppAccent, style = MaterialTheme.typography.labelSmall) 
+                            }
+                        }
                     }
-                    DropdownMenu(expanded = subExpanded, onDismissRequest = { subExpanded = false }) {
-                        listOf(0.0625f, 0.125f, 0.25f, 0.5f, 1f, 2f, 4f, 8f, 16f, 32f, 64f, 128f, 256f).forEach { sub ->
-                            DropdownMenuItem(text = {
-                                Text(when(sub) {
+
+                    // Bottom Row: On/Off + Wave/Beat
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (!isNew) {
+                            Surface(
+                                modifier = Modifier
+                                    .padding(end = 4.dp)
+                                    .height(20.dp)
+                                    .width(32.dp)
+                                    .clickable { 
+                                        bypassed = !bypassed
+                                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope))
+                                        onInteractionFinished() 
+                                    },
+                                color = AppBackground,
+                                shape = MaterialTheme.shapes.extraSmall,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (bypassed) AppText else AppAccent)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) { 
+                                    Text(
+                                        text = if (bypassed) "OFF" else "ON", 
+                                        color = AppText, 
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp)
+                                    ) 
+                                }
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.width(36.dp))
+                        }
+
+                        if (isBeat) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            IconButton(onClick = {
+                                val nextWave = Waveform.values()[(waveform.ordinal + 1) % Waveform.values().size]
+                                waveform = nextWave
+                                onUpdate(CvModulator(sourceId, operator, weight, bypassed, nextWave, subdivision, phaseOffset, slope))
+                                onInteractionFinished()
+                            }, modifier = Modifier.size(28.dp)) {
+                                Icon(
+                                    painter = painterResource(id = when(waveform) {
+                                        Waveform.SINE -> R.drawable.ic_wave_sine
+                                        Waveform.TRIANGLE -> R.drawable.ic_wave_triangle
+                                        Waveform.SQUARE -> R.drawable.ic_wave_square
+                                    }),
+                                    contentDescription = "Waveform",
+                                    tint = AppAccent,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            var subExpanded by remember { mutableStateOf(false) }
+                            Box(contentAlignment = Alignment.Center) {
+                                val subText = when(subdivision) {
                                     0.0625f -> "1/16"
                                     0.125f -> "1/8"
                                     0.25f -> "1/4"
                                     0.5f -> "1/2"
-                                    else -> sub.toInt().toString()
-                                })
-                            }, onClick = {
-                                subdivision = sub
-                                onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, sub, phaseOffset, slope))
-                                onInteractionFinished()
-                                subExpanded = false
-                            })
+                                    else -> subdivision.toInt().toString()
+                                }
+                                Text(
+                                    text = subText,
+                                    modifier = Modifier
+                                        .clickable { subExpanded = true }
+                                        .padding(horizontal = 8.dp),
+                                    color = AppAccent, 
+                                    style = MaterialTheme.typography.labelSmall, 
+                                    textAlign = TextAlign.Center
+                                )
+                                
+                                DropdownMenu(expanded = subExpanded, onDismissRequest = { subExpanded = false }) {
+                                    listOf(0.0625f, 0.125f, 0.25f, 0.5f, 1f, 2f, 4f, 8f, 16f, 32f, 64f, 128f, 256f).forEach { sub ->
+                                        DropdownMenuItem(text = {
+                                            Text(when(sub) {
+                                                0.0625f -> "1/16"
+                                                0.125f -> "1/8"
+                                                0.25f -> "1/4"
+                                                0.5f -> "1/2"
+                                                else -> sub.toInt().toString()
+                                            })
+                                        }, onClick = {
+                                            subdivision = sub
+                                            onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, sub, phaseOffset, slope))
+                                            onInteractionFinished()
+                                            subExpanded = false
+                                        })
+                                    }
+                                }
+                            }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
-                
-                Text("Phase:", style = MaterialTheme.typography.labelSmall, color = AppText)
-                KnobView(
-                    currentValue = phaseOffset,
-                    onValueChange = { newValue ->
-                        phaseOffset = newValue
-                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope))
-                    },
-                    onInteractionFinished = onInteractionFinished,
-                    isBipolar = false,
-                    focused = true,
-                    modifier = Modifier.padding(horizontal = 4.dp),
-                    knobSize = 32.dp,
-                    showValue = true
-                )
+                // RIGHT PART: Knobs
+                if (sourceId != "none") {
+                    // Weight Knob
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        KnobView(
+                            currentValue = weight,
+                            onValueChange = { newValue ->
+                                weight = newValue
+                                onUpdate(CvModulator(sourceId, operator, newValue, bypassed, waveform, subdivision, phaseOffset, slope))
+                            },
+                            onInteractionFinished = onInteractionFinished,
+                            isBipolar = true,
+                            focused = true,
+                            knobSize = 44.dp,
+                            showValue = true
+                        )
+                        Text("Weight", style = MaterialTheme.typography.labelSmall, color = AppText)
+                    }
 
-                val hasSecondSlider = waveform == Waveform.TRIANGLE || waveform == Waveform.SQUARE
-                if (hasSecondSlider) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (waveform == Waveform.TRIANGLE) "Slope:" else "Duty:",
-                        style = MaterialTheme.typography.labelSmall, 
-                        color = AppText
-                    )
-                    KnobView(
-                        currentValue = slope,
-                        onValueChange = { newValue ->
-                            slope = newValue
-                            onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, newValue))
-                        },
-                        onInteractionFinished = onInteractionFinished,
-                        isBipolar = false,
-                        focused = true,
-                        modifier = Modifier.padding(horizontal = 4.dp),
-                        knobSize = 32.dp,
-                        showValue = true
-                    )
+                    if (sourceId == "beatPhase") {
+                        // Phase Knob
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            KnobView(
+                                currentValue = phaseOffset,
+                                onValueChange = { newValue ->
+                                    phaseOffset = newValue
+                                    onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope))
+                                },
+                                onInteractionFinished = onInteractionFinished,
+                                isBipolar = false,
+                                focused = true,
+                                knobSize = 44.dp,
+                                showValue = true
+                            )
+                            Text("Phase", style = MaterialTheme.typography.labelSmall, color = AppText)
+                        }
+
+                        // Slope/Duty Knob
+                        val hasSecondSlider = waveform == Waveform.TRIANGLE || waveform == Waveform.SQUARE
+                        if (hasSecondSlider) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                                KnobView(
+                                    currentValue = slope,
+                                    onValueChange = { newValue ->
+                                        slope = newValue
+                                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, newValue))
+                                    },
+                                    onInteractionFinished = onInteractionFinished,
+                                    isBipolar = false,
+                                    focused = true,
+                                    knobSize = 44.dp,
+                                    showValue = true
+                                )
+                                Text(
+                                    text = if (waveform == Waveform.TRIANGLE) "Slope" else "Duty",
+                                    style = MaterialTheme.typography.labelSmall, 
+                                    color = AppText
+                                )
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.weight(2.7f))
+                    }
+                } else {
+                    Spacer(modifier = Modifier.weight(3.7f))
+                }
+            }
+
+            if (sourceId != "none") {
+                Box(modifier = Modifier.padding(top = 4.dp).fillMaxWidth().height(1.dp).background(AppText)) {
+                    Box(modifier = Modifier.fillMaxWidth(pulseValue.coerceIn(0f, 1f)).fillMaxHeight().background(AppAccent))
                 }
             }
         }
 
-        if (sourceId != "none") {
-            Box(modifier = Modifier.padding(top = 4.dp).fillMaxWidth().height(1.dp).background(AppText)) {
-                Box(modifier = Modifier.fillMaxWidth(pulseValue.coerceIn(0f, 1f)).fillMaxHeight().background(AppAccent))
+        if (!isNew) {
+            IconButton(
+                onClick = { showDeleteConfirm = true },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(24.dp)
+            ) {
+                Icon(
+                    Icons.Default.Close, 
+                    contentDescription = "Remove", 
+                    tint = AppText.copy(alpha = 0.5f), 
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     }

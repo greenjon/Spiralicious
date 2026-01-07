@@ -22,26 +22,31 @@ fun ParameterMatrix(
     onInteractionFinished: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val row1Count = 4
-    val row1Labels = labels.take(row1Count)
-    val row1Params = parameters.take(row1Count)
-    
-    val row2Labels = labels.drop(row1Count)
-    val row2Params = parameters.drop(row1Count)
+    // Row 1: L1 - L4
+    val row1Ids = listOf("L1", "L2", "L3", "L4")
+    val row1Indices = row1Ids.map { labels.indexOf(it) }.filter { it != -1 }
+    val row1Params = row1Indices.map { parameters[it] }
 
-    Column(modifier = modifier.fillMaxWidth()) {
-        // Row 1: L1-L4 (Labels above)
+    // Row 2: Everything else (expected to be 5 knobs)
+    val remainingIndices = parameters.indices.filter { !row1Indices.contains(it) }
+    val remainingLabels = remainingIndices.map { labels[it] }
+    val remainingParams = remainingIndices.map { parameters[it] }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // TOP ROW: 4 knobs, 81.5% width, centered
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier.fillMaxWidth(0.815f),
+            horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
             row1Params.forEachIndexed { index, param ->
-                val id = row1Labels[index]
                 KnobCell(
-                    id = id,
+                    id = row1Ids[index],
                     param = param,
-                    isFocused = id == focusedParameterId,
+                    isFocused = row1Ids[index] == focusedParameterId,
                     onFocusRequest = onFocusRequest,
                     onInteractionFinished = onInteractionFinished,
                     labelAbove = true
@@ -49,20 +54,19 @@ fun ParameterMatrix(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
-        // Row 2: Rest (Labels underneath)
+        // BOTTOM ROW: 5 knobs, full width
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            row2Params.forEachIndexed { index, param ->
-                val id = row2Labels[index]
+            remainingParams.forEachIndexed { index, param ->
                 KnobCell(
-                    id = id,
+                    id = remainingLabels[index],
                     param = param,
-                    isFocused = id == focusedParameterId,
+                    isFocused = remainingLabels[index] == focusedParameterId,
                     onFocusRequest = onFocusRequest,
                     onInteractionFinished = onInteractionFinished,
                     labelAbove = false
@@ -73,26 +77,25 @@ fun ParameterMatrix(
 }
 
 @Composable
-private fun RowScope.KnobCell(
+private fun KnobCell(
     id: String,
     param: ModulatableParameter,
     isFocused: Boolean,
     onFocusRequest: (String) -> Unit,
     onInteractionFinished: () -> Unit,
-    labelAbove: Boolean
+    labelAbove: Boolean,
+    modifier: Modifier = Modifier
 ) {
     var currentValue by remember(param) { mutableFloatStateOf(param.baseValue) }
 
     Box(
-        modifier = Modifier
-            .weight(1f)
+        modifier = modifier
             .padding(2.dp)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = { onFocusRequest(id) }
-            )
-            .padding(2.dp),
+            ),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -100,7 +103,8 @@ private fun RowScope.KnobCell(
                 Text(
                     text = id,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (isFocused) AppAccent else AppText
+                    color = if (isFocused) AppAccent else AppText,
+                    maxLines = 1
                 )
             }
             KnobView(
@@ -111,7 +115,7 @@ private fun RowScope.KnobCell(
                     onFocusRequest(id)
                 },
                 onInteractionFinished = onInteractionFinished,
-                modifier = Modifier.padding(vertical = 2.dp),
+                modifier = Modifier.padding(vertical = 1.dp),
                 isBipolar = false,
                 focused = isFocused,
                 knobSize = 44.dp,
@@ -121,7 +125,8 @@ private fun RowScope.KnobCell(
                 Text(
                     text = id,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (isFocused) AppAccent else AppText
+                    color = if (isFocused) AppAccent else AppText,
+                    maxLines = 1
                 )
             }
         }

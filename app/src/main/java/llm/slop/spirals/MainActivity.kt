@@ -274,10 +274,10 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // 4. Arm Length Matrix
+                // 4. Arm Length Matrix - Updated to show all 9 parameters in two rows
                 ParameterMatrix(
-                    labels = listOf("L1", "L2", "L3", "L4"),
-                    parameters = listOf(visualSource.parameters["L1"]!!, visualSource.parameters["L2"]!!, visualSource.parameters["L3"]!!, visualSource.parameters["L4"]!!),
+                    labels = visualSource.parameters.keys.toList(),
+                    parameters = visualSource.parameters.values.toList(),
                     focusedParameterId = focusedParameterId, 
                     onFocusRequest = { focusedParameterId = it },
                     onInteractionFinished = { manualChangeTrigger++ }

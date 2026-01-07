@@ -45,9 +45,9 @@ fun KnobView(
             val canvasCenter = center 
             val radius = this.size.minDimension / 2f - 4.dp.toPx()
             
-            // Background track - Brighter as requested
+            // Background track - Brighter grey for visibility
             drawCircle(
-                color = Color.Gray.copy(alpha = 0.3f),
+                color = Color.LightGray.copy(alpha = 0.2f),
                 radius = radius,
                 center = canvasCenter,
                 style = Stroke(width = 2.dp.toPx())
@@ -60,7 +60,7 @@ fun KnobView(
                 // Sweep from center (12 o'clock / 270°)
                 val sweep = currentValue * 180f
                 drawArc(
-                    color = if (focused) Color.Cyan else Color.LightGray,
+                    color = if (focused) Color.Cyan else Color.White.copy(alpha = 0.7f),
                     startAngle = 270f,
                     sweepAngle = sweep,
                     useCenter = false,
@@ -71,7 +71,7 @@ fun KnobView(
             } else {
                 // Sweep from 7 o'clock (120°)
                 drawArc(
-                    color = if (focused) Color.Cyan else Color.LightGray,
+                    color = if (focused) Color.Cyan else Color.White.copy(alpha = 0.7f),
                     startAngle = 120f,
                     sweepAngle = 300f * currentValue,
                     useCenter = false,
@@ -86,7 +86,7 @@ fun KnobView(
             Text(
                 text = "${(currentValue * 100).roundToInt()}",
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = (knobSize.value * 0.25f).sp),
-                color = if (focused) Color.Cyan else Color.Gray
+                color = if (focused) Color.Cyan else Color.White
             )
         }
     }

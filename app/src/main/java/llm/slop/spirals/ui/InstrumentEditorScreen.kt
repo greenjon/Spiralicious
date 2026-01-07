@@ -36,7 +36,6 @@ fun InstrumentEditorScreen(
 ) {
     val scrollState = rememberScrollState()
     val focusedParam = source.parameters[focusedId] ?: source.globalAlpha
-    val isArmLength = focusedId.startsWith("L") && focusedId.length == 2
     
     var refreshCount by remember { mutableIntStateOf(0) }
 
@@ -46,51 +45,7 @@ fun InstrumentEditorScreen(
             .background(Color.Black.copy(alpha = 0.4f))
             .padding(8.dp)
     ) {
-        // 1. Parameter Selector
-        var selectorExpanded by remember { mutableStateOf(false) }
-        Box(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
-            OutlinedButton(
-                onClick = { selectorExpanded = true },
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraSmall
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Parameter: $focusedId", color = Color.Cyan)
-                    Spacer(modifier = Modifier.weight(1f))
-                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
-                }
-            }
-            DropdownMenu(expanded = selectorExpanded, onDismissRequest = { selectorExpanded = false }) {
-                source.parameters.keys.forEach { id ->
-                    DropdownMenuItem(text = { Text(id) }, onClick = { onFocusChange(id); selectorExpanded = false })
-                }
-            }
-        }
-
         Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
-            if (!isArmLength) {
-                var baseVal by remember(focusedId) { mutableFloatStateOf(focusedParam.baseValue) }
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Base: ${(baseVal * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray, modifier = Modifier.width(60.dp))
-                    KnobView(
-                        currentValue = baseVal,
-                        onValueChange = { newValue ->
-                            baseVal = newValue
-                            focusedParam.baseValue = newValue
-                        },
-                        onInteractionFinished = onInteractionFinished,
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                        isBipolar = false,
-                        focused = true,
-                        knobSize = 32.dp
-                    )
-                }
-                HorizontalDivider(color = Color.DarkGray.copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 16.dp))
-            }
-
             key(focusedId, refreshCount) {
                 focusedParam.modulators.forEachIndexed { index, mod ->
                     ModulatorRow(
@@ -281,7 +236,7 @@ fun ModulatorRow(
 
         if (sourceId != "none") {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Weight: ${(weight * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray, modifier = Modifier.width(70.dp))
+                Text("Weight: ${(weight * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.width(70.dp))
                 KnobView(
                     currentValue = weight,
                     onValueChange = { newValue ->
@@ -300,7 +255,7 @@ fun ModulatorRow(
                 Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     val hasSecondSlider = waveform == Waveform.TRIANGLE || waveform == Waveform.SQUARE
                     
-                    Text("Phase: ${(phaseOffset * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray, modifier = Modifier.width(60.dp))
+                    Text("Phase: ${(phaseOffset * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.width(60.dp))
                     KnobView(
                         currentValue = phaseOffset,
                         onValueChange = { newValue ->
@@ -319,7 +274,7 @@ fun ModulatorRow(
                         Text(
                             text = if (waveform == Waveform.TRIANGLE) "Slope: ${(slope * 100).roundToInt()}" else "Duty: ${(slope * 100).roundToInt()}",
                             style = MaterialTheme.typography.labelSmall, 
-                            color = Color.Gray,
+                            color = Color.White.copy(alpha = 0.7f),
                             modifier = Modifier.width(60.dp)
                         )
                         KnobView(

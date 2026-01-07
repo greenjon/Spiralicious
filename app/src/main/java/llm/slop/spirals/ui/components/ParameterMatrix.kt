@@ -1,6 +1,5 @@
 package llm.slop.spirals.ui.components
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -22,54 +21,107 @@ fun ParameterMatrix(
     onInteractionFinished: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        parameters.forEachIndexed { index, param ->
-            val id = labels[index]
-            val isFocused = id == focusedParameterId
-            var currentValue by remember(param) { mutableFloatStateOf(param.baseValue) }
+    val row1Count = 4
+    val row1Labels = labels.take(row1Count)
+    val row1Params = parameters.take(row1Count)
+    
+    val row2Labels = labels.drop(row1Count)
+    val row2Params = parameters.drop(row1Count)
 
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(2.dp)
-                    .border(
-                        width = 1.dp,
-                        color = if (isFocused) Color.Cyan else Color.Transparent,
-                        shape = MaterialTheme.shapes.extraSmall
-                    )
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = { onFocusRequest(id) }
-                    )
-                    .padding(4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = id,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (isFocused) Color.Cyan else Color.Gray
-                    )
-                    KnobView(
-                        currentValue = currentValue,
-                        onValueChange = { newValue ->
-                            currentValue = newValue
-                            param.baseValue = newValue
-                            onFocusRequest(id)
-                        },
-                        onInteractionFinished = onInteractionFinished,
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        isBipolar = false,
-                        focused = isFocused,
-                        knobSize = 48.dp, // 50% larger (32 * 1.5)
-                        showValue = true
-                    )
-                }
+    Column(modifier = modifier.fillMaxWidth()) {
+        // Row 1: L1-L4 (Labels above)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            row1Params.forEachIndexed { index, param ->
+                val id = row1Labels[index]
+                KnobCell(
+                    id = id,
+                    param = param,
+                    isFocused = id == focusedParameterId,
+                    onFocusRequest = onFocusRequest,
+                    onInteractionFinished = onInteractionFinished,
+                    labelAbove = true
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Row 2: Rest (Labels underneath)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            row2Params.forEachIndexed { index, param ->
+                val id = row2Labels[index]
+                KnobCell(
+                    id = id,
+                    param = param,
+                    isFocused = id == focusedParameterId,
+                    onFocusRequest = onFocusRequest,
+                    onInteractionFinished = onInteractionFinished,
+                    labelAbove = false
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.KnobCell(
+    id: String,
+    param: ModulatableParameter,
+    isFocused: Boolean,
+    onFocusRequest: (String) -> Unit,
+    onInteractionFinished: () -> Unit,
+    labelAbove: Boolean
+) {
+    var currentValue by remember(param) { mutableFloatStateOf(param.baseValue) }
+
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .padding(2.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = { onFocusRequest(id) }
+            )
+            .padding(2.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (labelAbove) {
+                Text(
+                    text = id,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isFocused) Color.Cyan else Color.White.copy(alpha = 0.7f)
+                )
+            }
+            KnobView(
+                currentValue = currentValue,
+                onValueChange = { newValue ->
+                    currentValue = newValue
+                    param.baseValue = newValue
+                    onFocusRequest(id)
+                },
+                onInteractionFinished = onInteractionFinished,
+                modifier = Modifier.padding(vertical = 2.dp),
+                isBipolar = false,
+                focused = isFocused,
+                knobSize = 44.dp,
+                showValue = true
+            )
+            if (!labelAbove) {
+                Text(
+                    text = id,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isFocused) Color.Cyan else Color.White.copy(alpha = 0.7f)
+                )
             }
         }
     }

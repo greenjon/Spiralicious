@@ -157,7 +157,7 @@ fun ModulatorRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // LEFT PART: CV Name + Controls Below + Wave/Beat
-                Column(modifier = Modifier.weight(1.8f)) {
+                Column(modifier = Modifier.weight(1.4f)) {
                     // Top Row: CV Name + Add/Mul
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         var sourceExpanded by remember { mutableStateOf(false) }
@@ -349,11 +349,14 @@ fun ModulatorRow(
                         } else {
                             Spacer(modifier = Modifier.weight(1f))
                         }
+                        
+                        // Shift knobs to the left by adding a spacer at the end
+                        Spacer(modifier = Modifier.weight(1.1f))
                     } else {
-                        Spacer(modifier = Modifier.weight(2.7f))
+                        Spacer(modifier = Modifier.weight(3.1f))
                     }
                 } else {
-                    Spacer(modifier = Modifier.weight(3.7f))
+                    Spacer(modifier = Modifier.weight(4.1f))
                 }
             }
 

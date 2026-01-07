@@ -30,6 +30,7 @@ import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 @Composable
 fun InstrumentEditorScreen(
@@ -108,14 +109,29 @@ fun ModulatorRow(
     var showDeleteConfirm by remember { mutableStateOf(false) }
     
     var pulseValue by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(sourceId) {
+    LaunchedEffect(sourceId, weight, waveform, subdivision, phaseOffset, slope) {
         if (sourceId != "none") {
             while(true) {
-                pulseValue = if (sourceId == "beatPhase") {
-                    (CvRegistry.getSynchronizedTotalBeats() % 1.0).toFloat()
+                val rawCv = if (sourceId == "beatPhase") {
+                    val beats = CvRegistry.getSynchronizedTotalBeats()
+                    val localPhase = ((beats / subdivision) + phaseOffset) % 1.0
+                    val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
+                    
+                    when(waveform) {
+                        Waveform.SINE -> (sin(positivePhase * 2.0 * Math.PI).toFloat() * 0.5f) + 0.5f
+                        Waveform.TRIANGLE -> {
+                            val s = slope.toDouble()
+                            if (s <= 0.001) (1.0 - positivePhase).toFloat()
+                            else if (s >= 0.999) positivePhase.toFloat()
+                            else if (positivePhase < s) (positivePhase / s).toFloat()
+                            else ((1.0 - positivePhase) / (1.0 - s)).toFloat()
+                        }
+                        Waveform.SQUARE -> if (positivePhase < slope) 1.0f else 0.0f
+                    }
                 } else {
                     CvRegistry.get(sourceId)
                 }
+                pulseValue = rawCv * weight
                 delay(16)
             }
         } else {
@@ -361,8 +377,15 @@ fun ModulatorRow(
             }
 
             if (sourceId != "none") {
-                Box(modifier = Modifier.padding(top = 4.dp).fillMaxWidth().height(1.dp).background(AppText)) {
-                    Box(modifier = Modifier.fillMaxWidth(pulseValue.coerceIn(0f, 1f)).fillMaxHeight().background(AppAccent))
+                Box(modifier = Modifier.padding(top = 4.dp).fillMaxWidth().height(1.dp).background(AppText.copy(alpha = 0.2f))) {
+                    val displayValue = pulseValue.coerceIn(-1f, 1f)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(kotlin.math.abs(displayValue))
+                            .fillMaxHeight()
+                            .align(if (displayValue >= 0) Alignment.CenterStart else Alignment.CenterEnd)
+                            .background(if (displayValue >= 0) AppAccent else Color.Red.copy(alpha = 0.7f))
+                    )
                 }
             }
         }

@@ -2,13 +2,14 @@ package llm.slop.spirals
 
 import kotlinx.serialization.Serializable
 import llm.slop.spirals.cv.ModulationOperator
+import llm.slop.spirals.cv.Waveform
 
 @Serializable
 data class PatchData(
     val name: String,
     val recipeId: String,
     val parameters: List<ParameterData>,
-    val version: Int = 1 // Added versioning for future schema safety
+    val version: Int = 2 // Incremented version for new modulator fields
 )
 
 @Serializable
@@ -22,5 +23,10 @@ data class ParameterData(
 data class ModulatorData(
     val sourceId: String,
     val operator: String,
-    val weight: Float
+    val weight: Float,
+    val bypassed: Boolean = false,
+    val waveform: String = "SINE",
+    val subdivision: Float = 1.0f,
+    val phaseOffset: Float = 0.0f,
+    val slope: Float = 0.5f
 )

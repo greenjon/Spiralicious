@@ -13,16 +13,17 @@ import kotlin.math.PI
  * Renders exactly one complete closed loop based on integer frequencies.
  */
 class MandalaVisualSource : VisualSource {
-    override val parameters = mapOf(
+    // Note: Use a Map that preserves insertion order if you want the UI to follow this order
+    override val parameters = linkedMapOf(
         "L1" to ModulatableParameter(0.4f),
         "L2" to ModulatableParameter(0.3f),
         "L3" to ModulatableParameter(0.2f),
         "L4" to ModulatableParameter(0.1f),
         "Scale" to ModulatableParameter(0.125f), // Default 0.125 * 8x = 1.0 Unity
+        "Rotation" to ModulatableParameter(0.0f),
         "Thickness" to ModulatableParameter(0.1f),
         "Hue" to ModulatableParameter(0.0f),
-        "Saturation" to ModulatableParameter(1.0f),
-        "Rotation" to ModulatableParameter(0.0f)
+        "Saturation" to ModulatableParameter(1.0f)
     )
 
     override val globalAlpha = ModulatableParameter(1.0f)

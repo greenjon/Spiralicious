@@ -26,7 +26,18 @@ object PatchMapper {
             parameters.add(ParameterData(
                 id = id,
                 baseValue = param.baseValue,
-                modulators = param.modulators.map { ModulatorData(it.sourceId, it.operator.name, it.weight) }
+                modulators = param.modulators.map { 
+                    ModulatorData(
+                        sourceId = it.sourceId, 
+                        operator = it.operator.name, 
+                        weight = it.weight,
+                        bypassed = it.bypassed,
+                        waveform = it.waveform.name,
+                        subdivision = it.subdivision,
+                        phaseOffset = it.phaseOffset,
+                        slope = it.slope
+                    ) 
+                }
             ))
         }
         
@@ -53,7 +64,23 @@ object PatchMapper {
                             "MUL" -> ModulationOperator.MUL
                             else -> ModulationOperator.ADD
                         }
-                        validModulators.add(CvModulator(modData.sourceId, op, modData.weight))
+                        
+                        val wave = try {
+                            Waveform.valueOf(modData.waveform.uppercase())
+                        } catch (e: Exception) {
+                            Waveform.SINE
+                        }
+
+                        validModulators.add(CvModulator(
+                            sourceId = modData.sourceId, 
+                            operator = op, 
+                            weight = modData.weight,
+                            bypassed = modData.bypassed,
+                            waveform = wave,
+                            subdivision = modData.subdivision,
+                            phaseOffset = modData.phaseOffset,
+                            slope = modData.slope
+                        ))
                     } catch (e: Exception) {
                         // Suppress or log exception
                     }

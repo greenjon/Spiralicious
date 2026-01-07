@@ -57,7 +57,8 @@ fun InstrumentEditorScreen(
                 }
             }
             DropdownMenu(expanded = selectorExpanded, onDismissRequest = { selectorExpanded = false }) {
-                source.parameters.keys.sorted().forEach { id ->
+                // Use the map's keys directly without sorting to preserve insertion order
+                source.parameters.keys.forEach { id ->
                     DropdownMenuItem(text = { Text(id) }, onClick = { onFocusChange(id); selectorExpanded = false })
                 }
             }
@@ -74,12 +75,10 @@ fun InstrumentEditorScreen(
                         focusedParam.baseValue = it 
                     },
                     onValueChangeFinished = onInteractionFinished,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    modifier = Modifier.padding(bottom = 8.dp).padding(horizontal = 24.dp)
                 )
+                HorizontalDivider(color = Color.DarkGray.copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 16.dp))
             }
-
-            Text("Modulation Matrix", style = MaterialTheme.typography.titleSmall, color = Color.Cyan)
-            Spacer(modifier = Modifier.height(8.dp))
 
             key(focusedId, refreshCount) {
                 focusedParam.modulators.forEachIndexed { index, mod ->
@@ -140,7 +139,12 @@ fun ModulatorRow(
     LaunchedEffect(sourceId) {
         if (sourceId != "none") {
             while(true) {
-                pulseValue = CvRegistry.get(sourceId)
+                pulseValue = if (sourceId == "beatPhase") {
+                    // Use the precision clock for visual feedback
+                    (CvRegistry.getSynchronizedTotalBeats() % 1.0).toFloat()
+                } else {
+                    CvRegistry.get(sourceId)
+                }
                 delay(16)
             }
         } else {
@@ -157,12 +161,26 @@ fun ModulatorRow(
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (!isNew) {
                 Surface(
-                    modifier = Modifier.padding(end = 8.dp).size(24.dp).clickable { bypassed = !bypassed; onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope)); onInteractionFinished() },
+                    modifier = Modifier
+                        .padding(end = 8.dp)
+                        .height(24.dp)
+                        .width(36.dp)
+                        .clickable { 
+                            bypassed = !bypassed
+                            onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope))
+                            onInteractionFinished() 
+                        },
                     color = if (bypassed) Color.DarkGray else Color.Gray,
                     shape = MaterialTheme.shapes.extraSmall,
                     border = androidx.compose.foundation.BorderStroke(1.dp, if (bypassed) Color.Gray else Color.Cyan)
                 ) {
-                    Box(contentAlignment = Alignment.Center) { Text("B", color = if (bypassed) Color.Gray else Color.White, style = MaterialTheme.typography.labelSmall) }
+                    Box(contentAlignment = Alignment.Center) { 
+                        Text(
+                            text = if (bypassed) "OFF" else "ON", 
+                            color = if (bypassed) Color.Gray else Color.White, 
+                            style = MaterialTheme.typography.labelSmall
+                        ) 
+                    }
                 }
             }
 
@@ -253,19 +271,38 @@ fun ModulatorRow(
 
         if (sourceId != "none") {
             Text("Weight: ${"%.2f".format(weight)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-            Slider(value = weight, onValueChange = { weight = it; onUpdate(CvModulator(sourceId, operator, it, bypassed, waveform, subdivision, phaseOffset, slope)) }, onValueChangeFinished = onInteractionFinished, valueRange = -1f..1f, modifier = Modifier.height(24.dp))
+            Slider(
+                value = weight, 
+                onValueChange = { weight = it; onUpdate(CvModulator(sourceId, operator, it, bypassed, waveform, subdivision, phaseOffset, slope)) }, 
+                onValueChangeFinished = onInteractionFinished, 
+                valueRange = -1f..1f, 
+                modifier = Modifier.height(24.dp).padding(horizontal = 24.dp)
+            )
             
             if (isBeat) {
                 Row(modifier = Modifier.fillMaxWidth()) {
+                    val hasSecondSlider = waveform == Waveform.TRIANGLE || waveform == Waveform.SQUARE
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Phase: ${"%.2f".format(phaseOffset)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                        Slider(value = phaseOffset, onValueChange = { phaseOffset = it; onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, it, slope)) }, onValueChangeFinished = onInteractionFinished, modifier = Modifier.height(24.dp))
+                        Slider(
+                            value = phaseOffset, 
+                            onValueChange = { phaseOffset = it; onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, it, slope)) }, 
+                            onValueChangeFinished = onInteractionFinished, 
+                            modifier = Modifier.height(24.dp).padding(
+                                start = 24.dp, 
+                                end = if (hasSecondSlider) 4.dp else 24.dp
+                            )
+                        )
                     }
-                    if (waveform == Waveform.TRIANGLE || waveform == Waveform.SQUARE) {
-                        Spacer(modifier = Modifier.width(8.dp))
+                    if (hasSecondSlider) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(if (waveform == Waveform.TRIANGLE) "Slope: ${"%.2f".format(slope)}" else "Duty: ${"%.2f".format(slope)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                            Slider(value = slope, onValueChange = { slope = it; onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, it)) }, onValueChangeFinished = onInteractionFinished, modifier = Modifier.height(24.dp))
+                            Slider(
+                                value = slope, 
+                                onValueChange = { slope = it; onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, it)) }, 
+                                onValueChangeFinished = onInteractionFinished, 
+                                modifier = Modifier.height(24.dp).padding(start = 4.dp, end = 24.dp)
+                            )
                         }
                     }
                 }

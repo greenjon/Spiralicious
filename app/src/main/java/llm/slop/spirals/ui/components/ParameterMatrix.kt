@@ -1,6 +1,9 @@
 package llm.slop.spirals.ui.components
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -32,6 +35,8 @@ fun ParameterMatrix(
                         val isFocused = id == focusedParameterId
                         
                         var sliderValue by remember(param) { mutableFloatStateOf(param.baseValue) }
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val isDragged by interactionSource.collectIsDraggedAsState()
 
                         Box(
                             modifier = Modifier
@@ -42,21 +47,31 @@ fun ParameterMatrix(
                                     color = if (isFocused) Color.Cyan else Color.Transparent,
                                     shape = MaterialTheme.shapes.extraSmall
                                 )
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = { onFocusRequest(id) }
+                                )
                                 .padding(4.dp)
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    text = id,
+                                    text = "$id - ${"%.2f".format(sliderValue)}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (isFocused) Color.Cyan else Color.Gray
                                 )
                                 Slider(
                                     value = sliderValue,
                                     onValueChange = { 
-                                        sliderValue = it
-                                        param.baseValue = it
+                                        // Only update value if we are actively dragging
+                                        if (isDragged) {
+                                            sliderValue = it
+                                            param.baseValue = it
+                                        }
+                                        // Always request focus on any interaction
                                         onFocusRequest(id)
                                     },
+                                    interactionSource = interactionSource,
                                     onValueChangeFinished = onInteractionFinished,
                                     modifier = Modifier.height(24.dp)
                                 )

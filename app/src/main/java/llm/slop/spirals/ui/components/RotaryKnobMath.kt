@@ -6,7 +6,7 @@ import kotlin.math.pow
 
 data class KnobConfig(
     val rMin: Float = 0.001f,  // Fine resolution
-    val rMax: Float = 0.015f,  // Coarse resolution
+    val rMax: Float = 0.01f,   // Coarse resolution
     val isBipolar: Boolean = false
 )
 
@@ -28,9 +28,9 @@ object RotaryKnobMath {
         val smoothedVelocity = (prevVelocity * 0.7f) + (rawVelocity * 0.3f)
         
         // 2. Resolution Calculation
-        // vn: normalized velocity [0..1] based on expected drag speed range [50..1500 px/s]
-        val vn = ((smoothedVelocity - 50f) / (1500f - 50f)).coerceIn(0f, 1f)
-        val vs = vn.pow(2.0f) // Gamma for more natural "acceleration"
+        // vn: normalized velocity [0..1] based on expected drag speed range [50..2500 px/s]
+        val vn = ((smoothedVelocity - 50f) / (2500f - 50f)).coerceIn(0f, 1f)
+        val vs = vn.pow(3.0f) // Gamma for more natural "acceleration"
         var resolution = config.rMin + vs * (config.rMax - config.rMin)
         
         // Range Scaling (Bipolar is twice as wide as Unipolar)

@@ -22,6 +22,9 @@ import llm.slop.spirals.cv.audio.AudioSourceManager
 import llm.slop.spirals.cv.audio.AudioSourceType
 import llm.slop.spirals.cv.ui.CvHistoryBuffer
 import llm.slop.spirals.ui.components.OscilloscopeView
+import llm.slop.spirals.ui.theme.AppAccent
+import llm.slop.spirals.ui.theme.AppBackground
+import llm.slop.spirals.ui.theme.AppText
 import kotlinx.coroutines.delay
 
 @Composable
@@ -69,17 +72,17 @@ fun CvLabScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.8f))
+            .background(AppBackground)
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        Text("CV Diagnostic Lab", style = MaterialTheme.typography.headlineSmall, color = Color.White)
+        Text("CV Diagnostic Lab", style = MaterialTheme.typography.headlineSmall, color = AppText)
         
         Spacer(modifier = Modifier.height(8.dp))
         
         // Input Selector
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Audio Input: ", color = Color.White, style = MaterialTheme.typography.labelSmall)
+            Text("Audio Input: ", color = AppText, style = MaterialTheme.typography.labelSmall)
             CvSegmentedButton(
                 options = listOf("Mic", "Raw", "Internal"),
                 selected = when(audioSourceType) {
@@ -109,16 +112,14 @@ fun CvLabScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Monitor all registry signals using the centralized history
-        // The frameTick key forces these to redraw even though the buffer object reference doesn't change
         key(frameTick) {
             DiagnosticScope("ACCENT (Weighted Flux + Decay)", CvRegistry.history["accent"]!!)
             DiagnosticScope("ONSET (Raw Spikes)", CvRegistry.history["onset"]!!)
             
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = Color.DarkGray)
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = AppText.copy(alpha = 0.1f))
             
             DiagnosticScope("AMP (Master Envelope)", CvRegistry.history["amp"]!!)
             DiagnosticScope("BASS FLUX", CvRegistry.history["bassFlux"]!!)
-            DiagnosticScope("BEAT PHASE", CvRegistry.history["beatPhase"]!!)
         }
 
         Spacer(modifier = Modifier.height(100.dp))
@@ -128,7 +129,7 @@ fun CvLabScreen(
 @Composable
 fun DiagnosticScope(label: String, buffer: CvHistoryBuffer) {
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
-        Text(label, color = Color.Cyan, style = MaterialTheme.typography.labelSmall)
+        Text(label, color = AppAccent, style = MaterialTheme.typography.labelSmall)
         OscilloscopeView(history = buffer, modifier = Modifier.height(60.dp))
     }
 }
@@ -140,7 +141,8 @@ fun CvSegmentedButton(options: List<String>, selected: String, onSelect: (String
             Button(
                 onClick = { onSelect(option) },
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selected == option) MaterialTheme.colorScheme.primary else Color.Gray.copy(alpha = 0.4f)
+                    containerColor = if (selected == option) AppAccent else AppText.copy(alpha = 0.1f),
+                    contentColor = if (selected == option) Color.White else AppText
                 ),
                 shape = MaterialTheme.shapes.extraSmall,
                 modifier = Modifier.padding(horizontal = 2.dp)

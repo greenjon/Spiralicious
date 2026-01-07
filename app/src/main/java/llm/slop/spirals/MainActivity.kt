@@ -37,6 +37,9 @@ import llm.slop.spirals.ui.CvLabScreen
 import llm.slop.spirals.ui.InstrumentEditorScreen
 import llm.slop.spirals.ui.components.ParameterMatrix
 import llm.slop.spirals.ui.components.OscilloscopeView
+import llm.slop.spirals.ui.theme.AppBackground
+import llm.slop.spirals.ui.theme.AppText
+import llm.slop.spirals.ui.theme.AppAccent
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -52,12 +55,16 @@ class MainActivity : ComponentActivity() {
         sourceManager = AudioSourceManager(this)
         
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+            statusBarStyle = SystemBarStyle.light(AppBackground.toArgb(), AppBackground.toArgb()),
+            navigationBarStyle = SystemBarStyle.light(AppBackground.toArgb(), AppBackground.toArgb())
         )
         
         setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
+            MaterialTheme(colorScheme = lightColorScheme(
+                background = AppBackground,
+                surface = AppBackground,
+                surfaceVariant = AppBackground
+            )) {
                 MandalaScreen { csvData ->
                     val intent = Intent(Intent.ACTION_SEND).apply {
                         type = "text/csv"
@@ -119,11 +126,11 @@ class MainActivity : ComponentActivity() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(AppBackground)
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            // 1. TOP MONITOR AREA (Fixed size parts, Header can push everything down)
+            // 1. TOP MONITOR AREA
             Column(
                 modifier = Modifier
                     .wrapContentHeight()
@@ -135,19 +142,19 @@ class MainActivity : ComponentActivity() {
                 var showOpenDialog by remember { mutableStateOf(false) }
                 
                 Surface(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    color = AppBackground,
                     modifier = Modifier.fillMaxWidth().clickable { isHeaderExpanded = !isHeaderExpanded }.padding(bottom = 2.dp),
                     shape = MaterialTheme.shapes.extraSmall
                 ) {
                     Column(modifier = Modifier.padding(8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "${lastLoadedPatch?.name ?: "New Patch"}${if (isDirty) " *" else ""}", style = MaterialTheme.typography.titleMedium, color = Color.White)
+                            Text(text = "${lastLoadedPatch?.name ?: "New Patch"}${if (isDirty) " *" else ""}", style = MaterialTheme.typography.titleMedium, color = AppText)
                             Spacer(modifier = Modifier.weight(1f))
-                            Text(text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)", style = MaterialTheme.typography.labelSmall, color = Color.Cyan)
+                            Text(text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)", style = MaterialTheme.typography.labelSmall, color = AppAccent)
                         }
                         if (isHeaderExpanded) {
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text("Change Recipe", style = MaterialTheme.typography.labelLarge, color = Color.Cyan)
+                            Text("Change Recipe", style = MaterialTheme.typography.labelLarge, color = AppAccent)
                             var petalFilter by remember { mutableStateOf<Int?>(null) }
                             var filterExpanded by remember { mutableStateOf(false) }
                             Row(
@@ -155,23 +162,23 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Box {
-                                    TextButton(onClick = { filterExpanded = true }) { Text(if (petalFilter == null) "All Petals" else "${petalFilter}P") }
+                                    TextButton(onClick = { filterExpanded = true }) { Text(if (petalFilter == null) "All Petals" else "${petalFilter}P", color = AppText) }
                                     DropdownMenu(
                                         expanded = filterExpanded, 
                                         onDismissRequest = { filterExpanded = false },
-                                        containerColor = Color(0x66121212), // Highly transparent
+                                        containerColor = AppBackground,
                                         tonalElevation = 0.dp
                                     ) {
                                         DropdownMenuItem(
                                             text = { Text("All") }, 
                                             onClick = { petalFilter = null; filterExpanded = false },
-                                            colors = MenuDefaults.itemColors(textColor = Color.White)
+                                            colors = MenuDefaults.itemColors(textColor = AppText)
                                         )
                                         listOf(3, 4, 5, 6, 7, 8, 9, 10, 12, 16).forEach { p -> 
                                             DropdownMenuItem(
                                                 text = { Text("${p}P") }, 
                                                 onClick = { petalFilter = p; filterExpanded = false },
-                                                colors = MenuDefaults.itemColors(textColor = Color.White)
+                                                colors = MenuDefaults.itemColors(textColor = AppText)
                                             ) 
                                         }
                                     }
@@ -184,14 +191,15 @@ class MainActivity : ComponentActivity() {
                                     Button(
                                         onClick = { recipeExpanded = true }, 
                                         contentPadding = PaddingValues(horizontal = 12.dp),
-                                        shape = MaterialTheme.shapes.extraSmall
+                                        shape = MaterialTheme.shapes.extraSmall,
+                                        colors = ButtonDefaults.buttonColors(containerColor = AppAccent, contentColor = Color.White)
                                     ) { 
                                         Text("Recipe") 
                                     }
                                     DropdownMenu(
                                         expanded = recipeExpanded, 
                                         onDismissRequest = { recipeExpanded = false },
-                                        containerColor = Color(0x66121212), // Highly transparent
+                                        containerColor = AppBackground,
                                         tonalElevation = 0.dp,
                                         properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true),
                                         modifier = Modifier.widthIn(max = 240.dp)
@@ -201,7 +209,7 @@ class MainActivity : ComponentActivity() {
                                             DropdownMenuItem(
                                                 contentPadding = PaddingValues(horizontal = 12.dp),
                                                 text = { 
-                                                    Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)", color = Color.White) 
+                                                    Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)", color = AppText) 
                                                 }, 
                                                 onClick = { 
                                                     visualSource.recipe = ratio
@@ -212,20 +220,34 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color.DarkGray)
-                            Text("Patch Management", style = MaterialTheme.typography.labelLarge, color = Color.Cyan)
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = AppText.copy(alpha = 0.1f))
+                            Text("Patch Management", style = MaterialTheme.typography.labelLarge, color = AppAccent)
                             var nameInput by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
-                            OutlinedTextField(value = nameInput, onValueChange = { nameInput = it }, modifier = Modifier.fillMaxWidth(), label = { Text("Patch Name") }, textStyle = MaterialTheme.typography.bodySmall)
+                            OutlinedTextField(
+                                value = nameInput, 
+                                onValueChange = { nameInput = it }, 
+                                modifier = Modifier.fillMaxWidth(), 
+                                label = { Text("Patch Name") }, 
+                                textStyle = MaterialTheme.typography.bodySmall,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AppAccent,
+                                    unfocusedBorderColor = AppText.copy(alpha = 0.3f),
+                                    focusedLabelColor = AppAccent,
+                                    unfocusedLabelColor = AppText.copy(alpha = 0.5f),
+                                    focusedTextColor = AppText,
+                                    unfocusedTextColor = AppText
+                                )
+                            )
                             Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                                 Row {
-                                    Button(onClick = { scope.launch { val data = PatchMapper.fromVisualSource(nameInput, visualSource); vm.savePatch(data); lastLoadedPatch = data; isHeaderExpanded = false } }) { Text("Save") }
+                                    Button(onClick = { scope.launch { val data = PatchMapper.fromVisualSource(nameInput, visualSource); vm.savePatch(data); lastLoadedPatch = data; isHeaderExpanded = false } }, colors = ButtonDefaults.buttonColors(containerColor = AppAccent)) { Text("Save") }
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    IconButton(onClick = { val data = PatchMapper.fromVisualSource(nameInput, visualSource); context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) }, "Share Patch")) }) { Icon(Icons.Default.Share, contentDescription = null, tint = Color.White) }
+                                    IconButton(onClick = { val data = PatchMapper.fromVisualSource(nameInput, visualSource); context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) }, "Share Patch")) }) { Icon(Icons.Default.Share, contentDescription = null, tint = AppText) }
                                 }
                                 Row {
-                                    Button(onClick = { showOpenDialog = true }) { Text("Open") }
+                                    Button(onClick = { showOpenDialog = true }, colors = ButtonDefaults.buttonColors(containerColor = AppAccent)) { Text("Open") }
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Button(onClick = { scope.launch { val data = PatchMapper.fromVisualSource("$nameInput CLONE", visualSource); vm.savePatch(data); lastLoadedPatch = data; isHeaderExpanded = false } }) { Text("Clone") }
+                                    Button(onClick = { scope.launch { val data = PatchMapper.fromVisualSource("$nameInput CLONE", visualSource); vm.savePatch(data); lastLoadedPatch = data; isHeaderExpanded = false } }, colors = ButtonDefaults.buttonColors(containerColor = AppAccent)) { Text("Clone") }
                                     Spacer(modifier = Modifier.width(4.dp))
                                     IconButton(onClick = { lastLoadedPatch?.let { vm.deletePatch(it.name); lastLoadedPatch = null; isHeaderExpanded = false } }) { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) }
                                 }
@@ -240,13 +262,13 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // 2. Mandala Preview (Height determined by aspect ratio)
+                // 2. Mandala Preview
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .aspectRatio(16 / 9f)
                         .background(Color.Black)
-                        .border(1.dp, Color.DarkGray),
+                        .border(1.dp, AppText.copy(alpha = 0.1f)),
                     contentAlignment = Alignment.Center
                 ) {
                     AndroidView(factory = { ctx -> SpiralSurfaceView(ctx).also { spiralSurfaceView = it; it.setVisualSource(visualSource) } }, modifier = Modifier.fillMaxSize())
@@ -256,17 +278,17 @@ class MainActivity : ComponentActivity() {
 
                 // 3. Monitor Row
                 val focusedParam = visualSource.parameters[focusedParameterId] ?: visualSource.globalAlpha
-                Box(modifier = Modifier.fillMaxWidth().height(60.dp).border(1.dp, Color.DarkGray)) {
+                Box(modifier = Modifier.fillMaxWidth().height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
                     OscilloscopeView(history = focusedParam.history, modifier = Modifier.fillMaxSize())
                     Surface(
-                        color = Color.Black.copy(alpha = 0.5f),
+                        color = AppBackground.copy(alpha = 0.8f),
                         modifier = Modifier.align(Alignment.TopStart).padding(4.dp),
                         shape = MaterialTheme.shapes.extraSmall
                     ) {
                         Text(
                             text = focusedParameterId, 
                             style = MaterialTheme.typography.labelSmall, 
-                            color = Color.Cyan,
+                            color = AppAccent,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                         )
                     }
@@ -274,7 +296,7 @@ class MainActivity : ComponentActivity() {
 
                 Spacer(modifier = Modifier.height(4.dp))
 
-                // 4. Arm Length Matrix - Updated to show all 9 parameters in two rows
+                // 4. Parameter Matrix
                 ParameterMatrix(
                     labels = visualSource.parameters.keys.toList(),
                     parameters = visualSource.parameters.values.toList(),
@@ -284,11 +306,23 @@ class MainActivity : ComponentActivity() {
                 )
             }
 
-            // 5. BOTTOM CONTROL AREA (Takes up remaining space)
+            // 5. BOTTOM CONTROL AREA
             Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                TabRow(selectedTabIndex = if (currentTab == "Patch Bay") 0 else 1) {
-                    Tab(selected = currentTab == "Patch Bay", onClick = { currentTab = "Patch Bay" }) { Text("PATCH", modifier = Modifier.padding(8.dp)) }
-                    Tab(selected = currentTab == "CV Lab", onClick = { currentTab = "CV Lab" }) { Text("DIAG", modifier = Modifier.padding(8.dp)) }
+                TabRow(
+                    selectedTabIndex = if (currentTab == "Patch Bay") 0 else 1,
+                    containerColor = AppBackground,
+                    contentColor = AppAccent
+                ) {
+                    Tab(
+                        selected = currentTab == "Patch Bay", 
+                        onClick = { currentTab = "Patch Bay" },
+                        unselectedContentColor = AppText.copy(alpha = 0.5f)
+                    ) { Text("PATCH", modifier = Modifier.padding(8.dp)) }
+                    Tab(
+                        selected = currentTab == "CV Lab", 
+                        onClick = { currentTab = "CV Lab" },
+                        unselectedContentColor = AppText.copy(alpha = 0.5f)
+                    ) { Text("DIAG", modifier = Modifier.padding(8.dp)) }
                 }
                 Box(modifier = Modifier.fillMaxSize()) {
                     if (currentTab == "Patch Bay") {
@@ -319,9 +353,9 @@ class MainActivity : ComponentActivity() {
     fun OpenPatchDialog(vm: MandalaViewModel, onPatchSelected: (PatchData) -> Unit, onDismiss: () -> Unit) {
         val patches by vm.allPatches.collectAsState(initial = emptyList())
         Dialog(onDismissRequest = onDismiss) {
-            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
+            Surface(shape = MaterialTheme.shapes.medium, color = AppBackground) {
                 Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
-                    Text("Saved Patches", style = MaterialTheme.typography.titleLarge)
+                    Text("Saved Patches", style = MaterialTheme.typography.titleLarge, color = AppText)
                     Spacer(modifier = Modifier.height(8.dp))
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                         patches.forEach { entity ->
@@ -329,11 +363,11 @@ class MainActivity : ComponentActivity() {
                                 val patchData = PatchMapper.fromJson(entity.jsonSettings)
                                 if (patchData != null) onPatchSelected(patchData) 
                             }.padding(12.dp)) {
-                                Text(entity.name, style = MaterialTheme.typography.bodyLarge)
+                                Text(entity.name, style = MaterialTheme.typography.bodyLarge, color = AppText)
                             }
                         }
                     }
-                    if (patches.isEmpty()) Text("No patches saved yet.")
+                    if (patches.isEmpty()) Text("No patches saved yet.", color = AppText.copy(alpha = 0.5f))
                 }
             }
         }

@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import llm.slop.spirals.ui.theme.AppAccent
+import llm.slop.spirals.ui.theme.AppText
 import kotlin.math.roundToInt
 
 @Composable
@@ -45,12 +47,12 @@ fun KnobView(
             val canvasCenter = center 
             val radius = this.size.minDimension / 2f - 4.dp.toPx()
             
-            // Background track - Brighter grey for visibility
+            // Background track - Thinner circle
             drawCircle(
-                color = Color.LightGray.copy(alpha = 0.2f),
+                color = AppText,
                 radius = radius,
                 center = canvasCenter,
-                style = Stroke(width = 2.dp.toPx())
+                style = Stroke(width = 1.dp.toPx())
             )
 
             val arcTopLeft = Offset(canvasCenter.x - radius, canvasCenter.y - radius)
@@ -60,24 +62,24 @@ fun KnobView(
                 // Sweep from center (12 o'clock / 270°)
                 val sweep = currentValue * 180f
                 drawArc(
-                    color = if (focused) Color.Cyan else Color.White.copy(alpha = 0.7f),
+                    color = if (focused) AppAccent else AppText,
                     startAngle = 270f,
                     sweepAngle = sweep,
                     useCenter = false,
                     topLeft = arcTopLeft,
                     size = arcSize,
-                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                    style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
                 )
             } else {
                 // Sweep from 7 o'clock (120°)
                 drawArc(
-                    color = if (focused) Color.Cyan else Color.White.copy(alpha = 0.7f),
+                    color = if (focused) AppAccent else AppText,
                     startAngle = 120f,
                     sweepAngle = 300f * currentValue,
                     useCenter = false,
                     topLeft = arcTopLeft,
                     size = arcSize,
-                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
+                    style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
                 )
             }
         }
@@ -86,7 +88,7 @@ fun KnobView(
             Text(
                 text = "${(currentValue * 100).roundToInt()}",
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = (knobSize.value * 0.25f).sp),
-                color = if (focused) Color.Cyan else Color.White
+                color = if (focused) AppAccent else AppText
             )
         }
     }

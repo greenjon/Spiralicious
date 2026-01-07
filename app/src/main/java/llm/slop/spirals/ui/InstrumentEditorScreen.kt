@@ -23,6 +23,9 @@ import llm.slop.spirals.R
 import llm.slop.spirals.ui.components.KnobConfig
 import llm.slop.spirals.ui.components.knobInput
 import llm.slop.spirals.ui.components.KnobView
+import llm.slop.spirals.ui.theme.AppAccent
+import llm.slop.spirals.ui.theme.AppBackground
+import llm.slop.spirals.ui.theme.AppText
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -42,7 +45,7 @@ fun InstrumentEditorScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.4f))
+            .background(AppBackground)
             .padding(8.dp)
     ) {
         Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
@@ -60,7 +63,7 @@ fun InstrumentEditorScreen(
                             onInteractionFinished()
                         }
                     )
-                    HorizontalDivider(color = Color.DarkGray.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
+                    HorizontalDivider(color = AppText, modifier = Modifier.padding(vertical = 8.dp))
                 }
 
                 ModulatorRow(
@@ -135,20 +138,19 @@ fun ModulatorRow(
                             onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope))
                             onInteractionFinished() 
                         },
-                    color = if (bypassed) Color.DarkGray else Color.Gray,
+                    color = AppBackground,
                     shape = MaterialTheme.shapes.extraSmall,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, if (bypassed) Color.Gray else Color.Cyan)
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (bypassed) AppText else AppAccent)
                 ) {
                     Box(contentAlignment = Alignment.Center) { 
                         Text(
                             text = if (bypassed) "OFF" else "ON", 
-                            color = if (bypassed) Color.Gray else Color.White, 
+                            color = if (bypassed) AppText else AppText, 
                             style = MaterialTheme.typography.labelSmall
                         ) 
                     }
                 }
             } else {
-                // Placeholder space for the ON/OFF button to keep the drop-down aligned
                 Spacer(modifier = Modifier.width(44.dp))
             }
 
@@ -158,7 +160,7 @@ fun ModulatorRow(
                     text = if (isBeat) "BEAT" else sourceId.uppercase(),
                     modifier = Modifier.clickable { sourceExpanded = true }.padding(8.dp),
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isNew) Color.Gray else Color.White
+                    color = AppText
                 )
                 DropdownMenu(expanded = sourceExpanded, onDismissRequest = { sourceExpanded = false }) {
                     listOf("none", "amp", "bass", "mid", "high", "accent", "beatPhase").forEach { s ->
@@ -179,11 +181,10 @@ fun ModulatorRow(
                         if (!isNew) { onUpdate(CvModulator(sourceId, newOp, weight, bypassed, waveform, subdivision, phaseOffset, slope)); onInteractionFinished() }
                     },
                     modifier = Modifier.width(52.dp)
-                ) { Text(if (operator == ModulationOperator.ADD) "ADD" else "MUL", color = Color.Cyan, style = MaterialTheme.typography.labelSmall) }
+                ) { Text(if (operator == ModulationOperator.ADD) "ADD" else "MUL", color = AppAccent, style = MaterialTheme.typography.labelSmall) }
 
-                // Weight knob on the same line for everyone
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Weight:", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                    Text("Weight:", style = MaterialTheme.typography.labelSmall, color = AppText)
                     KnobView(
                         currentValue = weight,
                         onValueChange = { newValue ->
@@ -201,14 +202,12 @@ fun ModulatorRow(
             }
 
             if (!isNew) {
-                IconButton(onClick = onRemove) { Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color.LightGray, modifier = Modifier.size(16.dp)) }
+                IconButton(onClick = onRemove) { Icon(Icons.Default.Delete, contentDescription = "Remove", tint = AppText, modifier = Modifier.size(16.dp)) }
             }
         }
 
         if (sourceId == "beatPhase") {
-            // Beat-specific expanded controls (Row 2)
             Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                // Add spacer to align Row 2 with the drop-down in Row 1 (ON/OFF button width is 36dp + 8dp padding)
                 Spacer(modifier = Modifier.width(44.dp))
                 
                 IconButton(onClick = {
@@ -224,7 +223,7 @@ fun ModulatorRow(
                             Waveform.SQUARE -> R.drawable.ic_wave_square
                         }),
                         contentDescription = "Waveform",
-                        tint = Color.Cyan,
+                        tint = AppAccent,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -239,7 +238,7 @@ fun ModulatorRow(
                             0.5f -> "1/2"
                             else -> subdivision.toInt().toString()
                         }
-                        Text(subText, color = Color.Cyan)
+                        Text(subText, color = AppAccent)
                     }
                     DropdownMenu(expanded = subExpanded, onDismissRequest = { subExpanded = false }) {
                         listOf(0.0625f, 0.125f, 0.25f, 0.5f, 1f, 2f, 4f, 8f, 16f, 32f, 64f, 128f, 256f).forEach { sub ->
@@ -263,7 +262,7 @@ fun ModulatorRow(
 
                 Spacer(modifier = Modifier.width(8.dp))
                 
-                Text("Phase:", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                Text("Phase:", style = MaterialTheme.typography.labelSmall, color = AppText)
                 KnobView(
                     currentValue = phaseOffset,
                     onValueChange = { newValue ->
@@ -284,7 +283,7 @@ fun ModulatorRow(
                     Text(
                         text = if (waveform == Waveform.TRIANGLE) "Slope:" else "Duty:",
                         style = MaterialTheme.typography.labelSmall, 
-                        color = Color.White.copy(alpha = 0.7f)
+                        color = AppText
                     )
                     KnobView(
                         currentValue = slope,
@@ -304,8 +303,8 @@ fun ModulatorRow(
         }
 
         if (sourceId != "none") {
-            Box(modifier = Modifier.padding(top = 4.dp).fillMaxWidth().height(1.dp).background(Color.DarkGray)) {
-                Box(modifier = Modifier.fillMaxWidth(pulseValue.coerceIn(0f, 1f)).fillMaxHeight().background(Color.Cyan.copy(alpha = 0.5f)))
+            Box(modifier = Modifier.padding(top = 4.dp).fillMaxWidth().height(1.dp).background(AppText)) {
+                Box(modifier = Modifier.fillMaxWidth(pulseValue.coerceIn(0f, 1f)).fillMaxHeight().background(AppAccent))
             }
         }
     }

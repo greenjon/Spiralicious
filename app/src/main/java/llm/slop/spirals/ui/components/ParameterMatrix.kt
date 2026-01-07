@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import llm.slop.spirals.cv.ModulatableParameter
+import llm.slop.spirals.ui.theme.AppAccent
+import llm.slop.spirals.ui.theme.AppText
 
 @Composable
 fun ParameterMatrix(
@@ -99,7 +101,7 @@ private fun RowScope.KnobCell(
                 Text(
                     text = id,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (isFocused) Color.Cyan else Color.White.copy(alpha = 0.7f)
+                    color = if (isFocused) AppAccent else AppText
                 )
             }
             KnobView(
@@ -120,7 +122,7 @@ private fun RowScope.KnobCell(
                 Text(
                     text = id,
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (isFocused) Color.Cyan else Color.White.copy(alpha = 0.7f)
+                    color = if (isFocused) AppAccent else AppText
                 )
             }
         }

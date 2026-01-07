@@ -1,0 +1,58 @@
+package llm.slop.spirals.ui.components
+
+import kotlin.math.abs
+import kotlin.math.exp
+import kotlin.math.pow
+
+data class KnobConfig(
+    val rMin: Float = 0.001f,  // Fine resolution
+    val rMax: Float = 0.015f,  // Coarse resolution
+    val isBipolar: Boolean = false
+)
+
+object RotaryKnobMath {
+    /**
+     * Computes the new value for a rotary knob based on vertical drag delta and velocity.
+     * Returns a Pair of (new value, updated smoothed velocity).
+     */
+    fun computeNewValue(
+        deltaY: Float,
+        deltaTimeSec: Float, 
+        currentValue: Float,
+        prevVelocity: Float,
+        config: KnobConfig
+    ): Pair<Float, Float> {
+        // 1. Velocity Calculation (Cap deltaTime to prevent spikes)
+        val cappedDt = deltaTimeSec.coerceIn(0.008f, 0.033f)
+        val rawVelocity = abs(deltaY) / cappedDt
+        val smoothedVelocity = (prevVelocity * 0.7f) + (rawVelocity * 0.3f)
+        
+        // 2. Resolution Calculation
+        // vn: normalized velocity [0..1] based on expected drag speed range [50..1500 px/s]
+        val vn = ((smoothedVelocity - 50f) / (1500f - 50f)).coerceIn(0f, 1f)
+        val vs = vn.pow(2.0f) // Gamma for more natural "acceleration"
+        var resolution = config.rMin + vs * (config.rMax - config.rMin)
+        
+        // Range Scaling (Bipolar is twice as wide as Unipolar)
+        if (config.isBipolar) resolution *= 2.0f 
+        
+        // 3. Primary Movement
+        var value = currentValue + (-deltaY * resolution)
+        
+        // 4. Bipolar Soft Detent (Magnet effect at zero)
+        if (config.isBipolar) {
+            val detentWidth = 0.05f
+            val detentStrength = 0.4f * (1.0f - vs) // Weaken detent as user moves faster
+            val falloff = exp(-(value * value) / (detentWidth * detentWidth))
+            value += -value * falloff * detentStrength
+        }
+        
+        val finalValue = if (config.isBipolar) {
+            value.coerceIn(-1f, 1f)
+        } else {
+            value.coerceIn(0f, 1f)
+        }
+        
+        return Pair(finalValue, smoothedVelocity)
+    }
+}

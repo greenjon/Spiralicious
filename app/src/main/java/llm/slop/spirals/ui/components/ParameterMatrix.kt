@@ -1,12 +1,11 @@
 package llm.slop.spirals.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,9 +33,7 @@ fun ParameterMatrix(
                         val param = parameters[index]
                         val isFocused = id == focusedParameterId
                         
-                        var sliderValue by remember(param) { mutableFloatStateOf(param.baseValue) }
-                        val interactionSource = remember { MutableInteractionSource() }
-                        val isDragged by interactionSource.collectIsDraggedAsState()
+                        var currentValue by remember(param) { mutableFloatStateOf(param.baseValue) }
 
                         Box(
                             modifier = Modifier
@@ -54,27 +51,44 @@ fun ParameterMatrix(
                                 )
                                 .padding(4.dp)
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
                                 Text(
-                                    text = "$id - ${"%.2f".format(sliderValue)}",
+                                    text = "$id - ${"%.2f".format(currentValue)}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (isFocused) Color.Cyan else Color.Gray
                                 )
-                                Slider(
-                                    value = sliderValue,
-                                    onValueChange = { 
-                                        // Only update value if we are actively dragging
-                                        if (isDragged) {
-                                            sliderValue = it
-                                            param.baseValue = it
-                                        }
-                                        // Always request focus on any interaction
-                                        onFocusRequest(id)
-                                    },
-                                    interactionSource = interactionSource,
-                                    onValueChangeFinished = onInteractionFinished,
-                                    modifier = Modifier.height(24.dp)
-                                )
+                                
+                                // High-resolution Knob UI Component (Visual only for now)
+                                Box(
+                                    modifier = Modifier
+                                        .padding(vertical = 4.dp)
+                                        .height(32.dp)
+                                        .fillMaxWidth()
+                                        .background(Color.DarkGray.copy(alpha = 0.3f), MaterialTheme.shapes.extraSmall)
+                                        .knobInput(
+                                            value = currentValue,
+                                            config = KnobConfig(isBipolar = false),
+                                            onValueChange = { newValue ->
+                                                currentValue = newValue
+                                                param.baseValue = newValue
+                                                onFocusRequest(id)
+                                            },
+                                            onInteractionFinished = onInteractionFinished
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    // Simple visual indicator: a bar that grows with value
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .fillMaxWidth(currentValue)
+                                            .background(if (isFocused) Color.Cyan.copy(alpha = 0.4f) else Color.Gray.copy(alpha = 0.2f))
+                                            .align(Alignment.CenterStart)
+                                    )
+                                }
                             }
                         }
                     } else {

@@ -20,6 +20,8 @@ import llm.slop.spirals.MandalaVisualSource
 import llm.slop.spirals.MandalaViewModel
 import llm.slop.spirals.cv.*
 import llm.slop.spirals.R
+import llm.slop.spirals.ui.components.KnobConfig
+import llm.slop.spirals.ui.components.knobInput
 import kotlinx.coroutines.delay
 
 @Composable
@@ -57,7 +59,6 @@ fun InstrumentEditorScreen(
                 }
             }
             DropdownMenu(expanded = selectorExpanded, onDismissRequest = { selectorExpanded = false }) {
-                // Use the map's keys directly without sorting to preserve insertion order
                 source.parameters.keys.forEach { id ->
                     DropdownMenuItem(text = { Text(id) }, onClick = { onFocusChange(id); selectorExpanded = false })
                 }
@@ -68,15 +69,33 @@ fun InstrumentEditorScreen(
             if (!isArmLength) {
                 var baseVal by remember(focusedId) { mutableFloatStateOf(focusedParam.baseValue) }
                 Text("Base Value: ${"%.2f".format(baseVal)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                Slider(
-                    value = baseVal,
-                    onValueChange = { 
-                        baseVal = it
-                        focusedParam.baseValue = it 
-                    },
-                    onValueChangeFinished = onInteractionFinished,
-                    modifier = Modifier.padding(bottom = 8.dp).padding(horizontal = 24.dp)
-                )
+                
+                Box(
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                        .padding(horizontal = 24.dp)
+                        .height(32.dp)
+                        .fillMaxWidth()
+                        .background(Color.DarkGray.copy(alpha = 0.3f), MaterialTheme.shapes.extraSmall)
+                        .knobInput(
+                            value = baseVal,
+                            config = KnobConfig(isBipolar = false),
+                            onValueChange = { newValue ->
+                                baseVal = newValue
+                                focusedParam.baseValue = newValue
+                            },
+                            onInteractionFinished = onInteractionFinished
+                        ),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(baseVal.coerceIn(0f, 1f))
+                            .background(Color.Cyan.copy(alpha = 0.4f))
+                    )
+                }
+                
                 HorizontalDivider(color = Color.DarkGray.copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 16.dp))
             }
 
@@ -140,7 +159,6 @@ fun ModulatorRow(
         if (sourceId != "none") {
             while(true) {
                 pulseValue = if (sourceId == "beatPhase") {
-                    // Use the precision clock for visual feedback
                     (CvRegistry.getSynchronizedTotalBeats() % 1.0).toFloat()
                 } else {
                     CvRegistry.get(sourceId)
@@ -271,44 +289,100 @@ fun ModulatorRow(
 
         if (sourceId != "none") {
             Text("Weight: ${"%.2f".format(weight)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-            Slider(
-                value = weight, 
-                onValueChange = { weight = it; onUpdate(CvModulator(sourceId, operator, it, bypassed, waveform, subdivision, phaseOffset, slope)) }, 
-                onValueChangeFinished = onInteractionFinished, 
-                valueRange = -1f..1f, 
-                modifier = Modifier.height(24.dp).padding(horizontal = 24.dp)
-            )
+            
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 24.dp)
+                    .height(32.dp)
+                    .fillMaxWidth()
+                    .background(Color.DarkGray.copy(alpha = 0.3f), MaterialTheme.shapes.extraSmall)
+                    .knobInput(
+                        value = weight,
+                        config = KnobConfig(isBipolar = true),
+                        onValueChange = { newValue ->
+                            weight = newValue
+                            onUpdate(CvModulator(sourceId, operator, newValue, bypassed, waveform, subdivision, phaseOffset, slope))
+                        },
+                        onInteractionFinished = onInteractionFinished
+                    ),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                // Visual for Bipolar: Bar from center
+                val visualPos = (weight + 1f) / 2f
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth(visualPos.coerceIn(0f, 1f))
+                        .background(Color.Cyan.copy(alpha = 0.4f))
+                )
+            }
             
             if (isBeat) {
-                Row(modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                     val hasSecondSlider = waveform == Waveform.TRIANGLE || waveform == Waveform.SQUARE
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Phase: ${"%.2f".format(phaseOffset)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                        Slider(
-                            value = phaseOffset, 
-                            onValueChange = { phaseOffset = it; onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, it, slope)) }, 
-                            onValueChangeFinished = onInteractionFinished, 
-                            modifier = Modifier.height(24.dp).padding(
-                                start = 24.dp, 
-                                end = if (hasSecondSlider) 4.dp else 24.dp
+                        Box(
+                            modifier = Modifier
+                                .padding(
+                                    start = 24.dp, 
+                                    end = if (hasSecondSlider) 4.dp else 24.dp
+                                )
+                                .height(32.dp)
+                                .fillMaxWidth()
+                                .background(Color.DarkGray.copy(alpha = 0.3f), MaterialTheme.shapes.extraSmall)
+                                .knobInput(
+                                    value = phaseOffset,
+                                    config = KnobConfig(isBipolar = false),
+                                    onValueChange = { newValue ->
+                                        phaseOffset = newValue
+                                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope))
+                                    },
+                                    onInteractionFinished = onInteractionFinished
+                                ),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .fillMaxWidth(phaseOffset.coerceIn(0f, 1f))
+                                    .background(Color.Cyan.copy(alpha = 0.4f))
                             )
-                        )
+                        }
                     }
                     if (hasSecondSlider) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(if (waveform == Waveform.TRIANGLE) "Slope: ${"%.2f".format(slope)}" else "Duty: ${"%.2f".format(slope)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
-                            Slider(
-                                value = slope, 
-                                onValueChange = { slope = it; onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, it)) }, 
-                                onValueChangeFinished = onInteractionFinished, 
-                                modifier = Modifier.height(24.dp).padding(start = 4.dp, end = 24.dp)
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .padding(start = 4.dp, end = 24.dp)
+                                    .height(32.dp)
+                                    .fillMaxWidth()
+                                    .background(Color.DarkGray.copy(alpha = 0.3f), MaterialTheme.shapes.extraSmall)
+                                    .knobInput(
+                                        value = slope,
+                                        config = KnobConfig(isBipolar = false),
+                                        onValueChange = { newValue ->
+                                            slope = newValue
+                                            onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, newValue))
+                                        },
+                                        onInteractionFinished = onInteractionFinished
+                                    ),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .fillMaxWidth(slope.coerceIn(0f, 1f))
+                                        .background(Color.Cyan.copy(alpha = 0.4f))
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color.DarkGray)) {
+            Box(modifier = Modifier.padding(top = 4.dp).fillMaxWidth().height(1.dp).background(Color.DarkGray)) {
                 Box(modifier = Modifier.fillMaxWidth(pulseValue.coerceIn(0f, 1f)).fillMaxHeight().background(Color.Cyan.copy(alpha = 0.5f)))
             }
         }

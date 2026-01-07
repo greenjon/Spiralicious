@@ -86,7 +86,7 @@ class ModulatableParameter(
             
             result = when (mod.operator) {
                 ModulationOperator.ADD -> result + modAmount
-                ModulationOperator.MUL -> result * modAmount
+                ModulationOperator.MUL -> result * (1.0f + modAmount)
             }
         }
         

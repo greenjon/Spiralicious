@@ -147,16 +147,10 @@ fun ModulatorRow(
                         ) 
                     }
                 }
+            } else {
+                // Placeholder space for the ON/OFF button to keep the drop-down aligned
+                Spacer(modifier = Modifier.width(44.dp))
             }
-
-            TextButton(
-                onClick = { 
-                    val newOp = if (operator == ModulationOperator.ADD) ModulationOperator.MUL else ModulationOperator.ADD
-                    operator = newOp
-                    if (!isNew) { onUpdate(CvModulator(sourceId, newOp, weight, bypassed, waveform, subdivision, phaseOffset, slope)); onInteractionFinished() }
-                },
-                modifier = Modifier.width(48.dp)
-            ) { Text(if (operator == ModulationOperator.ADD) "+" else "X", color = Color.Cyan) }
 
             var sourceExpanded by remember { mutableStateOf(false) }
             Box(modifier = Modifier.weight(1f)) {
@@ -177,7 +171,46 @@ fun ModulatorRow(
                 }
             }
 
-            if (isBeat) {
+            if (sourceId != "none") {
+                TextButton(
+                    onClick = { 
+                        val newOp = if (operator == ModulationOperator.ADD) ModulationOperator.MUL else ModulationOperator.ADD
+                        operator = newOp
+                        if (!isNew) { onUpdate(CvModulator(sourceId, newOp, weight, bypassed, waveform, subdivision, phaseOffset, slope)); onInteractionFinished() }
+                    },
+                    modifier = Modifier.width(52.dp)
+                ) { Text(if (operator == ModulationOperator.ADD) "ADD" else "MUL", color = Color.Cyan, style = MaterialTheme.typography.labelSmall) }
+
+                // Weight knob on the same line for everyone
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Weight:", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
+                    KnobView(
+                        currentValue = weight,
+                        onValueChange = { newValue ->
+                            weight = newValue
+                            onUpdate(CvModulator(sourceId, operator, newValue, bypassed, waveform, subdivision, phaseOffset, slope))
+                        },
+                        onInteractionFinished = onInteractionFinished,
+                        isBipolar = true,
+                        focused = true,
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        knobSize = 40.dp,
+                        showValue = true
+                    )
+                }
+            }
+
+            if (!isNew) {
+                IconButton(onClick = onRemove) { Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color.LightGray, modifier = Modifier.size(16.dp)) }
+            }
+        }
+
+        if (sourceId == "beatPhase") {
+            // Beat-specific expanded controls (Row 2)
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                // Add spacer to align Row 2 with the drop-down in Row 1 (ON/OFF button width is 36dp + 8dp padding)
+                Spacer(modifier = Modifier.width(44.dp))
+                
                 IconButton(onClick = {
                     val nextWave = Waveform.values()[(waveform.ordinal + 1) % Waveform.values().size]
                     waveform = nextWave
@@ -227,72 +260,50 @@ fun ModulatorRow(
                         }
                     }
                 }
-            }
 
-            if (!isNew) {
-                IconButton(onClick = onRemove) { Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color.LightGray, modifier = Modifier.size(16.dp)) }
-            }
-        }
-
-        if (sourceId != "none") {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Weight: ${(weight * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.width(70.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                Text("Phase:", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f))
                 KnobView(
-                    currentValue = weight,
+                    currentValue = phaseOffset,
                     onValueChange = { newValue ->
-                        weight = newValue
-                        onUpdate(CvModulator(sourceId, operator, newValue, bypassed, waveform, subdivision, phaseOffset, slope))
+                        phaseOffset = newValue
+                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope))
                     },
                     onInteractionFinished = onInteractionFinished,
-                    isBipolar = true,
+                    isBipolar = false,
                     focused = true,
-                    modifier = Modifier.padding(horizontal = 8.dp),
-                    knobSize = 32.dp
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                    knobSize = 32.dp,
+                    showValue = true
                 )
-            }
-            
-            if (isBeat) {
-                Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val hasSecondSlider = waveform == Waveform.TRIANGLE || waveform == Waveform.SQUARE
-                    
-                    Text("Phase: ${(phaseOffset * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.width(60.dp))
+
+                val hasSecondSlider = waveform == Waveform.TRIANGLE || waveform == Waveform.SQUARE
+                if (hasSecondSlider) {
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (waveform == Waveform.TRIANGLE) "Slope:" else "Duty:",
+                        style = MaterialTheme.typography.labelSmall, 
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
                     KnobView(
-                        currentValue = phaseOffset,
+                        currentValue = slope,
                         onValueChange = { newValue ->
-                            phaseOffset = newValue
-                            onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope))
+                            slope = newValue
+                            onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, newValue))
                         },
                         onInteractionFinished = onInteractionFinished,
                         isBipolar = false,
                         focused = true,
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                        knobSize = 32.dp
+                        modifier = Modifier.padding(horizontal = 4.dp),
+                        knobSize = 32.dp,
+                        showValue = true
                     )
-
-                    if (hasSecondSlider) {
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Text(
-                            text = if (waveform == Waveform.TRIANGLE) "Slope: ${(slope * 100).roundToInt()}" else "Duty: ${(slope * 100).roundToInt()}",
-                            style = MaterialTheme.typography.labelSmall, 
-                            color = Color.White.copy(alpha = 0.7f),
-                            modifier = Modifier.width(60.dp)
-                        )
-                        KnobView(
-                            currentValue = slope,
-                            onValueChange = { newValue ->
-                                slope = newValue
-                                onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, newValue))
-                            },
-                            onInteractionFinished = onInteractionFinished,
-                            isBipolar = false,
-                            focused = true,
-                            modifier = Modifier.padding(horizontal = 8.dp),
-                            knobSize = 32.dp
-                        )
-                    }
                 }
             }
+        }
 
+        if (sourceId != "none") {
             Box(modifier = Modifier.padding(top = 4.dp).fillMaxWidth().height(1.dp).background(Color.DarkGray)) {
                 Box(modifier = Modifier.fillMaxWidth(pulseValue.coerceIn(0f, 1f)).fillMaxHeight().background(Color.Cyan.copy(alpha = 0.5f)))
             }

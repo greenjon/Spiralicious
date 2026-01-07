@@ -28,7 +28,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.PopupProperties
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spirals.cv.*
@@ -87,6 +86,7 @@ class MainActivity : ComponentActivity() {
         var lastLoadedPatch by remember { mutableStateOf<PatchData?>(null) }
         var manualChangeTrigger by remember { mutableIntStateOf(0) }
         var isDirty by remember { mutableStateOf(false) }
+        var recipeExpanded by remember { mutableStateOf(false) }
 
         // Audio State
         var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
@@ -137,127 +137,107 @@ class MainActivity : ComponentActivity() {
                     .fillMaxWidth()
                     .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
-                // Collapsible Header & Patch Management
-                var isHeaderExpanded by remember { mutableStateOf(false) }
+                // Header & Patch Management
+                var showMenu by remember { mutableStateOf(false) }
                 var showOpenDialog by remember { mutableStateOf(false) }
-                
-                Surface(
-                    color = AppBackground,
-                    modifier = Modifier.fillMaxWidth().clickable { isHeaderExpanded = !isHeaderExpanded }.padding(bottom = 2.dp),
-                    shape = MaterialTheme.shapes.extraSmall
+                var showRenameDialog by remember { mutableStateOf(false) }
+                var patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "${lastLoadedPatch?.name ?: "New Patch"}${if (isDirty) " *" else ""}", style = MaterialTheme.typography.titleMedium, color = AppText)
-                            Spacer(modifier = Modifier.weight(1f))
-                            Text(text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)", style = MaterialTheme.typography.labelSmall, color = AppAccent)
+                    Text(
+                        text = "$patchName${if (isDirty || patchName != (lastLoadedPatch?.name ?: "New Patch")) " *" else ""}",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = AppText,
+                        modifier = Modifier
+                            .clickable { showRenameDialog = true }
+                            .padding(4.dp)
+                    )
+                    
+                    Spacer(modifier = Modifier.weight(1f))
+                    
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Patch Menu", tint = AppText)
                         }
-                        if (isHeaderExpanded) {
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text("Change Recipe", style = MaterialTheme.typography.labelLarge, color = AppAccent)
-                            var petalFilter by remember { mutableStateOf<Int?>(null) }
-                            var filterExpanded by remember { mutableStateOf(false) }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Box {
-                                    TextButton(onClick = { filterExpanded = true }) { Text(if (petalFilter == null) "All Petals" else "${petalFilter}P", color = AppText) }
-                                    DropdownMenu(
-                                        expanded = filterExpanded, 
-                                        onDismissRequest = { filterExpanded = false },
-                                        containerColor = AppBackground,
-                                        tonalElevation = 0.dp
-                                    ) {
-                                        DropdownMenuItem(
-                                            text = { Text("All") }, 
-                                            onClick = { petalFilter = null; filterExpanded = false },
-                                            colors = MenuDefaults.itemColors(textColor = AppText)
-                                        )
-                                        listOf(3, 4, 5, 6, 7, 8, 9, 10, 12, 16).forEach { p -> 
-                                            DropdownMenuItem(
-                                                text = { Text("${p}P") }, 
-                                                onClick = { petalFilter = p; filterExpanded = false },
-                                                colors = MenuDefaults.itemColors(textColor = AppText)
-                                            ) 
-                                        }
-                                    }
-                                }
-                                
-                                Spacer(modifier = Modifier.weight(1f))
-                                
-                                var recipeExpanded by remember { mutableStateOf(false) }
-                                Box {
-                                    Button(
-                                        onClick = { recipeExpanded = true }, 
-                                        contentPadding = PaddingValues(horizontal = 12.dp),
-                                        shape = MaterialTheme.shapes.extraSmall,
-                                        colors = ButtonDefaults.buttonColors(containerColor = AppAccent, contentColor = Color.White)
-                                    ) { 
-                                        Text("Recipe") 
-                                    }
-                                    DropdownMenu(
-                                        expanded = recipeExpanded, 
-                                        onDismissRequest = { recipeExpanded = false },
-                                        containerColor = AppBackground,
-                                        tonalElevation = 0.dp,
-                                        properties = PopupProperties(focusable = true, dismissOnBackPress = true, dismissOnClickOutside = true),
-                                        modifier = Modifier.widthIn(max = 240.dp)
-                                    ) {
-                                        val filtered = MandalaLibrary.MandalaRatios.filter { petalFilter == null || it.petals == petalFilter }.take(100)
-                                        filtered.forEach { ratio ->
-                                            DropdownMenuItem(
-                                                contentPadding = PaddingValues(horizontal = 12.dp),
-                                                text = { 
-                                                    Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)", color = AppText) 
-                                                }, 
-                                                onClick = { 
-                                                    visualSource.recipe = ratio
-                                                    manualChangeTrigger++
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = AppText.copy(alpha = 0.1f))
-                            Text("Patch Management", style = MaterialTheme.typography.labelLarge, color = AppAccent)
-                            var nameInput by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
-                            OutlinedTextField(
-                                value = nameInput, 
-                                onValueChange = { nameInput = it }, 
-                                modifier = Modifier.fillMaxWidth(), 
-                                label = { Text("Patch Name") }, 
-                                textStyle = MaterialTheme.typography.bodySmall,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = AppAccent,
-                                    unfocusedBorderColor = AppText.copy(alpha = 0.3f),
-                                    focusedLabelColor = AppAccent,
-                                    unfocusedLabelColor = AppText.copy(alpha = 0.5f),
-                                    focusedTextColor = AppText,
-                                    unfocusedTextColor = AppText
-                                )
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false },
+                            containerColor = AppBackground
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Open", color = AppText) },
+                                onClick = { showOpenDialog = true; showMenu = false }
                             )
-                            Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Row {
-                                    Button(onClick = { scope.launch { val data = PatchMapper.fromVisualSource(nameInput, visualSource); vm.savePatch(data); lastLoadedPatch = data; isHeaderExpanded = false } }, colors = ButtonDefaults.buttonColors(containerColor = AppAccent)) { Text("Save") }
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    IconButton(onClick = { val data = PatchMapper.fromVisualSource(nameInput, visualSource); context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) }, "Share Patch")) }) { Icon(Icons.Default.Share, contentDescription = null, tint = AppText) }
+                            DropdownMenuItem(
+                                text = { Text("Save", color = AppText) },
+                                onClick = { 
+                                    scope.launch { 
+                                        val data = PatchMapper.fromVisualSource(patchName, visualSource)
+                                        vm.savePatch(data)
+                                        lastLoadedPatch = data
+                                    }
+                                    showMenu = false 
                                 }
-                                Row {
-                                    Button(onClick = { showOpenDialog = true }, colors = ButtonDefaults.buttonColors(containerColor = AppAccent)) { Text("Open") }
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Button(onClick = { scope.launch { val data = PatchMapper.fromVisualSource("$nameInput CLONE", visualSource); vm.savePatch(data); lastLoadedPatch = data; isHeaderExpanded = false } }, colors = ButtonDefaults.buttonColors(containerColor = AppAccent)) { Text("Clone") }
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    IconButton(onClick = { lastLoadedPatch?.let { vm.deletePatch(it.name); lastLoadedPatch = null; isHeaderExpanded = false } }) { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Clone", color = AppText) },
+                                onClick = { 
+                                    scope.launch { 
+                                        val data = PatchMapper.fromVisualSource("$patchName CLONE", visualSource)
+                                        vm.savePatch(data)
+                                        lastLoadedPatch = data
+                                    }
+                                    showMenu = false 
                                 }
-                            }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Share", color = AppText) },
+                                onClick = { 
+                                    val data = PatchMapper.fromVisualSource(patchName, visualSource)
+                                    context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { 
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) 
+                                    }, "Share Patch"))
+                                    showMenu = false 
+                                },
+                                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = AppText) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete", color = Color.Red) },
+                                onClick = { 
+                                    lastLoadedPatch?.let { vm.deletePatch(it.name) }
+                                    lastLoadedPatch = null
+                                    showMenu = false 
+                                },
+                                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) }
+                            )
                         }
                     }
                 }
 
+                if (showRenameDialog) {
+                    RenamePatchDialog(
+                        initialName = patchName,
+                        onRename = { patchName = it },
+                        onDismiss = { showRenameDialog = false }
+                    )
+                }
+
                 if (showOpenDialog) {
-                    OpenPatchDialog(vm, onPatchSelected = { PatchMapper.applyToVisualSource(it, visualSource); lastLoadedPatch = it; showOpenDialog = false; isHeaderExpanded = false }, onDismiss = { showOpenDialog = false })
+                    OpenPatchDialog(
+                        vm, 
+                        onPatchSelected = { 
+                            PatchMapper.applyToVisualSource(it, visualSource)
+                            lastLoadedPatch = it
+                            showOpenDialog = false 
+                        }, 
+                        onDismiss = { showOpenDialog = false }
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -272,6 +252,41 @@ class MainActivity : ComponentActivity() {
                     contentAlignment = Alignment.Center
                 ) {
                     AndroidView(factory = { ctx -> SpiralSurfaceView(ctx).also { spiralSurfaceView = it; it.setVisualSource(visualSource) } }, modifier = Modifier.fillMaxSize())
+                    
+                    // Recipe Overlay
+                    Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                        Surface(
+                            color = AppBackground.copy(alpha = 0.7f),
+                            shape = MaterialTheme.shapes.extraSmall,
+                            modifier = Modifier.clickable { recipeExpanded = true }
+                        ) {
+                            Text(
+                                text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = AppAccent,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = recipeExpanded,
+                            onDismissRequest = { recipeExpanded = false },
+                            containerColor = AppBackground,
+                            tonalElevation = 0.dp
+                        ) {
+                            MandalaLibrary.MandalaRatios.forEach { ratio ->
+                                DropdownMenuItem(
+                                    text = { 
+                                        Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)", color = AppText) 
+                                    }, 
+                                    onClick = { 
+                                        visualSource.recipe = ratio
+                                        manualChangeTrigger++
+                                        recipeExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -371,6 +386,39 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    @Composable
+    fun RenamePatchDialog(initialName: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
+        var name by remember { mutableStateOf(initialName) }
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Rename Patch", color = AppText) },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AppAccent,
+                        unfocusedTextColor = AppText,
+                        focusedTextColor = AppText,
+                        cursorColor = AppAccent
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { onRename(name); onDismiss() }) {
+                    Text("RENAME", color = AppAccent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("CANCEL", color = AppText)
+                }
+            },
+            containerColor = AppBackground
+        )
     }
 
     override fun onPause() { super.onPause(); spiralSurfaceView?.onPause(); audioEngine.stop() }

@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -81,12 +82,14 @@ class MainActivity : ComponentActivity() {
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
         
-        var currentTab by remember { mutableStateOf("Patch Bay") }
         var focusedParameterId by remember { mutableStateOf("L1") }
         var lastLoadedPatch by remember { mutableStateOf<PatchData?>(null) }
         var manualChangeTrigger by remember { mutableIntStateOf(0) }
         var isDirty by remember { mutableStateOf(false) }
         var recipeExpanded by remember { mutableStateOf(false) }
+        
+        // UI Navigation State
+        var showCvLab by remember { mutableStateOf(false) }
 
         // Audio State
         var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
@@ -130,217 +133,186 @@ class MainActivity : ComponentActivity() {
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            // 1. TOP MONITOR AREA
-            Column(
+            // Header Row (The "Header")
+            var showMenu by remember { mutableStateOf(false) }
+            var showOpenDialog by remember { mutableStateOf(false) }
+            var showRenameDialog by remember { mutableStateOf(false) }
+            var patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
+
+            Row(
                 modifier = Modifier
-                    .wrapContentHeight()
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Header & Patch Management
-                var showMenu by remember { mutableStateOf(false) }
-                var showOpenDialog by remember { mutableStateOf(false) }
-                var showRenameDialog by remember { mutableStateOf(false) }
-                var patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
-
-                Row(
+                Text(
+                    text = "$patchName${if (isDirty || patchName != (lastLoadedPatch?.name ?: "New Patch")) " *" else ""}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = AppText,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp, vertical = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "$patchName${if (isDirty || patchName != (lastLoadedPatch?.name ?: "New Patch")) " *" else ""}",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = AppText,
-                        modifier = Modifier
-                            .clickable { showRenameDialog = true }
-                            .padding(4.dp)
-                    )
-                    
-                    Spacer(modifier = Modifier.weight(1f))
-                    
-                    Box {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Patch Menu", tint = AppText)
-                        }
-                        DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false },
-                            containerColor = AppBackground
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Open", color = AppText) },
-                                onClick = { showOpenDialog = true; showMenu = false }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Save", color = AppText) },
-                                onClick = { 
-                                    scope.launch { 
-                                        val data = PatchMapper.fromVisualSource(patchName, visualSource)
-                                        vm.savePatch(data)
-                                        lastLoadedPatch = data
-                                    }
-                                    showMenu = false 
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Clone", color = AppText) },
-                                onClick = { 
-                                    scope.launch { 
-                                        val data = PatchMapper.fromVisualSource("$patchName CLONE", visualSource)
-                                        vm.savePatch(data)
-                                        lastLoadedPatch = data
-                                    }
-                                    showMenu = false 
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Share", color = AppText) },
-                                onClick = { 
-                                    val data = PatchMapper.fromVisualSource(patchName, visualSource)
-                                    context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { 
-                                        type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) 
-                                    }, "Share Patch"))
-                                    showMenu = false 
-                                },
-                                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = AppText) }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Delete", color = Color.Red) },
-                                onClick = { 
-                                    lastLoadedPatch?.let { vm.deletePatch(it.name) }
-                                    lastLoadedPatch = null
-                                    showMenu = false 
-                                },
-                                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) }
-                            )
-                        }
+                        .clickable { showRenameDialog = true }
+                        .padding(4.dp)
+                )
+                
+                Spacer(modifier = Modifier.weight(1f))
+                
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
                     }
-                }
-
-                if (showRenameDialog) {
-                    RenamePatchDialog(
-                        initialName = patchName,
-                        onRename = { patchName = it },
-                        onDismiss = { showRenameDialog = false }
-                    )
-                }
-
-                if (showOpenDialog) {
-                    OpenPatchDialog(
-                        vm, 
-                        onPatchSelected = { 
-                            PatchMapper.applyToVisualSource(it, visualSource)
-                            lastLoadedPatch = it
-                            showOpenDialog = false 
-                        }, 
-                        onDismiss = { showOpenDialog = false }
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // 2. Mandala Preview
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(16 / 9f)
-                        .background(Color.Black)
-                        .border(1.dp, AppText.copy(alpha = 0.1f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    AndroidView(factory = { ctx -> SpiralSurfaceView(ctx).also { spiralSurfaceView = it; it.setVisualSource(visualSource) } }, modifier = Modifier.fillMaxSize())
-                    
-                    // Recipe Overlay
-                    Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-                        Surface(
-                            color = AppBackground.copy(alpha = 0.7f),
-                            shape = MaterialTheme.shapes.extraSmall,
-                            modifier = Modifier.clickable { recipeExpanded = true }
-                        ) {
-                            Text(
-                                text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = AppAccent,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = recipeExpanded,
-                            onDismissRequest = { recipeExpanded = false },
-                            containerColor = AppBackground,
-                            tonalElevation = 0.dp
-                        ) {
-                            MandalaLibrary.MandalaRatios.forEach { ratio ->
-                                DropdownMenuItem(
-                                    text = { 
-                                        Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)", color = AppText) 
-                                    }, 
-                                    onClick = { 
-                                        visualSource.recipe = ratio
-                                        manualChangeTrigger++
-                                        recipeExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // 3. Monitor Row
-                val focusedParam = visualSource.parameters[focusedParameterId] ?: visualSource.globalAlpha
-                Box(modifier = Modifier.fillMaxWidth().height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
-                    OscilloscopeView(history = focusedParam.history, modifier = Modifier.fillMaxSize())
-                    Surface(
-                        color = AppBackground.copy(alpha = 0.8f),
-                        modifier = Modifier.align(Alignment.TopStart).padding(4.dp),
-                        shape = MaterialTheme.shapes.extraSmall
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        containerColor = AppBackground
                     ) {
-                        Text(
-                            text = focusedParameterId, 
-                            style = MaterialTheme.typography.labelSmall, 
-                            color = AppAccent,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        DropdownMenuItem(
+                            text = { Text("CV Lab", color = AppAccent) },
+                            onClick = { showCvLab = true; showMenu = false },
+                            leadingIcon = { Icon(Icons.Default.Build, contentDescription = null, tint = AppAccent) }
+                        )
+                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                        DropdownMenuItem(
+                            text = { Text("Open", color = AppText) },
+                            onClick = { showOpenDialog = true; showMenu = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Save", color = AppText) },
+                            onClick = { 
+                                scope.launch { 
+                                    val data = PatchMapper.fromVisualSource(patchName, visualSource)
+                                    vm.savePatch(data)
+                                    lastLoadedPatch = data
+                                }
+                                showMenu = false 
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Clone", color = AppText) },
+                            onClick = { 
+                                scope.launch { 
+                                    val data = PatchMapper.fromVisualSource("$patchName CLONE", visualSource)
+                                    vm.savePatch(data)
+                                    lastLoadedPatch = data
+                                }
+                                showMenu = false 
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Share", color = AppText) },
+                            onClick = { 
+                                val data = PatchMapper.fromVisualSource(patchName, visualSource)
+                                context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { 
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) 
+                                }, "Share Patch"))
+                                showMenu = false 
+                            },
+                            leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = AppText) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete", color = Color.Red) },
+                            onClick = { 
+                                lastLoadedPatch?.let { vm.deletePatch(it.name) }
+                                lastLoadedPatch = null
+                                showMenu = false 
+                            },
+                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) }
                         )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // 4. Parameter Matrix
-                ParameterMatrix(
-                    labels = visualSource.parameters.keys.toList(),
-                    parameters = visualSource.parameters.values.toList(),
-                    focusedParameterId = focusedParameterId, 
-                    onFocusRequest = { focusedParameterId = it },
-                    onInteractionFinished = { manualChangeTrigger++ }
-                )
             }
 
-            // 5. BOTTOM CONTROL AREA
-            Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                TabRow(
-                    selectedTabIndex = if (currentTab == "Patch Bay") 0 else 1,
-                    containerColor = AppBackground,
-                    contentColor = AppAccent
-                ) {
-                    Tab(
-                        selected = currentTab == "Patch Bay", 
-                        onClick = { currentTab = "Patch Bay" },
-                        unselectedContentColor = AppText.copy(alpha = 0.5f)
-                    ) { Text("PATCH", modifier = Modifier.padding(8.dp)) }
-                    Tab(
-                        selected = currentTab == "CV Lab", 
-                        onClick = { currentTab = "CV Lab" },
-                        unselectedContentColor = AppText.copy(alpha = 0.5f)
-                    ) { Text("DIAG", modifier = Modifier.padding(8.dp)) }
-                }
-                Box(modifier = Modifier.fillMaxSize()) {
-                    if (currentTab == "Patch Bay") {
+            // Main content area that can be overlaid by CV Lab
+            Box(modifier = Modifier.weight(1f)) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // Monitor Area
+                    Column(
+                        modifier = Modifier
+                            .wrapContentHeight()
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
+                    ) {
+                        // Mandala Preview
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .aspectRatio(16 / 9f)
+                                .background(Color.Black)
+                                .border(1.dp, AppText.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AndroidView(factory = { ctx -> SpiralSurfaceView(ctx).also { spiralSurfaceView = it; it.setVisualSource(visualSource) } }, modifier = Modifier.fillMaxSize())
+                            
+                            // Recipe Overlay
+                            Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                                Surface(
+                                    color = AppBackground.copy(alpha = 0.7f),
+                                    shape = MaterialTheme.shapes.extraSmall,
+                                    modifier = Modifier.clickable { recipeExpanded = true }
+                                ) {
+                                    Text(
+                                        text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = AppAccent,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = recipeExpanded,
+                                    onDismissRequest = { recipeExpanded = false },
+                                    containerColor = AppBackground,
+                                    tonalElevation = 0.dp
+                                ) {
+                                    MandalaLibrary.MandalaRatios.forEach { ratio ->
+                                        DropdownMenuItem(
+                                            text = { 
+                                                Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)", color = AppText) 
+                                            }, 
+                                            onClick = { 
+                                                visualSource.recipe = ratio
+                                                manualChangeTrigger++
+                                                recipeExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Monitor Row
+                        val focusedParam = visualSource.parameters[focusedParameterId] ?: visualSource.globalAlpha
+                        Box(modifier = Modifier.fillMaxWidth().height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
+                            OscilloscopeView(history = focusedParam.history, modifier = Modifier.fillMaxSize())
+                            Surface(
+                                color = AppBackground.copy(alpha = 0.8f),
+                                modifier = Modifier.align(Alignment.TopStart).padding(4.dp),
+                                shape = MaterialTheme.shapes.extraSmall
+                            ) {
+                                Text(
+                                    text = focusedParameterId, 
+                                    style = MaterialTheme.typography.labelSmall, 
+                                    color = AppAccent,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Parameter Matrix
+                        ParameterMatrix(
+                            labels = visualSource.parameters.keys.toList(),
+                            parameters = visualSource.parameters.values.toList(),
+                            focusedParameterId = focusedParameterId, 
+                            onFocusRequest = { focusedParameterId = it },
+                            onInteractionFinished = { manualChangeTrigger++ }
+                        )
+                    }
+
+                    // Instrument Editor Area (Filling remaining space)
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                         InstrumentEditorScreen(
                             source = visualSource, 
                             vm = vm, 
@@ -348,7 +320,18 @@ class MainActivity : ComponentActivity() {
                             onFocusChange = { focusedParameterId = it },
                             onInteractionFinished = { manualChangeTrigger++ }
                         ) 
-                    } else {
+                    }
+                }
+
+                // CV Lab Overlay
+                // Wrap in a separate Box to ensure we call the top-level AnimatedVisibility correctly
+                Box(modifier = Modifier.fillMaxSize()) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showCvLab,
+                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
                         CvLabScreen(
                             audioEngine = audioEngine,
                             sourceManager = sourceManager!!,
@@ -356,10 +339,32 @@ class MainActivity : ComponentActivity() {
                             onAudioSourceTypeChange = { audioSourceType = it },
                             hasMicPermission = hasMicPermission,
                             onMicPermissionGranted = { hasMicPermission = true },
-                            onInternalAudioRecordCreated = { currentInternalAudioRecord = it }
+                            onInternalAudioRecordCreated = { currentInternalAudioRecord = it },
+                            onClose = { showCvLab = false }
                         )
                     }
                 }
+            }
+
+            // Dialogs
+            if (showRenameDialog) {
+                RenamePatchDialog(
+                    initialName = patchName,
+                    onRename = { patchName = it },
+                    onDismiss = { showRenameDialog = false }
+                )
+            }
+
+            if (showOpenDialog) {
+                OpenPatchDialog(
+                    vm, 
+                    onPatchSelected = { 
+                        PatchMapper.applyToVisualSource(it, visualSource)
+                        lastLoadedPatch = it
+                        showOpenDialog = false 
+                    }, 
+                    onDismiss = { showOpenDialog = false }
+                )
             }
         }
     }

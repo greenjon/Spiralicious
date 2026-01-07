@@ -10,6 +10,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,7 +37,8 @@ fun CvLabScreen(
     onAudioSourceTypeChange: (AudioSourceType) -> Unit,
     hasMicPermission: Boolean,
     onMicPermissionGranted: () -> Unit,
-    onInternalAudioRecordCreated: (AudioRecord) -> Unit
+    onInternalAudioRecordCreated: (AudioRecord) -> Unit,
+    onClose: () -> Unit
 ) {
     val micPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -76,7 +79,16 @@ fun CvLabScreen(
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
-        Text("CV Diagnostic Lab", style = MaterialTheme.typography.headlineSmall, color = AppText)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("CV Lab", style = MaterialTheme.typography.headlineSmall, color = AppText)
+            IconButton(onClick = onClose) {
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = AppText)
+            }
+        }
         
         Spacer(modifier = Modifier.height(8.dp))
         

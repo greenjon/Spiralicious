@@ -23,6 +23,7 @@ import llm.slop.spirals.R
 import llm.slop.spirals.ui.components.KnobConfig
 import llm.slop.spirals.ui.components.knobInput
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 @Composable
 fun InstrumentEditorScreen(
@@ -68,7 +69,7 @@ fun InstrumentEditorScreen(
         Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
             if (!isArmLength) {
                 var baseVal by remember(focusedId) { mutableFloatStateOf(focusedParam.baseValue) }
-                Text("Base Value: ${"%.2f".format(baseVal)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                Text("Base Value: ${(baseVal * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                 
                 Box(
                     modifier = Modifier
@@ -288,7 +289,7 @@ fun ModulatorRow(
         }
 
         if (sourceId != "none") {
-            Text("Weight: ${"%.2f".format(weight)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+            Text("Weight: ${(weight * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
             
             Box(
                 modifier = Modifier
@@ -321,7 +322,7 @@ fun ModulatorRow(
                 Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                     val hasSecondSlider = waveform == Waveform.TRIANGLE || waveform == Waveform.SQUARE
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Phase: ${"%.2f".format(phaseOffset)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                        Text("Phase: ${(phaseOffset * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                         Box(
                             modifier = Modifier
                                 .padding(
@@ -352,7 +353,7 @@ fun ModulatorRow(
                     }
                     if (hasSecondSlider) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(if (waveform == Waveform.TRIANGLE) "Slope: ${"%.2f".format(slope)}" else "Duty: ${"%.2f".format(slope)}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
+                            Text(if (waveform == Waveform.TRIANGLE) "Slope: ${(slope * 100).roundToInt()}" else "Duty: ${(slope * 100).roundToInt()}", style = MaterialTheme.typography.labelSmall, color = Color.Gray)
                             Box(
                                 modifier = Modifier
                                     .padding(start = 4.dp, end = 24.dp)

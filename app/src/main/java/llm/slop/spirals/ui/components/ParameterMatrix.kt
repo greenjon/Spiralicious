@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import llm.slop.spirals.cv.ModulatableParameter
+import kotlin.math.roundToInt
 
 @Composable
 fun ParameterMatrix(
@@ -56,7 +57,7 @@ fun ParameterMatrix(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
-                                    text = "$id - ${"%.2f".format(currentValue)}",
+                                    text = "$id - ${(currentValue * 100).roundToInt()}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = if (isFocused) Color.Cyan else Color.Gray
                                 )

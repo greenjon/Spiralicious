@@ -63,9 +63,10 @@ fun MixerEditorScreen(
             val setEntity = allSets.find { it.id == slot.mandalaSetId }
             if (setEntity != null) {
                 val orderedIds = Json.decodeFromString<List<String>>(setEntity.jsonOrderedMandalaIds)
-                val firstMandalaId = orderedIds.firstOrNull()
-                if (firstMandalaId != null) {
-                    val patchEntity = allPatches.find { it.name == firstMandalaId }
+                if (orderedIds.isNotEmpty()) {
+                    val safeIndex = slot.currentIndex.coerceIn(0, orderedIds.size - 1)
+                    val mandalaId = orderedIds[safeIndex]
+                    val patchEntity = allPatches.find { it.name == mandalaId }
                     patchEntity?.let { pe ->
                         val patchData = PatchMapper.fromJson(pe.jsonSettings)
                         patchData?.let { pd ->
@@ -83,11 +84,6 @@ fun MixerEditorScreen(
             renderer?.mixerPatch = null
             renderer?.monitorSource = "F"
         }
-    }
-
-    fun selectPatch(id: String) {
-        val entity = allMixerPatches.find { it.id == id } ?: return
-        currentPatch = Json.decodeFromString(entity.jsonSettings)
     }
 
     Column(
@@ -260,7 +256,7 @@ fun MixerEditorScreen(
                             Row(modifier = Modifier.fillMaxWidth().clickable {
                                 currentPatch = currentPatch.copy(
                                     slots = currentPatch.slots.toMutableList().also {
-                                        it[focusedSlotIndex] = it[focusedSlotIndex].copy(mandalaSetId = setEntity.id)
+                                        it[focusedSlotIndex] = it[focusedSlotIndex].copy(mandalaSetId = setEntity.id, currentIndex = 0)
                                     }
                                 )
                                 showSetPicker = false
@@ -272,6 +268,54 @@ fun MixerEditorScreen(
                 }
             }
         }
+    }
+
+    if (showOpenDialog) {
+        Dialog(onDismissRequest = { showOpenDialog = false }) {
+            Surface(shape = MaterialTheme.shapes.medium, color = AppBackground) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
+                    Text("Open Mixer Patch", style = MaterialTheme.typography.titleLarge, color = AppText)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        allMixerPatches.forEach { entity ->
+                            Row(modifier = Modifier.fillMaxWidth().clickable {
+                                currentPatch = Json.decodeFromString(entity.jsonSettings)
+                                showOpenDialog = false
+                            }.padding(12.dp)) {
+                                Text(entity.name, style = MaterialTheme.typography.bodyLarge, color = AppText)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showRenameDialog) {
+        var newName by remember { mutableStateOf(currentPatch.name) }
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("Rename Mixer") },
+            text = {
+                TextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    currentPatch = currentPatch.copy(name = newName)
+                    showRenameDialog = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) { Text("Cancel") }
+            },
+            containerColor = AppBackground,
+            titleContentColor = AppText,
+            textContentColor = AppText
+        )
     }
 }
 
@@ -442,11 +486,35 @@ fun SlotControlPanel(
             }
 
             if (slot.sourceIsSet) {
+                val setEntity = allSets.find { it.id == slot.mandalaSetId }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    val setName = allSets.find { it.id == slot.mandalaSetId }?.name ?: "No Set"
+                    val setName = setEntity?.name ?: "No Set"
                     Text(setName, style = MaterialTheme.typography.bodySmall, color = AppText, modifier = Modifier.weight(1f), maxLines = 1)
-                    IconButton(onClick = { /* Previous */ }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.KeyboardArrowLeft, contentDescription = null) }
-                    IconButton(onClick = { /* Next */ }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.KeyboardArrowRight, contentDescription = null) }
+                    IconButton(
+                        onClick = { 
+                            setEntity?.let { 
+                                val ids = Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds)
+                                if (ids.isNotEmpty()) {
+                                    val nextIdx = if (slot.currentIndex <= 0) ids.size - 1 else slot.currentIndex - 1
+                                    onPatchUpdate(updateSlot(currentPatch, selectedIndex, slot.copy(currentIndex = nextIdx)))
+                                }
+                            }
+                        }, 
+                        modifier = Modifier.size(24.dp)
+                    ) { Icon(Icons.Default.KeyboardArrowLeft, contentDescription = null, tint = AppText) }
+                    
+                    IconButton(
+                        onClick = { 
+                            setEntity?.let { 
+                                val ids = Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds)
+                                if (ids.isNotEmpty()) {
+                                    val nextIdx = (slot.currentIndex + 1) % ids.size
+                                    onPatchUpdate(updateSlot(currentPatch, selectedIndex, slot.copy(currentIndex = nextIdx)))
+                                }
+                            }
+                        }, 
+                        modifier = Modifier.size(24.dp)
+                    ) { Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = AppText) }
                 }
                 OutlinedButton(onClick = onOpenSetPicker, modifier = Modifier.height(28.dp), contentPadding = PaddingValues(horizontal = 8.dp)) {
                     Text("Pick Set", style = MaterialTheme.typography.labelSmall)

@@ -33,9 +33,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spirals.cv.*
 import llm.slop.spirals.cv.audio.*
-import llm.slop.spirals.ui.CvLabScreen
-import llm.slop.spirals.ui.InstrumentEditorScreen
-import llm.slop.spirals.ui.MandalaSetEditorScreen
+import llm.slop.spirals.ui.*
 import llm.slop.spirals.ui.components.MandalaParameterMatrix
 import llm.slop.spirals.ui.components.OscilloscopeView
 import llm.slop.spirals.ui.theme.AppBackground
@@ -45,7 +43,8 @@ import kotlinx.coroutines.launch
 
 enum class AppScreen {
     MANDALA_EDITOR,
-    MANDALA_SET_EDITOR
+    MANDALA_SET_EDITOR,
+    MIXER_EDITOR
 }
 
 class MainActivity : ComponentActivity() {
@@ -96,12 +95,15 @@ class MainActivity : ComponentActivity() {
             mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
         }
 
+        val renderer = remember { mutableStateOf<SpiralRenderer?>(null) }
+
         // Shared preview content
         val previewContent = @Composable { 
             AndroidView(
                 factory = { ctx -> 
-                    spiralSurfaceView ?: SpiralSurfaceView(ctx).also { 
+                    SpiralSurfaceView(ctx).also { 
                         spiralSurfaceView = it
+                        renderer.value = it.renderer
                         it.setVisualSource(visualSource)
                     }
                 },
@@ -137,54 +139,69 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(AppBackground)
-                .statusBarsPadding()
-                .navigationBarsPadding()
-        ) {
-             when (currentScreen) {
-                AppScreen.MANDALA_EDITOR -> {
-                    MandalaEditorScreen(
-                        vm = vm,
-                        visualSource = visualSource,
-                        isDirty = isDirty,
-                        lastLoadedPatch = lastLoadedPatch,
-                        onPatchLoaded = { lastLoadedPatch = it },
-                        onInteraction = { manualChangeTrigger++ },
-                        onNavigateToSetEditor = { currentScreen = AppScreen.MANDALA_SET_EDITOR },
-                        onShowCvLab = { showCvLab = true },
-                        previewContent = previewContent
-                    )
+        CompositionLocalProvider(LocalSpiralRenderer provides renderer.value) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(AppBackground)
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
+            ) {
+                 when (currentScreen) {
+                    AppScreen.MANDALA_EDITOR -> {
+                        MandalaEditorScreen(
+                            vm = vm,
+                            visualSource = visualSource,
+                            isDirty = isDirty,
+                            lastLoadedPatch = lastLoadedPatch,
+                            onPatchLoaded = { lastLoadedPatch = it },
+                            onInteraction = { manualChangeTrigger++ },
+                            onNavigateToSetEditor = { currentScreen = AppScreen.MANDALA_SET_EDITOR },
+                            onNavigateToMixerEditor = { currentScreen = AppScreen.MIXER_EDITOR },
+                            onShowCvLab = { showCvLab = true },
+                            previewContent = previewContent
+                        )
+                    }
+                    AppScreen.MANDALA_SET_EDITOR -> {
+                        MandalaSetEditorScreen(
+                            onClose = { currentScreen = AppScreen.MANDALA_EDITOR },
+                            onNavigateToMixerEditor = { currentScreen = AppScreen.MIXER_EDITOR },
+                            onShowCvLab = { showCvLab = true },
+                            previewContent = previewContent,
+                            visualSource = visualSource
+                        )
+                    }
+                    AppScreen.MIXER_EDITOR -> {
+                        MixerEditorScreen(
+                            vm = vm,
+                            onClose = { currentScreen = AppScreen.MANDALA_EDITOR },
+                            onNavigateToSetEditor = { currentScreen = AppScreen.MANDALA_SET_EDITOR },
+                            onNavigateToMandalaEditor = { currentScreen = AppScreen.MANDALA_EDITOR },
+                            onShowCvLab = { showCvLab = true },
+                            previewContent = previewContent
+                        )
+                    }
                 }
-                AppScreen.MANDALA_SET_EDITOR -> {
-                    MandalaSetEditorScreen(
-                        onClose = { currentScreen = AppScreen.MANDALA_EDITOR },
-                        previewContent = previewContent,
-                        visualSource = visualSource
-                    )
-                }
-            }
 
-            // Overlays
-            Box(modifier = Modifier.fillMaxSize()) {
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = showCvLab,
-                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    CvLabScreen(
-                        audioEngine = audioEngine,
-                        sourceManager = sourceManager!!,
-                        audioSourceType = audioSourceType,
-                        onAudioSourceTypeChange = { audioSourceType = it },
-                        hasMicPermission = hasMicPermission,
-                        onMicPermissionGranted = { hasMicPermission = true },
-                        onInternalAudioRecordCreated = { currentInternalAudioRecord = it },
-                        onClose = { showCvLab = false }
-                    )
+                // Overlays
+                Box(modifier = Modifier.fillMaxSize()) {
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showCvLab,
+                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        CvLabScreen(
+                            audioEngine = audioEngine,
+                            sourceManager = sourceManager!!,
+                            audioSourceType = audioSourceType,
+                            onAudioSourceTypeChange = { audioSourceType = it },
+                            hasMicPermission = hasMicPermission,
+                            onMicPermissionGranted = { hasMicPermission = true },
+                            onInternalAudioRecordCreated = { currentInternalAudioRecord = it },
+                            onClose = { showCvLab = false }
+                        )
+                    }
                 }
             }
         }
@@ -199,6 +216,7 @@ class MainActivity : ComponentActivity() {
         onPatchLoaded: (PatchData) -> Unit,
         onInteraction: () -> Unit,
         onNavigateToSetEditor: () -> Unit,
+        onNavigateToMixerEditor: () -> Unit,
         onShowCvLab: () -> Unit,
         previewContent: @Composable () -> Unit
     ) {
@@ -210,6 +228,13 @@ class MainActivity : ComponentActivity() {
         var showOpenDialog by remember { mutableStateOf(false) }
         var showRenameDialog by remember { mutableStateOf(false) }
         var patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
+
+        // Ensure renderer is pointing to our visualSource when this screen is active
+        val renderer = LocalSpiralRenderer.current
+        LaunchedEffect(renderer) {
+            renderer?.visualSource = visualSource
+            renderer?.mixerPatch = null
+        }
 
         Column(modifier = Modifier.fillMaxSize()) {
             // Header Row
@@ -242,6 +267,7 @@ class MainActivity : ComponentActivity() {
                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
                         DropdownMenuItem(text = { Text("CV Lab", color = AppAccent) }, onClick = { onShowCvLab(); showMenu = false }, leadingIcon = { Icon(Icons.Default.Build, contentDescription = null, tint = AppAccent) })
                         DropdownMenuItem(text = { Text("Mandala Set Editor", color = AppAccent) }, onClick = { onNavigateToSetEditor(); showMenu = false }, leadingIcon = { Icon(Icons.Default.List, contentDescription = null, tint = AppAccent) })
+                        DropdownMenuItem(text = { Text("Mixer Editor", color = AppAccent) }, onClick = { onNavigateToMixerEditor(); showMenu = false }, leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = AppAccent) })
                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
                         DropdownMenuItem(text = { Text("Open", color = AppText) }, onClick = { showOpenDialog = true; showMenu = false })
                         DropdownMenuItem(text = { Text("Save", color = AppText) }, onClick = { 

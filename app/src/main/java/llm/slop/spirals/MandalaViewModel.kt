@@ -16,6 +16,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     private val tagDao = db.mandalaTagDao()
     private val patchDao = db.mandalaPatchDao()
     private val setDao = db.mandalaSetDao()
+    private val mixerDao = db.mixerPatchDao()
 
     val tags: StateFlow<Map<String, List<String>>> = tagDao.getAllTags()
         .map { list -> list.groupBy({ it.id }, { it.tag }) }
@@ -23,6 +24,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
 
     val allPatches = patchDao.getAllPatches()
     val allSets = setDao.getAllSets()
+    val allMixerPatches = mixerDao.getAllMixerPatches()
 
     fun savePatch(patchData: PatchData) {
         viewModelScope.launch {
@@ -49,6 +51,17 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
 
     fun deleteSet(id: String) {
         viewModelScope.launch { setDao.deleteById(id) }
+    }
+
+    fun saveMixerPatch(mixerPatch: MixerPatch) {
+        viewModelScope.launch {
+            val json = Json.encodeToString(mixerPatch)
+            mixerDao.insertMixerPatch(MixerPatchEntity(mixerPatch.id, mixerPatch.name, json))
+        }
+    }
+
+    fun deleteMixerPatch(id: String) {
+        viewModelScope.launch { mixerDao.deleteById(id) }
     }
 
     fun toggleTag(id: String, tag: String) {

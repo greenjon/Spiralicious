@@ -9,6 +9,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,6 +37,8 @@ import kotlinx.serialization.json.Json
 fun MandalaSetEditorScreen(
     vm: MandalaViewModel = viewModel(), 
     onClose: () -> Unit,
+    onNavigateToMixerEditor: () -> Unit,
+    onShowCvLab: () -> Unit,
     previewContent: @Composable () -> Unit,
     visualSource: MandalaVisualSource
 ) {
@@ -115,8 +120,19 @@ fun MandalaSetEditorScreen(
                         )
                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
                         DropdownMenuItem(
+                            text = { Text("CV Lab", color = AppAccent) },
+                            onClick = { onShowCvLab(); showMenu = false },
+                            leadingIcon = { Icon(Icons.Default.Build, contentDescription = null, tint = AppAccent) }
+                        )
+                        DropdownMenuItem(
                             text = { Text("Mandala Editor", color = AppAccent) },
-                            onClick = { onClose(); showMenu = false }
+                            onClick = { onClose(); showMenu = false },
+                            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = AppAccent) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Mixer Editor", color = AppAccent) },
+                            onClick = { onNavigateToMixerEditor(); showMenu = false },
+                            leadingIcon = { Icon(Icons.Default.List, contentDescription = null, tint = AppAccent) }
                         )
                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
                         DropdownMenuItem(
@@ -224,13 +240,6 @@ fun MandalaSetEditorScreen(
                             currentSet = currentSet?.copy(orderedMandalaIds = newOrder.toMutableList())
                         }
                     )
-                    
-                    Spacer(modifier = Modifier.weight(1f))
-                    
-                    // Save Button (Quick action)
-                    Button(onClick = { currentSet?.let { vm.saveSet(it) }; onClose() }) {
-                        Text("Save & Exit")
-                    }
                 }
             }
         }

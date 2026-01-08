@@ -17,7 +17,17 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     private val resolution = 2048
     
+    @Volatile
     var visualSource: MandalaVisualSource? = null
+
+    // Mixer support
+    @Volatile
+    var mixerPatch: MixerPatch? = null
+    @Volatile
+    var monitorSource: String = "1" // "1", "2", "3", "4", "A"
+    
+    // We maintain 4 internal sources for the mixer slots
+    private val slotSources = List(4) { MandalaVisualSource() }
 
     @Volatile
     var params = MandalaParams(omega1 = 20, omega2 = 17, omega3 = 11, thickness = 0.005f)
@@ -35,9 +45,12 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var uGlobalScaleLocation: Int = -1
     private var uColorLocation: Int = -1
 
+    fun getSlotSource(index: Int) = slotSources[index]
+
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         GLES30.glEnable(GLES30.GL_BLEND)
+        // Default blend: Normal
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
 
         program = ShaderHelper.buildProgram(context, R.raw.mandala_vertex, R.raw.mandala_fragment)
@@ -96,44 +109,64 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         if (program == 0) return
         GLES30.glUseProgram(program)
 
-        val source = visualSource
-        val p1: Float; val p2: Float; val p3: Float; val p4: Float
-        val o1: Float; val o2: Float; val o3: Float; val o4: Float
-        val thick: Float
-        val finalScale: Float
-        val rotation: Float
-        val hue: Float; val sat: Float; val alpha: Float
+        val currentMonitor = monitorSource
+        val currentMixerPatch = mixerPatch
 
-        if (source != null) {
-            source.update()
-            p1 = source.parameters["L1"]?.value ?: 0f
-            p2 = source.parameters["L2"]?.value ?: 0f
-            p3 = source.parameters["L3"]?.value ?: 0f
-            p4 = source.parameters["L4"]?.value ?: 0f
-            
-            // Frequencies are now truthful integers from the recipe
-            o1 = source.recipe.a.toFloat()
-            o2 = source.recipe.b.toFloat()
-            o3 = source.recipe.c.toFloat()
-            o4 = source.recipe.d.toFloat()
-            
-            thick = (source.parameters["Thickness"]?.value ?: 0f) * 0.02f
-            val localScale = source.parameters["Scale"]?.value ?: 0.125f
-            finalScale = localScale * source.globalScale.value * 8.0f
-            
-            rotation = (source.parameters["Rotation"]?.value ?: 0f) * 2.0f * PI.toFloat()
-            
-            hue = source.parameters["Hue"]?.value ?: 0f
-            sat = source.parameters["Saturation"]?.value ?: 1f
-            alpha = source.globalAlpha.value
+        if (currentMonitor == "A" && currentMixerPatch != null) {
+            // Render composite
+            currentMixerPatch.slots.forEachIndexed { index, slot ->
+                if (slot.enabled) {
+                    // Set blend mode for this layer
+                    when (slot.blendMode) {
+                        "Add" -> GLES30.glBlendFunc(GLES30.GL_ONE, GLES30.GL_ONE)
+                        else -> GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
+                    }
+                    
+                    val source = slotSources[index]
+                    // Mixer slots use their own opacity control
+                    // For Phase 1, we assume opacityBaseValue is evaluated or just used directly
+                    // Actually, we should probably evaluate it.
+                    val opacity = slot.opacityBaseValue 
+                    renderSource(source, opacityOverride = opacity)
+                }
+            }
+            // Reset blend mode
+            GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
         } else {
-            p1 = params.l1; p2 = params.l2; p3 = params.l3; p4 = params.l4
-            o1 = params.omega1.toFloat(); o2 = params.omega2.toFloat(); o3 = params.omega3.toFloat(); o4 = params.omega4.toFloat()
-            thick = params.thickness
-            finalScale = 1.0f
-            rotation = 0f
-            hue = 0.5f; sat = 0.8f; alpha = 1.0f
+            // Render single source (either a specific slot or the global visualSource)
+            val slotIndex = currentMonitor.toIntOrNull()?.minus(1)
+            if (slotIndex != null && slotIndex in 0..3) {
+                renderSource(slotSources[slotIndex])
+            } else {
+                renderSource(visualSource)
+            }
         }
+    }
+
+    private fun renderSource(source: MandalaVisualSource?, opacityOverride: Float? = null) {
+        if (source == null) return
+        
+        source.update()
+        
+        val p1 = source.parameters["L1"]?.value ?: 0f
+        val p2 = source.parameters["L2"]?.value ?: 0f
+        val p3 = source.parameters["L3"]?.value ?: 0f
+        val p4 = source.parameters["L4"]?.value ?: 0f
+        
+        val o1 = source.recipe.a.toFloat()
+        val o2 = source.recipe.b.toFloat()
+        val o3 = source.recipe.c.toFloat()
+        val o4 = source.recipe.d.toFloat()
+        
+        val thick = (source.parameters["Thickness"]?.value ?: 0f) * 0.02f
+        val localScale = source.parameters["Scale"]?.value ?: 0.125f
+        val finalScale = localScale * source.globalScale.value * 8.0f
+        
+        val rotation = (source.parameters["Rotation"]?.value ?: 0f) * 2.0f * PI.toFloat()
+        
+        val hue = source.parameters["Hue"]?.value ?: 0f
+        val sat = source.parameters["Saturation"]?.value ?: 1f
+        val alpha = opacityOverride ?: source.globalAlpha.value
 
         GLES30.glUniform4f(uOmegaLocation, o1, o2, o3, o4)
         GLES30.glUniform4f(uLLocation, p1, p2, p3, p4)

@@ -92,7 +92,8 @@ fun SetChipList(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(horizontal = 4.dp)
     ) {
-        itemsIndexed(chipIds, key = { _, id -> id }) { index, chipId ->
+        // Fix: Use index as key to prevent crash when adding the same mandala multiple times
+        itemsIndexed(chipIds, key = { index, _ -> index }) { index, chipId ->
             Card(
                 modifier = Modifier
                     .padding(vertical = 4.dp)

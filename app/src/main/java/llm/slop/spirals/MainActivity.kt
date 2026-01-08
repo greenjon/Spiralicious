@@ -35,13 +35,18 @@ import llm.slop.spirals.cv.*
 import llm.slop.spirals.cv.audio.*
 import llm.slop.spirals.ui.CvLabScreen
 import llm.slop.spirals.ui.InstrumentEditorScreen
-import llm.slop.spirals.ui.components.ParameterMatrix
+import llm.slop.spirals.ui.MandalaSetEditorScreen
+import llm.slop.spirals.ui.components.MandalaParameterMatrix
 import llm.slop.spirals.ui.components.OscilloscopeView
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.ui.theme.AppAccent
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+enum class AppScreen {
+    MANDALA_EDITOR,
+    MANDALA_SET_EDITOR
+}
 
 class MainActivity : ComponentActivity() {
     private var spiralSurfaceView: SpiralSurfaceView? = null
@@ -65,28 +70,20 @@ class MainActivity : ComponentActivity() {
                 surface = AppBackground,
                 surfaceVariant = AppBackground
             )) {
-                MandalaScreen { csvData ->
-                    val intent = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/csv"
-                        putExtra(Intent.EXTRA_SUBJECT, "Mandala Curation Export")
-                        putExtra(Intent.EXTRA_TEXT, csvData)
-                    }
-                    startActivity(Intent.createChooser(intent, "Share Export"))
-                }
+                AppRoot() 
             }
         }
     }
 
     @Composable
-    fun MandalaScreen(vm: MandalaViewModel = viewModel(), onShare: (String) -> Unit) {
-        val scope = rememberCoroutineScope()
-        val context = LocalContext.current
+    fun AppRoot(vm: MandalaViewModel = viewModel()) {
+        var currentScreen by remember { mutableStateOf(AppScreen.MANDALA_EDITOR) }
         
-        var focusedParameterId by remember { mutableStateOf("L1") }
+        val scope = rememberCoroutineScope()
+        
         var lastLoadedPatch by remember { mutableStateOf<PatchData?>(null) }
         var manualChangeTrigger by remember { mutableIntStateOf(0) }
         var isDirty by remember { mutableStateOf(false) }
-        var recipeExpanded by remember { mutableStateOf(false) }
         
         // UI Navigation State
         var showCvLab by remember { mutableStateOf(false) }
@@ -94,8 +91,22 @@ class MainActivity : ComponentActivity() {
         // Audio State
         var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
         var currentInternalAudioRecord by remember { mutableStateOf<AudioRecord?>(null) }
+        val context = LocalContext.current
         var hasMicPermission by remember {
             mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
+        }
+
+        // Shared preview content
+        val previewContent = @Composable { 
+            AndroidView(
+                factory = { ctx -> 
+                    spiralSurfaceView ?: SpiralSurfaceView(ctx).also { 
+                        spiralSurfaceView = it
+                        it.setVisualSource(visualSource)
+                    }
+                },
+                modifier = Modifier.fillMaxSize()
+            )
         }
 
         // Global Lifecycle
@@ -133,12 +144,75 @@ class MainActivity : ComponentActivity() {
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            // Header Row (The "Header")
-            var showMenu by remember { mutableStateOf(false) }
-            var showOpenDialog by remember { mutableStateOf(false) }
-            var showRenameDialog by remember { mutableStateOf(false) }
-            var patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
+             when (currentScreen) {
+                AppScreen.MANDALA_EDITOR -> {
+                    MandalaEditorScreen(
+                        vm = vm,
+                        visualSource = visualSource,
+                        isDirty = isDirty,
+                        lastLoadedPatch = lastLoadedPatch,
+                        onPatchLoaded = { lastLoadedPatch = it },
+                        onInteraction = { manualChangeTrigger++ },
+                        onNavigateToSetEditor = { currentScreen = AppScreen.MANDALA_SET_EDITOR },
+                        onShowCvLab = { showCvLab = true },
+                        previewContent = previewContent
+                    )
+                }
+                AppScreen.MANDALA_SET_EDITOR -> {
+                    MandalaSetEditorScreen(
+                        onClose = { currentScreen = AppScreen.MANDALA_EDITOR },
+                        previewContent = previewContent,
+                        visualSource = visualSource
+                    )
+                }
+            }
 
+            // Overlays
+            Box(modifier = Modifier.fillMaxSize()) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showCvLab,
+                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    CvLabScreen(
+                        audioEngine = audioEngine,
+                        sourceManager = sourceManager!!,
+                        audioSourceType = audioSourceType,
+                        onAudioSourceTypeChange = { audioSourceType = it },
+                        hasMicPermission = hasMicPermission,
+                        onMicPermissionGranted = { hasMicPermission = true },
+                        onInternalAudioRecordCreated = { currentInternalAudioRecord = it },
+                        onClose = { showCvLab = false }
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun MandalaEditorScreen(
+        vm: MandalaViewModel,
+        visualSource: MandalaVisualSource,
+        isDirty: Boolean,
+        lastLoadedPatch: PatchData?,
+        onPatchLoaded: (PatchData) -> Unit,
+        onInteraction: () -> Unit,
+        onNavigateToSetEditor: () -> Unit,
+        onShowCvLab: () -> Unit,
+        previewContent: @Composable () -> Unit
+    ) {
+        val scope = rememberCoroutineScope()
+        val context = LocalContext.current
+        var focusedParameterId by remember { mutableStateOf("L1") }
+        var recipeExpanded by remember { mutableStateOf(false) }
+        var showMenu by remember { mutableStateOf(false) }
+        var showOpenDialog by remember { mutableStateOf(false) }
+        var showRenameDialog by remember { mutableStateOf(false) }
+        var patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Header Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -149,9 +223,7 @@ class MainActivity : ComponentActivity() {
                     text = "$patchName${if (isDirty || patchName != (lastLoadedPatch?.name ?: "New Patch")) " *" else ""}",
                     style = MaterialTheme.typography.titleMedium,
                     color = AppText,
-                    modifier = Modifier
-                        .clickable { showRenameDialog = true }
-                        .padding(4.dp)
+                    modifier = Modifier.padding(4.dp)
                 )
                 
                 Spacer(modifier = Modifier.weight(1f))
@@ -160,212 +232,102 @@ class MainActivity : ComponentActivity() {
                     IconButton(onClick = { showMenu = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
                     }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
-                        containerColor = AppBackground
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("CV Lab", color = AppAccent) },
-                            onClick = { showCvLab = true; showMenu = false },
-                            leadingIcon = { Icon(Icons.Default.Build, contentDescription = null, tint = AppAccent) }
-                        )
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }, containerColor = AppBackground) {
+                        DropdownMenuItem(text = { Text("CV Lab", color = AppAccent) }, onClick = { onShowCvLab(); showMenu = false }, leadingIcon = { Icon(Icons.Default.Build, contentDescription = null, tint = AppAccent) })
+                        DropdownMenuItem(text = { Text("Mandala Set Editor", color = AppAccent) }, onClick = { onNavigateToSetEditor(); showMenu = false }, leadingIcon = { Icon(Icons.Default.List, contentDescription = null, tint = AppAccent) })
                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-                        DropdownMenuItem(
-                            text = { Text("Open", color = AppText) },
-                            onClick = { showOpenDialog = true; showMenu = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Save", color = AppText) },
-                            onClick = { 
-                                scope.launch { 
-                                    val data = PatchMapper.fromVisualSource(patchName, visualSource)
-                                    vm.savePatch(data)
-                                    lastLoadedPatch = data
-                                }
-                                showMenu = false 
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Clone", color = AppText) },
-                            onClick = { 
-                                scope.launch { 
-                                    val data = PatchMapper.fromVisualSource("$patchName CLONE", visualSource)
-                                    vm.savePatch(data)
-                                    lastLoadedPatch = data
-                                }
-                                showMenu = false 
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Share", color = AppText) },
-                            onClick = { 
+                        DropdownMenuItem(text = { Text("Open", color = AppText) }, onClick = { showOpenDialog = true; showMenu = false })
+                        DropdownMenuItem(text = { Text("Save", color = AppText) }, onClick = { 
+                            scope.launch { 
                                 val data = PatchMapper.fromVisualSource(patchName, visualSource)
-                                context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { 
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) 
-                                }, "Share Patch"))
-                                showMenu = false 
-                            },
-                            leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = AppText) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Delete", color = Color.Red) },
-                            onClick = { 
-                                lastLoadedPatch?.let { vm.deletePatch(it.name) }
-                                lastLoadedPatch = null
-                                showMenu = false 
-                            },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) }
-                        )
+                                vm.savePatch(data)
+                                onPatchLoaded(data)
+                            }
+                            showMenu = false 
+                        })
+                        DropdownMenuItem(text = { Text("Rename", color = AppText) }, onClick = { showRenameDialog = true; showMenu = false })
+                        DropdownMenuItem(text = { Text("Clone", color = AppText) }, onClick = { 
+                            scope.launch { 
+                                val data = PatchMapper.fromVisualSource("$patchName CLONE", visualSource)
+                                vm.savePatch(data)
+                                onPatchLoaded(data)
+                            }
+                            showMenu = false 
+                        })
+                        DropdownMenuItem(text = { Text("Share", color = AppText) }, onClick = { 
+                            val data = PatchMapper.fromVisualSource(patchName, visualSource)
+                            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) }, "Share Patch"))
+                            showMenu = false 
+                        }, leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = AppText) })
+                        DropdownMenuItem(text = { Text("Delete", color = Color.Red) }, onClick = { 
+                            lastLoadedPatch?.let { vm.deletePatch(it.name) }
+                            onPatchLoaded(PatchData("New Patch", MandalaLibrary.MandalaRatios.first().id, emptyList<ParameterData>()))
+                            showMenu = false 
+                        }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) })
                     }
                 }
             }
 
-            // Main content area that can be overlaid by CV Lab
-            Box(modifier = Modifier.weight(1f)) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    // Monitor Area
-                    Column(
-                        modifier = Modifier
-                            .wrapContentHeight()
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp)
-                    ) {
-                        // Mandala Preview
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .aspectRatio(16 / 9f)
-                                .background(Color.Black)
-                                .border(1.dp, AppText.copy(alpha = 0.1f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            AndroidView(factory = { ctx -> SpiralSurfaceView(ctx).also { spiralSurfaceView = it; it.setVisualSource(visualSource) } }, modifier = Modifier.fillMaxSize())
-                            
-                            // Recipe Overlay
-                            Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-                                Surface(
-                                    color = AppBackground.copy(alpha = 0.7f),
-                                    shape = MaterialTheme.shapes.extraSmall,
-                                    modifier = Modifier.clickable { recipeExpanded = true }
-                                ) {
-                                    Text(
-                                        text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = AppAccent,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = recipeExpanded,
-                                    onDismissRequest = { recipeExpanded = false },
-                                    containerColor = AppBackground,
-                                    tonalElevation = 0.dp
-                                ) {
-                                    MandalaLibrary.MandalaRatios.forEach { ratio ->
-                                        DropdownMenuItem(
-                                            text = { 
-                                                Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)", color = AppText) 
-                                            }, 
-                                            onClick = { 
-                                                visualSource.recipe = ratio
-                                                manualChangeTrigger++
-                                                recipeExpanded = false
-                                            }
-                                        )
-                                    }
+            // Main content area
+            Column(modifier = Modifier.weight(1f).fillMaxSize()) {
+                // Monitor Area
+                Column(modifier = Modifier.wrapContentHeight().fillMaxWidth().padding(horizontal = 8.dp)) {
+                    // Mandala Preview
+                    Box(modifier = Modifier.fillMaxWidth().aspectRatio(16 / 9f).background(Color.Black).border(1.dp, AppText.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
+                        previewContent()
+                        
+                        // Recipe Overlay
+                        Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                            Surface(color = AppBackground.copy(alpha = 0.7f), shape = MaterialTheme.shapes.extraSmall, modifier = Modifier.clickable { recipeExpanded = true }) {
+                                Text(text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)", style = MaterialTheme.typography.labelSmall, color = AppAccent, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp))
+                            }
+                            DropdownMenu(expanded = recipeExpanded, onDismissRequest = { recipeExpanded = false }, containerColor = AppBackground, tonalElevation = 0.dp) {
+                                MandalaLibrary.MandalaRatios.forEach { ratio ->
+                                    DropdownMenuItem(text = { Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)", color = AppText) }, onClick = { 
+                                        visualSource.recipe = ratio
+                                        onInteraction()
+                                        recipeExpanded = false
+                                    })
                                 }
                             }
                         }
+                    }
 
-                        Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                        // Monitor Row
-                        val focusedParam = visualSource.parameters[focusedParameterId] ?: visualSource.globalAlpha
-                        Box(modifier = Modifier.fillMaxWidth().height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
-                            OscilloscopeView(history = focusedParam.history, modifier = Modifier.fillMaxSize())
-                            Surface(
-                                color = AppBackground.copy(alpha = 0.8f),
-                                modifier = Modifier.align(Alignment.TopStart).padding(4.dp),
-                                shape = MaterialTheme.shapes.extraSmall
-                            ) {
-                                Text(
-                                    text = focusedParameterId, 
-                                    style = MaterialTheme.typography.labelSmall, 
-                                    color = AppAccent,
-                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                )
-                            }
+                    // Monitor Row
+                    val focusedParam = visualSource.parameters[focusedParameterId] ?: visualSource.globalAlpha
+                    Box(modifier = Modifier.fillMaxWidth().height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
+                        OscilloscopeView(history = focusedParam.history, modifier = Modifier.fillMaxSize())
+                        Surface(color = AppBackground.copy(alpha = 0.8f), modifier = Modifier.align(Alignment.TopStart).padding(4.dp), shape = MaterialTheme.shapes.extraSmall) {
+                            Text(text = focusedParameterId, style = MaterialTheme.typography.labelSmall, color = AppAccent, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
                         }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Parameter Matrix
-                        ParameterMatrix(
-                            labels = visualSource.parameters.keys.toList(),
-                            parameters = visualSource.parameters.values.toList(),
-                            focusedParameterId = focusedParameterId, 
-                            onFocusRequest = { focusedParameterId = it },
-                            onInteractionFinished = { manualChangeTrigger++ }
-                        )
                     }
 
-                    // Instrument Editor Area (Filling remaining space)
-                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                        InstrumentEditorScreen(
-                            source = visualSource, 
-                            vm = vm, 
-                            focusedId = focusedParameterId, 
-                            onFocusChange = { focusedParameterId = it },
-                            onInteractionFinished = { manualChangeTrigger++ }
-                        ) 
-                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Parameter Matrix
+                    MandalaParameterMatrix(labels = visualSource.parameters.keys.toList(), parameters = visualSource.parameters.values.toList(), focusedParameterId = focusedParameterId, onFocusRequest = { focusedParameterId = it }, onInteractionFinished = onInteraction)
                 }
 
-                // CV Lab Overlay
-                // Wrap in a separate Box to ensure we call the top-level AnimatedVisibility correctly
-                Box(modifier = Modifier.fillMaxSize()) {
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = showCvLab,
-                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        CvLabScreen(
-                            audioEngine = audioEngine,
-                            sourceManager = sourceManager!!,
-                            audioSourceType = audioSourceType,
-                            onAudioSourceTypeChange = { audioSourceType = it },
-                            hasMicPermission = hasMicPermission,
-                            onMicPermissionGranted = { hasMicPermission = true },
-                            onInternalAudioRecordCreated = { currentInternalAudioRecord = it },
-                            onClose = { showCvLab = false }
-                        )
-                    }
+                // Instrument Editor Area (Filling remaining space)
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    InstrumentEditorScreen(source = visualSource, vm = vm, focusedId = focusedParameterId, onFocusChange = { focusedParameterId = it }, onInteractionFinished = onInteraction)
                 }
             }
+        }
 
-            // Dialogs
-            if (showRenameDialog) {
-                RenamePatchDialog(
-                    initialName = patchName,
-                    onRename = { patchName = it },
-                    onDismiss = { showRenameDialog = false }
-                )
-            }
+        // Dialogs
+        if (showRenameDialog) {
+            RenamePatchDialog(initialName = patchName, onRename = { patchName = it }, onDismiss = { showRenameDialog = false })
+        }
 
-            if (showOpenDialog) {
-                OpenPatchDialog(
-                    vm, 
-                    onPatchSelected = { 
-                        PatchMapper.applyToVisualSource(it, visualSource)
-                        lastLoadedPatch = it
-                        showOpenDialog = false 
-                    }, 
-                    onDismiss = { showOpenDialog = false }
-                )
-            }
+        if (showOpenDialog) {
+            OpenPatchDialog(vm, onPatchSelected = { 
+                PatchMapper.applyToVisualSource(it, visualSource)
+                onPatchLoaded(it)
+                showOpenDialog = false 
+            }, onDismiss = { showOpenDialog = false })
         }
     }
 
@@ -396,34 +358,13 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun RenamePatchDialog(initialName: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
         var name by remember { mutableStateOf(initialName) }
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text("Rename Patch", color = AppText) },
-            text = {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = AppAccent,
-                        unfocusedTextColor = AppText,
-                        focusedTextColor = AppText,
-                        cursorColor = AppAccent
-                    )
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { onRename(name); onDismiss() }) {
-                    Text("RENAME", color = AppAccent)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss) {
-                    Text("CANCEL", color = AppText)
-                }
-            },
-            containerColor = AppBackground
-        )
+        AlertDialog(onDismissRequest = onDismiss, title = { Text("Rename Patch", color = AppText) }, text = {
+            OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AppAccent, unfocusedTextColor = AppText, focusedTextColor = AppText, cursorColor = AppAccent))
+        }, confirmButton = {
+            TextButton(onClick = { onRename(name); onDismiss() }) { Text("RENAME", color = AppAccent) }
+        }, dismissButton = {
+            TextButton(onClick = onDismiss) { Text("CANCEL", color = AppText) }
+        }, containerColor = AppBackground)
     }
 
     override fun onPause() { super.onPause(); spiralSurfaceView?.onPause(); audioEngine.stop() }

@@ -14,7 +14,7 @@ import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppText
 
 @Composable
-fun ParameterMatrix(
+fun MandalaParameterMatrix(
     labels: List<String>,
     parameters: List<ModulatableParameter>,
     focusedParameterId: String?,
@@ -22,7 +22,7 @@ fun ParameterMatrix(
     onInteractionFinished: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Row 1: L1 - L4
+    // Row 1: L1 - L4 (Specific to Mandala "Arms")
     val row1Ids = listOf("L1", "L2", "L3", "L4")
     val row1Indices = row1Ids.map { labels.indexOf(it) }.filter { it != -1 }
     val row1Params = row1Indices.map { parameters[it] }
@@ -36,7 +36,7 @@ fun ParameterMatrix(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // TOP ROW: 4 knobs, 81.5% width, centered
+        // TOP ROW: 4 knobs centered over the 4 gaps below
         Row(
             modifier = Modifier.fillMaxWidth(0.815f),
             horizontalArrangement = Arrangement.SpaceAround,
@@ -54,9 +54,9 @@ fun ParameterMatrix(
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // BOTTOM ROW: 5 knobs, full width
+        // BOTTOM ROW: 5 knobs
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceAround,
@@ -87,6 +87,7 @@ private fun KnobCell(
     modifier: Modifier = Modifier
 ) {
     var currentValue by remember(param) { mutableFloatStateOf(param.baseValue) }
+    val currentOnFocusRequest by rememberUpdatedState(onFocusRequest)
 
     Box(
         modifier = modifier
@@ -94,7 +95,7 @@ private fun KnobCell(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = { onFocusRequest(id) }
+                onClick = { currentOnFocusRequest(id) }
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -112,11 +113,11 @@ private fun KnobCell(
                 onValueChange = { newValue ->
                     currentValue = newValue
                     param.baseValue = newValue
-                    onFocusRequest(id)
+                    currentOnFocusRequest(id)
                 },
                 onInteractionFinished = onInteractionFinished,
                 modifier = Modifier.padding(vertical = 1.dp),
-                isBipolar = false,
+                isBipolar = false, // Parameters in matrix are typically unipolar 0-1
                 focused = isFocused,
                 knobSize = 44.dp,
                 showValue = true

@@ -29,8 +29,9 @@ object RotaryKnobMath {
         
         // 2. Resolution Calculation
         // vn: normalized velocity [0..1] based on expected drag speed range [50..2500 px/s]
-        val vn = ((smoothedVelocity - 50f) / (2500f - 50f)).coerceIn(0f, 1f)
-        val vs = vn.pow(3.0f) // Gamma for more natural "acceleration"
+        val vHigh = 2500f
+        val vn = ((smoothedVelocity - 50f) / (vHigh - 50f)).coerceIn(0f, 1f)
+        val vs = vn.pow(3.0f) // Gamma 3.0 for natural "acceleration"
         var resolution = config.rMin + vs * (config.rMax - config.rMin)
         
         // Range Scaling (Bipolar is twice as wide as Unipolar)

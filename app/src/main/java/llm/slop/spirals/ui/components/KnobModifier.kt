@@ -40,8 +40,9 @@ fun Modifier.knobInput(
                     if (!isDragging) {
                         if (abs(currentY - startY) > deadzone) {
                             isDragging = true
-                            // Reset lastY to currentY to avoid a jump when crossing the deadzone
-                            lastY = currentY
+                            // Implement 10px vertical slop subtract offset to prevent jump
+                            val sign = if (currentY > startY) 1 else -1
+                            lastY = startY + (deadzone * sign)
                             lastTime = currentTime
                         }
                     }

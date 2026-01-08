@@ -8,17 +8,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class MandalaViewModel(application: Application) : AndroidViewModel(application) {
     private val db = MandalaDatabase.getDatabase(application)
     private val tagDao = db.mandalaTagDao()
     private val patchDao = db.mandalaPatchDao()
+    private val setDao = db.mandalaSetDao()
 
     val tags: StateFlow<Map<String, List<String>>> = tagDao.getAllTags()
         .map { list -> list.groupBy({ it.id }, { it.tag }) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     val allPatches = patchDao.getAllPatches()
+    val allSets = setDao.getAllSets()
 
     fun savePatch(patchData: PatchData) {
         viewModelScope.launch {
@@ -29,6 +33,22 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
 
     fun deletePatch(name: String) {
         viewModelScope.launch { patchDao.deleteByName(name) }
+    }
+
+    fun saveSet(mandalaSet: MandalaSet) {
+        viewModelScope.launch {
+            val entity = MandalaSetEntity(
+                id = mandalaSet.id,
+                name = mandalaSet.name,
+                jsonOrderedMandalaIds = Json.encodeToString(mandalaSet.orderedMandalaIds),
+                selectionPolicy = mandalaSet.selectionPolicy.name
+            )
+            setDao.insertSet(entity)
+        }
+    }
+
+    fun deleteSet(id: String) {
+        viewModelScope.launch { setDao.deleteById(id) }
     }
 
     fun toggleTag(id: String, tag: String) {

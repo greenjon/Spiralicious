@@ -7,13 +7,15 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spirals.MandalaSet
 import llm.slop.spirals.MandalaViewModel
@@ -41,14 +43,16 @@ fun MandalaSetEditorScreen(
     var currentSet by remember { mutableStateOf<MandalaSet?>(null) }
     var focusedMandalaId by remember { mutableStateOf<String?>(null) }
     var showMandalaPicker by remember { mutableStateOf(false) }
+    
+    var showMenu by remember { mutableStateOf(false) }
+    var showOpenDialog by remember { mutableStateOf(false) }
+    var showRenameDialog by remember { mutableStateOf(false) }
 
     // Logic to clear the preview when no set or mandala is selected
     LaunchedEffect(currentSet, focusedMandalaId) {
         if (currentSet == null || focusedMandalaId == null) {
-            // "Clear" the visual source. Assuming 0 alpha hides it effectively.
             visualSource.globalAlpha.baseValue = 0f
         } else {
-            // Find the patch and apply it
             val patchEntity = allPatches.find { it.name == focusedMandalaId }
             patchEntity?.let { entity ->
                 val patchData = PatchMapper.fromJson(entity.jsonSettings)
@@ -60,7 +64,6 @@ fun MandalaSetEditorScreen(
         }
     }
 
-    // When a set is selected, load it into the editor state
     fun selectSet(setId: String) {
         val entity = allSets.find { it.id == setId } ?: return
         currentSet = MandalaSet(
@@ -69,7 +72,6 @@ fun MandalaSetEditorScreen(
             orderedMandalaIds = Json.decodeFromString(entity.jsonOrderedMandalaIds),
             selectionPolicy = SelectionPolicy.valueOf(entity.selectionPolicy)
         )
-        // If set has mandalas, focus the first one
         focusedMandalaId = currentSet?.orderedMandalaIds?.firstOrNull()
     }
 
@@ -78,7 +80,7 @@ fun MandalaSetEditorScreen(
             .fillMaxSize()
             .background(AppBackground)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -87,25 +89,80 @@ fun MandalaSetEditorScreen(
             ) {
                 val breadcrumb = "Mandala Set: ${currentSet?.name ?: "..."}"
                 val focusedName = if(focusedMandalaId != null) " › $focusedMandalaId" else ""
-                Text(breadcrumb + focusedName, style = MaterialTheme.typography.headlineSmall, color = AppText)
+                Text(
+                    text = breadcrumb + focusedName, 
+                    style = MaterialTheme.typography.titleMedium, 
+                    color = AppText,
+                    modifier = Modifier.padding(4.dp)
+                )
                 
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = AppText)
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
+                    }
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        containerColor = AppBackground
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("New Set", color = AppText) },
+                            onClick = { 
+                                currentSet = MandalaSet(name = "New Set", orderedMandalaIds = mutableListOf())
+                                focusedMandalaId = null
+                                showMenu = false 
+                            }
+                        )
+                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                        DropdownMenuItem(
+                            text = { Text("Mandala Editor", color = AppAccent) },
+                            onClick = { onClose(); showMenu = false }
+                        )
+                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                        DropdownMenuItem(
+                            text = { Text("Open Set", color = AppText) },
+                            onClick = { showOpenDialog = true; showMenu = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Save Set", color = AppText) },
+                            onClick = { 
+                                currentSet?.let { vm.saveSet(it) }
+                                showMenu = false 
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Rename Set", color = AppText) },
+                            onClick = { showRenameDialog = true; showMenu = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Delete Set", color = Color.Red) },
+                            onClick = { 
+                                currentSet?.let { vm.deleteSet(it.id) }
+                                currentSet = null
+                                focusedMandalaId = null
+                                showMenu = false 
+                            }
+                        )
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Always show preview window area
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16 / 9f)
+                    .background(Color.Black)
+            ) {
+                previewContent()
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             if (currentSet == null) {
-                // Set Selection / Creation View
                 Column {
-                    Button(onClick = { 
-                        currentSet = MandalaSet(name = "New Set", orderedMandalaIds = mutableListOf())
-                        focusedMandalaId = null
-                    }) {
-                        Text("Create New Set")
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
                     Text("Existing Sets:", style = MaterialTheme.typography.titleMedium, color = AppText)
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                         allSets.forEach { setEntity ->
@@ -118,63 +175,61 @@ fun MandalaSetEditorScreen(
                     }
                 }
             } else {
-                 // Preview Window
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(16 / 9f)
-                        .background(Color.Black)
-                ) {
-                    previewContent()
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                
                 // Set Editor View
                 Column {
-                    // Add Mandala Button
-                    Button(onClick = { showMandalaPicker = true }) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Add Mandala")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Button(onClick = { showMandalaPicker = true }) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Add Mandala")
+                        }
+                        
+                        Spacer(modifier = Modifier.width(16.dp))
+                        
+                        // Policy Selector Dropdown
+                        var policyExpanded by remember { mutableStateOf(false) }
+                        Box {
+                            OutlinedButton(
+                                onClick = { policyExpanded = true },
+                                shape = MaterialTheme.shapes.extraSmall,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(currentSet?.selectionPolicy?.name ?: "Policy", style = MaterialTheme.typography.labelSmall, color = AppText)
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = AppText)
+                            }
+                            DropdownMenu(
+                                expanded = policyExpanded,
+                                onDismissRequest = { policyExpanded = false },
+                                containerColor = AppBackground
+                            ) {
+                                SelectionPolicy.values().forEach { policy ->
+                                    DropdownMenuItem(
+                                        text = { Text(policy.name, style = MaterialTheme.typography.labelSmall) },
+                                        onClick = { 
+                                            currentSet = currentSet?.copy(selectionPolicy = policy)
+                                            policyExpanded = false 
+                                        }
+                                    )
+                                }
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Chip List
                     SetChipList(
                         chipIds = currentSet!!.orderedMandalaIds,
                         onChipTapped = { focusedMandalaId = it },
                         onChipReordered = { newOrder -> 
-                            currentSet?.let { it.orderedMandalaIds.clear(); it.orderedMandalaIds.addAll(newOrder) }
+                            currentSet = currentSet?.copy(orderedMandalaIds = newOrder.toMutableList())
                         }
                     )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Policy Selector
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Policy: ", color = AppText, style = MaterialTheme.typography.labelSmall)
-                        SelectionPolicy.values().forEach { policy ->
-                            Button(
-                                onClick = { currentSet?.let { it.selectionPolicy = policy } },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (currentSet?.selectionPolicy == policy) AppAccent else AppText.copy(alpha = 0.1f),
-                                    contentColor = if (currentSet?.selectionPolicy == policy) Color.White else AppText
-                                ),
-                                shape = MaterialTheme.shapes.extraSmall,
-                                modifier = Modifier.padding(horizontal = 2.dp)
-                            ) {
-                                Text(policy.name, style = MaterialTheme.typography.labelSmall)
-                            }
-                        }
-                    }
                     
                     Spacer(modifier = Modifier.weight(1f))
                     
-                    // Save Button
+                    // Save Button (Quick action)
                     Button(onClick = { currentSet?.let { vm.saveSet(it) }; onClose() }) {
-                        Text("Save & Close")
+                        Text("Save & Exit")
                     }
                 }
             }
@@ -189,11 +244,69 @@ fun MandalaSetEditorScreen(
                     focusedMandalaId = patchName
                 },
                 onPatchAdded = { patchName -> 
-                    currentSet?.orderedMandalaIds?.add(patchName)
+                    currentSet = currentSet?.copy(
+                        orderedMandalaIds = (currentSet?.orderedMandalaIds ?: mutableListOf()).toMutableList().apply { add(patchName) }
+                    )
                     focusedMandalaId = patchName
-                    showMandalaPicker = false
                 }
             )
         }
+    }
+
+    if (showOpenDialog) {
+        Dialog(onDismissRequest = { showOpenDialog = false }) {
+            Surface(shape = MaterialTheme.shapes.medium, color = AppBackground) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
+                    Text("Saved Sets", style = MaterialTheme.typography.titleLarge, color = AppText)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        allSets.forEach { entity ->
+                            Row(modifier = Modifier.fillMaxWidth().clickable { 
+                                selectSet(entity.id)
+                                showOpenDialog = false 
+                            }.padding(12.dp)) {
+                                Text(entity.name, style = MaterialTheme.typography.bodyLarge, color = AppText)
+                            }
+                        }
+                    }
+                    if (allSets.isEmpty()) Text("No sets saved yet.", color = AppText.copy(alpha = 0.5f))
+                }
+            }
+        }
+    }
+
+    if (showRenameDialog) {
+        var name by remember { mutableStateOf(currentSet?.name ?: "") }
+        AlertDialog(
+            onDismissRequest = { showRenameDialog = false },
+            title = { Text("Rename Set", color = AppText) },
+            text = {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = AppAccent,
+                        unfocusedTextColor = AppText,
+                        focusedTextColor = AppText,
+                        cursorColor = AppAccent
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { 
+                    currentSet = currentSet?.copy(name = name)
+                    showRenameDialog = false 
+                }) {
+                    Text("RENAME", color = AppAccent)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDialog = false }) {
+                    Text("CANCEL", color = AppText)
+                }
+            },
+            containerColor = AppBackground
+        )
     }
 }

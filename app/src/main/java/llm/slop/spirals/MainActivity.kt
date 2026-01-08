@@ -233,6 +233,13 @@ class MainActivity : ComponentActivity() {
                         Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
                     }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }, containerColor = AppBackground) {
+                        DropdownMenuItem(text = { Text("New", color = AppText) }, onClick = { 
+                            val defaultRecipe = MandalaLibrary.MandalaRatios.first()
+                            visualSource.recipe = defaultRecipe
+                            onPatchLoaded(PatchData("New Patch", defaultRecipe.id, emptyList<ParameterData>()))
+                            showMenu = false 
+                        })
+                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
                         DropdownMenuItem(text = { Text("CV Lab", color = AppAccent) }, onClick = { onShowCvLab(); showMenu = false }, leadingIcon = { Icon(Icons.Default.Build, contentDescription = null, tint = AppAccent) })
                         DropdownMenuItem(text = { Text("Mandala Set Editor", color = AppAccent) }, onClick = { onNavigateToSetEditor(); showMenu = false }, leadingIcon = { Icon(Icons.Default.List, contentDescription = null, tint = AppAccent) })
                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
@@ -279,7 +286,7 @@ class MainActivity : ComponentActivity() {
                         // Recipe Overlay
                         Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
                             Surface(color = AppBackground.copy(alpha = 0.7f), shape = MaterialTheme.shapes.extraSmall, modifier = Modifier.clickable { recipeExpanded = true }) {
-                                Text(text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)", style = MaterialTheme.typography.labelSmall, color = AppAccent, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp))
+                                Text(text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)", style = MaterialTheme.typography.labelSmall, color = AppAccent, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp) )
                             }
                             DropdownMenu(expanded = recipeExpanded, onDismissRequest = { recipeExpanded = false }, containerColor = AppBackground, tonalElevation = 0.dp) {
                                 MandalaLibrary.MandalaRatios.forEach { ratio ->

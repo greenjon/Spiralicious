@@ -17,10 +17,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import llm.slop.spirals.ui.theme.AppAccent
-import llm.slop.spirals.ui.theme.AppText
 import kotlinx.coroutines.launch
 
 @Composable
@@ -34,12 +33,16 @@ fun SetChipList(
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
     var draggedIndex by remember { mutableStateOf<Int?>(null) }
 
+    // Colors as requested
+    val chipBackground = Color(0xFFEEE8D5)
+    val chipTextColor = Color(0xFF360B00)
+
     LazyRow(
         state = listState,
         modifier = Modifier
             .fillMaxWidth()
-            .height(50.dp)
-            .pointerInput(Unit) {
+            .height(60.dp)
+            .pointerInput(chipIds) { // Re-bind when chipIds change
                 detectDragGesturesAfterLongPress(
                     onDragStart = { offset ->
                         listState.layoutInfo.visibleItemsInfo
@@ -66,11 +69,20 @@ fun SetChipList(
                         draggedIndex = null
                         dragOffset = Offset.Zero
                     },
+                    onDragCancel = {
+                        draggedIndex = null
+                        dragOffset = Offset.Zero
+                    },
                     onDrag = { change, dragAmount ->
                         dragOffset += dragAmount
                         draggedIndex?.let {
                             coroutineScope.launch {
-                                listState.scrollBy(-dragAmount.x)
+                                // Auto-scroll if dragging near edges
+                                if (dragOffset.x > size.width * 0.9f) {
+                                    listState.scrollBy(10f)
+                                } else if (dragOffset.x < size.width * 0.1f) {
+                                    listState.scrollBy(-10f)
+                                }
                             }
                         }
                         change.consume()
@@ -85,11 +97,12 @@ fun SetChipList(
                 modifier = Modifier
                     .padding(vertical = 4.dp)
                     .clickable { onChipTapped(chipId) },
-                colors = CardDefaults.cardColors(containerColor = AppAccent)
+                colors = CardDefaults.cardColors(containerColor = chipBackground),
+                elevation = CardDefaults.cardElevation(defaultElevation = if (draggedIndex == index) 8.dp else 2.dp)
             ) {
                 Text(
                     text = chipId,
-                    color = AppText,
+                    color = chipTextColor,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                 )
             }

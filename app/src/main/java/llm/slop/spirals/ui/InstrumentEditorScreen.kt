@@ -173,7 +173,7 @@ fun ModulatorRow(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // LEFT PART: CV Name + Controls Below + Wave/Beat
-                Column(modifier = Modifier.weight(1.4f)) {
+                Column(modifier = Modifier.weight(1.6f)) {
                     // Top Row: CV Name + Add/Mul
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         var sourceExpanded by remember { mutableStateOf(false) }
@@ -241,7 +241,7 @@ fun ModulatorRow(
                         }
 
                         if (isBeat) {
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
                             
                             IconButton(onClick = {
                                 val nextWave = Waveform.values()[(waveform.ordinal + 1) % Waveform.values().size]
@@ -262,7 +262,7 @@ fun ModulatorRow(
                             }
 
                             var subExpanded by remember { mutableStateOf(false) }
-                            Box(contentAlignment = Alignment.Center) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.widthIn(min = 36.dp)) {
                                 val subText = when(subdivision) {
                                     0.0625f -> "1/16"
                                     0.125f -> "1/8"
@@ -274,10 +274,12 @@ fun ModulatorRow(
                                     text = subText,
                                     modifier = Modifier
                                         .clickable { subExpanded = true }
-                                        .padding(horizontal = 8.dp),
+                                        .padding(horizontal = 4.dp),
                                     color = AppAccent, 
                                     style = MaterialTheme.typography.labelSmall, 
-                                    textAlign = TextAlign.Center
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                                 
                                 DropdownMenu(expanded = subExpanded, onDismissRequest = { subExpanded = false }) {
@@ -367,12 +369,12 @@ fun ModulatorRow(
                         }
                         
                         // Shift knobs to the left by adding a spacer at the end
-                        Spacer(modifier = Modifier.weight(1.1f))
+                        Spacer(modifier = Modifier.weight(0.9f))
                     } else {
-                        Spacer(modifier = Modifier.weight(3.1f))
+                        Spacer(modifier = Modifier.weight(2.9f))
                     }
                 } else {
-                    Spacer(modifier = Modifier.weight(4.1f))
+                    Spacer(modifier = Modifier.weight(3.9f))
                 }
             }
 

@@ -3,11 +3,14 @@ package llm.slop.spirals
 import android.content.Context
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
+import androidx.compose.runtime.staticCompositionLocalOf
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.PI
+
+val LocalSpiralRenderer = staticCompositionLocalOf<SpiralRenderer?> { null }
 
 class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
@@ -24,7 +27,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     @Volatile
     var mixerPatch: MixerPatch? = null
     @Volatile
-    var monitorSource: String = "1" // "1", "2", "3", "4", "A"
+    var monitorSource: String = "F" // "1", "2", "3", "4", "A", "B", "F"
     
     // We maintain 4 internal sources for the mixer slots
     private val slotSources = List(4) { MandalaVisualSource() }
@@ -45,12 +48,11 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var uGlobalScaleLocation: Int = -1
     private var uColorLocation: Int = -1
 
-    fun getSlotSource(index: Int) = slotSources[index]
+    fun getSlotSource(index: Int): MandalaVisualSource = slotSources[index]
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
         GLES30.glEnable(GLES30.GL_BLEND)
-        // Default blend: Normal
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
 
         program = ShaderHelper.buildProgram(context, R.raw.mandala_vertex, R.raw.mandala_fragment)
@@ -109,41 +111,95 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         if (program == 0) return
         GLES30.glUseProgram(program)
 
-        val currentMonitor = monitorSource
-        val currentMixerPatch = mixerPatch
+        val patch = mixerPatch
+        val monitor = monitorSource
 
-        if (currentMonitor == "A" && currentMixerPatch != null) {
-            // Render composite
-            currentMixerPatch.slots.forEachIndexed { index, slot ->
-                if (slot.enabled) {
-                    // Set blend mode for this layer
-                    when (slot.blendMode) {
-                        "Add" -> GLES30.glBlendFunc(GLES30.GL_ONE, GLES30.GL_ONE)
-                        else -> GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
-                    }
-                    
-                    val source = slotSources[index]
-                    // Mixer slots use their own opacity control
-                    // For Phase 1, we assume opacityBaseValue is evaluated or just used directly
-                    // Actually, we should probably evaluate it.
-                    val opacity = slot.opacityBaseValue 
-                    renderSource(source, opacityOverride = opacity)
+        if (patch == null) {
+            renderSource(visualSource)
+            return
+        }
+
+        when (monitor) {
+            "1", "2", "3", "4" -> {
+                val idx = monitor.toInt() - 1
+                if (patch.slots[idx].enabled) {
+                    renderSource(slotSources[idx], gain = patch.slots[idx].gain.baseValue)
                 }
             }
-            // Reset blend mode
+            "A" -> {
+                renderHierarchicalGroup(patch.mixerA, slotSources[0], slotSources[1], patch.slots[0], patch.slots[1])
+            }
+            "B" -> {
+                renderHierarchicalGroup(patch.mixerB, slotSources[2], slotSources[3], patch.slots[2], patch.slots[3])
+            }
+            "F" -> {
+                // For Phase 1, we simulate hierarchy by rendering all 4 slots.
+                // We'll apply Mixer A settings to Slot 2, Mixer B settings to Slot 4,
+                // and Mixer F settings broadly.
+                renderHierarchicalGroup(patch.mixerA, slotSources[0], slotSources[1], patch.slots[0], patch.slots[1])
+                renderHierarchicalGroup(patch.mixerB, slotSources[2], slotSources[3], patch.slots[2], patch.slots[3])
+                // Note: Real Group F mixing would require rendering A and B to textures first.
+            }
+            else -> renderSource(visualSource)
+        }
+    }
+
+    private fun renderHierarchicalGroup(
+        group: MixerGroupData,
+        src1: MandalaVisualSource,
+        src2: MandalaVisualSource,
+        slot1: MixerSlotData,
+        slot2: MixerSlotData
+    ) {
+        if (slot1.enabled) {
+            // Apply balance to Slot 1: balance goes from 0 (left only) to 1 (right only).
+            // So left channel is 1.0 at balance 0.0, and 0.0 at balance 1.0.
+            val bal1 = (1.0f - group.balance.baseValue) * 2.0f
+            renderSource(src1, gain = slot1.gain.baseValue * bal1.coerceIn(0f, 1f) * group.gain.baseValue)
+        }
+        
+        if (slot2.enabled) {
+            // Apply blend mode for the second source in the group
+            setBlendMode(group.mode)
+            
+            val bal2 = group.balance.baseValue * 2.0f
+            // Mix factor: for XFADE it's crossfade, for others it's usually opacity of the top layer
+            val mixFactor = group.mix.baseValue
+            
+            renderSource(src2, gain = slot2.gain.baseValue * bal2.coerceIn(0f, 1f) * mixFactor * group.gain.baseValue)
+            
+            // Reset to default blend
             GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
-        } else {
-            // Render single source (either a specific slot or the global visualSource)
-            val slotIndex = currentMonitor.toIntOrNull()?.minus(1)
-            if (slotIndex != null && slotIndex in 0..3) {
-                renderSource(slotSources[slotIndex])
-            } else {
-                renderSource(visualSource)
+            GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)
+        }
+    }
+
+    private fun setBlendMode(mode: MixerMode) {
+        when (mode) {
+            MixerMode.ADD -> {
+                GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)
+                GLES30.glBlendFunc(GLES30.GL_ONE, GLES30.GL_ONE)
+            }
+            MixerMode.SCREEN -> {
+                GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)
+                GLES30.glBlendFunc(GLES30.GL_ONE, GLES30.GL_ONE_MINUS_SRC_COLOR)
+            }
+            MixerMode.MULT -> {
+                GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)
+                GLES30.glBlendFunc(GLES30.GL_DST_COLOR, GLES30.GL_ZERO)
+            }
+            MixerMode.MAX -> {
+                GLES30.glBlendEquation(GLES30.GL_MAX)
+                GLES30.glBlendFunc(GLES30.GL_ONE, GLES30.GL_ONE)
+            }
+            MixerMode.XFADE -> {
+                GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)
+                GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
             }
         }
     }
 
-    private fun renderSource(source: MandalaVisualSource?, opacityOverride: Float? = null) {
+    private fun renderSource(source: MandalaVisualSource?, gain: Float = 1.0f, opacityOverride: Float? = null) {
         if (source == null) return
         
         source.update()
@@ -166,7 +222,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         
         val hue = source.parameters["Hue"]?.value ?: 0f
         val sat = source.parameters["Saturation"]?.value ?: 1f
-        val alpha = opacityOverride ?: source.globalAlpha.value
+        val alpha = (opacityOverride ?: source.globalAlpha.value) * gain
 
         GLES30.glUniform4f(uOmegaLocation, o1, o2, o3, o4)
         GLES30.glUniform4f(uLLocation, p1, p2, p3, p4)

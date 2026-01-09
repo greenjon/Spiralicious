@@ -14,7 +14,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -56,7 +58,6 @@ fun MixerEditorScreen(
 
     val mainRenderer = LocalSpiralRenderer.current
 
-    // Sync state to main renderer and sources
     LaunchedEffect(mainRenderer, currentPatch, monitorSource, allSets, allPatches) {
         if (mainRenderer == null) return@LaunchedEffect
         mainRenderer.mixerPatch = currentPatch
@@ -128,18 +129,17 @@ fun MixerEditorScreen(
             }
         }
 
-        // Main Preview Window (The video monitor)
+        // Main Preview Window (Matched to Mandala Editor)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp)
+                .padding(horizontal = 8.dp)
                 .aspectRatio(16 / 9f)
                 .background(Color.Black)
                 .border(1.dp, AppText.copy(alpha = 0.1f))
         ) {
             previewContent()
 
-            // Monitor Selector Overlaid (7 buttons)
             Row(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -166,14 +166,12 @@ fun MixerEditorScreen(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // Oscilloscope tied to monitorSource
-        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(40.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
+        // Oscilloscope (Matched to Mandala Editor)
+        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
             val monIdx = monitorSource.toIntOrNull()?.minus(1)
             val targetSource = if (monIdx != null && monIdx in 0..3) {
                 mainRenderer?.getSlotSource(monIdx)
             } else {
-                // For A, B, F we'll just show slot 0 for now as a representative history, 
-                // or we could combine them, but keeping it simple as per original
                 mainRenderer?.getSlotSource(0)
             }
             
@@ -184,55 +182,44 @@ fun MixerEditorScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Strip Header with Toggle and Labels
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Toggle Switch
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("1A2", color = if (viewSet1A2) AppAccent else AppText.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Switch(
-                    checked = !viewSet1A2,
-                    onCheckedChange = { viewSet1A2 = !it },
-                    modifier = Modifier.padding(horizontal = 6.dp).graphicsLayer { scaleX = 0.7f; scaleY = 0.7f }
-                )
-                Text("3B4", color = if (!viewSet1A2) AppAccent else AppText.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        // Strips Section
+        Box(modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp)) {
+            Row(modifier = Modifier.fillMaxSize()) {
+                if (viewSet1A2) {
+                    SourceStrip(0, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 0 }, { showMandalaPickerForSlot = 0 }, allSets, "1", Alignment.BottomEnd, Alignment.TopEnd, Modifier.weight(1f))
+                    MonitorStrip("A", currentPatch, { currentPatch = it }, mainRenderer, "A", Alignment.BottomCenter, Modifier.weight(1f))
+                    SourceStrip(1, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 1 }, { showMandalaPickerForSlot = 1 }, allSets, "2", Alignment.BottomStart, Alignment.TopStart, Modifier.weight(1f))
+                } else {
+                    SourceStrip(2, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 2 }, { showMandalaPickerForSlot = 2 }, allSets, "3", Alignment.BottomEnd, Alignment.TopEnd, Modifier.weight(1f))
+                    MonitorStrip("B", currentPatch, { currentPatch = it }, mainRenderer, "B", Alignment.BottomCenter, Modifier.weight(1f))
+                    SourceStrip(3, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 3 }, { showMandalaPickerForSlot = 3 }, allSets, "4", Alignment.BottomStart, Alignment.TopStart, Modifier.weight(1f))
+                }
+                MonitorStrip("F", currentPatch, { currentPatch = it }, mainRenderer, "F", Alignment.BottomCenter, Modifier.weight(1f))
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
-
-            // Labels
-            val labels = if (viewSet1A2) listOf("Source 1", "Mixer A", "Source 2", "Final Mixer")
-                         else listOf("Source 3", "Mixer B", "Source 4", "Final Mixer")
-            
-            Row(modifier = Modifier.weight(1f)) {
-                labels.forEach { label ->
-                    Text(
-                        text = label,
-                        modifier = Modifier.weight(1f),
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = AppText.copy(alpha = 0.7f),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp
+            // Overlay the 1/2 [switch] 3/4 switch over the A/B monitor (the second strip)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth(0.5f) // Positioned over the first two strips area
+                    .padding(top = 4.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Row(
+                    modifier = Modifier
+                        .offset(x = (20).dp) // Nudge it to be more centered over the A/B monitor
+                        .background(AppBackground.copy(alpha = 0.9f), MaterialTheme.shapes.extraSmall)
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("1/2", color = if (viewSet1A2) AppAccent else AppText.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    Switch(
+                        checked = !viewSet1A2,
+                        onCheckedChange = { viewSet1A2 = !it },
+                        modifier = Modifier.padding(horizontal = 2.dp).graphicsLayer { scaleX = 0.6f; scaleY = 0.6f }
                     )
+                    Text("3/4", color = if (!viewSet1A2) AppAccent else AppText.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 }
             }
-        }
-
-        // Strips Section
-        Row(modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 2.dp)) {
-            if (viewSet1A2) {
-                SourceStrip(0, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 0 }, { showMandalaPickerForSlot = 0 }, allSets, Modifier.weight(1f))
-                MonitorStrip("A", currentPatch, { currentPatch = it }, mainRenderer, Modifier.weight(1f))
-                SourceStrip(1, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 1 }, { showMandalaPickerForSlot = 1 }, allSets, Modifier.weight(1f))
-            } else {
-                SourceStrip(2, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 2 }, { showMandalaPickerForSlot = 2 }, allSets, Modifier.weight(1f))
-                MonitorStrip("B", currentPatch, { currentPatch = it }, mainRenderer, Modifier.weight(1f))
-                SourceStrip(3, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 3 }, { showMandalaPickerForSlot = 3 }, allSets, Modifier.weight(1f))
-            }
-            MonitorStrip("F", currentPatch, { currentPatch = it }, mainRenderer, Modifier.weight(1f))
         }
     }
 
@@ -286,6 +273,9 @@ fun SourceStrip(
     onPickSet: () -> Unit,
     onPickMandala: () -> Unit,
     allSets: List<MandalaSetEntity>,
+    identity: String,
+    identityAlignment: Alignment,
+    onOffAlignment: Alignment,
     modifier: Modifier = Modifier
 ) {
     val slot = patch.slots[index]
@@ -296,22 +286,55 @@ fun SourceStrip(
         // Preview Window
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).background(Color.Black).border(1.dp, AppText.copy(alpha = 0.2f))) {
             StripPreview(monitorSource = "${index + 1}", patch = patch, mainRenderer = mainRenderer)
+            
+            // Identity Marker
+            Text(
+                text = identity,
+                modifier = Modifier
+                    .align(identityAlignment)
+                    .padding(horizontal = 2.dp, vertical = 0.dp),
+                style = TextStyle(
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    shadow = Shadow(color = Color.Black, blurRadius = 3f)
+                )
+            )
+
+            // On/Off Button
+            Text(
+                text = if (slot.enabled) "ON" else "OFF",
+                modifier = Modifier
+                    .align(onOffAlignment)
+                    .padding(horizontal = 2.dp, vertical = 0.dp)
+                    .clickable {
+                        val newSlots = patch.slots.toMutableList()
+                        newSlots[index] = slot.copy(enabled = !slot.enabled)
+                        onPatchChange(patch.copy(slots = newSlots))
+                    },
+                style = TextStyle(
+                    color = if (slot.enabled) AppAccent else Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    shadow = Shadow(color = Color.Black, blurRadius = 3f)
+                )
+            )
         }
         
         Spacer(modifier = Modifier.height(4.dp))
         
-        // Source
+        // Source Label
         Text(
-            text = if (slot.sourceIsSet) "Set" else "Man",
+            text = if (slot.sourceIsSet) "Mandala Set" else "Mandala",
             style = MaterialTheme.typography.labelSmall,
             color = AppAccent,
-            fontSize = 8.sp,
+            fontSize = 9.sp,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.clickable {
                 val newSlots = patch.slots.toMutableList()
                 newSlots[index] = slot.copy(sourceIsSet = !slot.sourceIsSet)
                 onPatchChange(patch.copy(slots = newSlots))
-            }
+            }.padding(2.dp)
         )
         
         val displayName = if (slot.sourceIsSet) {
@@ -322,7 +345,7 @@ fun SourceStrip(
         
         Button(
             onClick = { if (slot.sourceIsSet) onPickSet() else onPickMandala() },
-            modifier = Modifier.fillMaxWidth().height(24.dp),
+            modifier = Modifier.fillMaxWidth().height(28.dp),
             contentPadding = PaddingValues(horizontal = 2.dp),
             colors = ButtonDefaults.buttonColors(containerColor = AppText.copy(alpha = 0.1f)),
             shape = MaterialTheme.shapes.extraSmall
@@ -330,25 +353,10 @@ fun SourceStrip(
             Text(displayName, style = MaterialTheme.typography.labelSmall, color = AppText, maxLines = 1, textAlign = TextAlign.Center, fontSize = 8.sp)
         }
         
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // on/off
-                Surface(
-                    color = if (slot.enabled) AppAccent else AppText.copy(alpha = 0.2f),
-                    modifier = Modifier.size(32.dp, 20.dp).clickable {
-                        val newSlots = patch.slots.toMutableList()
-                        newSlots[index] = slot.copy(enabled = !slot.enabled)
-                        onPatchChange(patch.copy(slots = newSlots))
-                    },
-                    shape = MaterialTheme.shapes.extraSmall
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(if (slot.enabled) "ON" else "OFF", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-                
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                 // arrows
                 Row {
                     IconButton(
@@ -366,10 +374,10 @@ fun SourceStrip(
                                 }
                             }
                         },
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(24.dp),
                         enabled = slot.sourceIsSet
                     ) {
-                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = null, tint = AppText, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = null, tint = AppText, modifier = Modifier.size(20.dp))
                     }
                     IconButton(
                         onClick = {
@@ -386,15 +394,15 @@ fun SourceStrip(
                                 }
                             }
                         },
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(24.dp),
                         enabled = slot.sourceIsSet
                     ) {
-                        Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = AppText, modifier = Modifier.size(14.dp))
+                        Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = AppText, modifier = Modifier.size(20.dp))
                     }
                 }
             }
             
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                 KnobView(
                     currentValue = slot.gain.baseValue,
                     onValueChange = {
@@ -403,9 +411,10 @@ fun SourceStrip(
                         onPatchChange(patch.copy(slots = newSlots))
                     },
                     onInteractionFinished = {},
-                    knobSize = 28.dp
+                    knobSize = 44.dp,
+                    showValue = true
                 )
-                Text("GAIN", style = MaterialTheme.typography.labelSmall, fontSize = 7.sp, color = AppText)
+                Text("GAIN", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = AppText)
             }
         }
     }
@@ -417,6 +426,8 @@ fun MonitorStrip(
     patch: MixerPatch,
     onPatchChange: (MixerPatch) -> Unit,
     mainRenderer: SpiralRenderer?,
+    identity: String,
+    identityAlignment: Alignment,
     modifier: Modifier = Modifier
 ) {
     val groupData = when(group) {
@@ -431,6 +442,20 @@ fun MonitorStrip(
     ) {
         Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).background(Color.Black).border(1.dp, AppText.copy(alpha = 0.2f))) {
             StripPreview(monitorSource = group, patch = patch, mainRenderer = mainRenderer)
+
+            // Identity Marker
+            Text(
+                text = identity,
+                modifier = Modifier
+                    .align(identityAlignment)
+                    .padding(horizontal = 2.dp, vertical = 0.dp),
+                style = TextStyle(
+                    color = Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    shadow = Shadow(color = Color.Black, blurRadius = 3f)
+                )
+            )
         }
         
         Spacer(modifier = Modifier.height(4.dp))
@@ -441,13 +466,13 @@ fun MonitorStrip(
                 text = groupData.mode.name,
                 style = MaterialTheme.typography.labelSmall,
                 color = AppAccent,
-                fontSize = 8.sp,
+                fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.clickable { modeExpanded = true }.padding(2.dp)
             )
             DropdownMenu(expanded = modeExpanded, onDismissRequest = { modeExpanded = false }, containerColor = AppBackground) {
                 MixerMode.values().forEach { m ->
-                    DropdownMenuItem(text = { Text(m.name, fontSize = 10.sp) }, onClick = {
+                    DropdownMenuItem(text = { Text(m.name, fontSize = 11.sp) }, onClick = {
                         val newGroup = groupData.copy(mode = m)
                         onPatchChange(updateGroup(patch, group, newGroup))
                         modeExpanded = false
@@ -460,7 +485,7 @@ fun MonitorStrip(
         
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("BAL", style = MaterialTheme.typography.labelSmall, fontSize = 7.sp, color = AppText)
+                Text("BAL", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = AppText)
                 KnobView(
                     currentValue = groupData.balance.baseValue,
                     onValueChange = {
@@ -468,12 +493,13 @@ fun MonitorStrip(
                         onPatchChange(updateGroup(patch, group, newGroup))
                     },
                     onInteractionFinished = {},
-                    knobSize = 24.dp,
+                    knobSize = 44.dp,
+                    showValue = true,
                     focused = groupData.mode != MixerMode.XFADE
                 )
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("MIX", style = MaterialTheme.typography.labelSmall, fontSize = 7.sp, color = AppText)
+                Text("MIX", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = AppText)
                 KnobView(
                     currentValue = groupData.mix.baseValue,
                     onValueChange = {
@@ -481,7 +507,8 @@ fun MonitorStrip(
                         onPatchChange(updateGroup(patch, group, newGroup))
                     },
                     onInteractionFinished = {},
-                    knobSize = 24.dp
+                    knobSize = 44.dp,
+                    showValue = true
                 )
             }
         }
@@ -496,9 +523,10 @@ fun MonitorStrip(
                     onPatchChange(updateGroup(patch, group, newGroup))
                 },
                 onInteractionFinished = {},
-                knobSize = 32.dp
+                knobSize = 44.dp,
+                showValue = true
             )
-            Text("GAIN", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = AppText, fontWeight = FontWeight.Bold)
+            Text("GAIN", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = AppText, fontWeight = FontWeight.Bold)
         }
     }
 }

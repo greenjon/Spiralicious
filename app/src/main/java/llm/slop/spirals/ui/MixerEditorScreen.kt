@@ -82,15 +82,16 @@ fun MixerEditorScreen(
                 allPatches.find { it.name == slot.selectedMandalaId }
             }
 
+            val source = mainRenderer.getSlotSource(index)
             patchEntity?.let { pe ->
                 val patchData = PatchMapper.fromJson(pe.jsonSettings)
                 patchData?.let { pd ->
-                    val source = mainRenderer.getSlotSource(index)
                     PatchMapper.applyToVisualSource(pd, source)
+                    // Explicitly ensure it's visible after mapping
+                    source.globalAlpha.baseValue = 1.0f 
                 }
             } ?: run {
                 // If no patch is loaded, zero out the source to prevent "red mandala"
-                val source = mainRenderer.getSlotSource(index)
                 source.globalAlpha.baseValue = 0f
             }
         }
@@ -755,22 +756,24 @@ fun StripPreview(monitorSource: String, patch: MixerPatch, mainRenderer: SpiralR
     AndroidView(
         factory = { ctx ->
             SpiralSurfaceView(ctx).apply {
-                setMixerState(patch, monitorSource)
+                // Ensure we have slot sources even in the mini previews
                 mainRenderer?.let { mr ->
                     (0..3).forEach { i ->
                         renderer.setSlotSource(i, mr.getSlotSource(i))
                     }
                 }
+                setMixerState(patch, monitorSource)
             }
         },
         modifier = Modifier.fillMaxSize(),
         update = { view ->
-            view.setMixerState(patch, monitorSource)
+            // Keep the mini renderer's sources in sync with the main renderer
             mainRenderer?.let { mr ->
                 (0..3).forEach { i ->
                     view.renderer.setSlotSource(i, mr.getSlotSource(i))
                 }
             }
+            view.setMixerState(patch, monitorSource)
         }
     )
 }

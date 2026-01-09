@@ -30,7 +30,15 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     var monitorSource: String = "F" // "1", "2", "3", "4", "A", "B", "F"
     
     // We maintain 4 internal sources for the mixer slots
-    private val slotSources = List(4) { MandalaVisualSource() }
+    private val slotSources = Array(4) { MandalaVisualSource() }
+
+    fun getSlotSource(index: Int): MandalaVisualSource = slotSources[index]
+    
+    fun setSlotSource(index: Int, source: MandalaVisualSource) {
+        if (index in 0..3) {
+            slotSources[index] = source
+        }
+    }
 
     @Volatile
     var params = MandalaParams(omega1 = 20, omega2 = 17, omega3 = 11, thickness = 0.005f)
@@ -47,8 +55,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var uThicknessLocation: Int = -1
     private var uGlobalScaleLocation: Int = -1
     private var uColorLocation: Int = -1
-
-    fun getSlotSource(index: Int): MandalaVisualSource = slotSources[index]
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
@@ -133,12 +139,15 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 renderHierarchicalGroup(patch.mixerB, slotSources[2], slotSources[3], patch.slots[2], patch.slots[3])
             }
             "F" -> {
-                // For Phase 1, we simulate hierarchy by rendering all 4 slots.
-                // We'll apply Mixer A settings to Slot 2, Mixer B settings to Slot 4,
-                // and Mixer F settings broadly.
-                renderHierarchicalGroup(patch.mixerA, slotSources[0], slotSources[1], patch.slots[0], patch.slots[1])
-                renderHierarchicalGroup(patch.mixerB, slotSources[2], slotSources[3], patch.slots[2], patch.slots[3])
-                // Note: Real Group F mixing would require rendering A and B to textures first.
+                // Approximate Final Mix by rendering both groups
+                renderHierarchicalGroup(patch.mixerA, slotSources[0], slotSources[1], patch.slots[0], patch.slots[1], groupGainScale = patch.mixerF.gain.baseValue * (1.0f - patch.mixerF.balance.baseValue) * 2.0f)
+                
+                // For group B, we use balance and mix from mixerF
+                val groupBScale = patch.mixerF.gain.baseValue * patch.mixerF.balance.baseValue * 2.0f * patch.mixerF.mix.baseValue
+                setBlendMode(patch.mixerF.mode)
+                renderHierarchicalGroup(patch.mixerB, slotSources[2], slotSources[3], patch.slots[2], patch.slots[3], groupGainScale = groupBScale)
+                GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
+                GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)
             }
             else -> renderSource(visualSource)
         }
@@ -149,26 +158,22 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         src1: MandalaVisualSource,
         src2: MandalaVisualSource,
         slot1: MixerSlotData,
-        slot2: MixerSlotData
+        slot2: MixerSlotData,
+        groupGainScale: Float = 1.0f
     ) {
+        val totalGroupGain = group.gain.baseValue * groupGainScale
+
         if (slot1.enabled) {
-            // Apply balance to Slot 1: balance goes from 0 (left only) to 1 (right only).
-            // So left channel is 1.0 at balance 0.0, and 0.0 at balance 1.0.
             val bal1 = (1.0f - group.balance.baseValue) * 2.0f
-            renderSource(src1, gain = slot1.gain.baseValue * bal1.coerceIn(0f, 1f) * group.gain.baseValue)
+            renderSource(src1, gain = slot1.gain.baseValue * bal1.coerceIn(0f, 1f) * totalGroupGain)
         }
         
         if (slot2.enabled) {
-            // Apply blend mode for the second source in the group
             setBlendMode(group.mode)
-            
             val bal2 = group.balance.baseValue * 2.0f
-            // Mix factor: for XFADE it's crossfade, for others it's usually opacity of the top layer
             val mixFactor = group.mix.baseValue
+            renderSource(src2, gain = slot2.gain.baseValue * bal2.coerceIn(0f, 1f) * mixFactor * totalGroupGain)
             
-            renderSource(src2, gain = slot2.gain.baseValue * bal2.coerceIn(0f, 1f) * mixFactor * group.gain.baseValue)
-            
-            // Reset to default blend
             GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
             GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)
         }

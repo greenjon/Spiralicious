@@ -29,6 +29,7 @@ data class MixerGroupData(
 @Serializable
 data class MixerSlotData(
     val mandalaSetId: String? = null,
+    val selectedMandalaId: String? = null,
     val currentIndex: Int = 0,
     val enabled: Boolean = true,
     val advanceMode: AdvanceMode = AdvanceMode.MANUAL,

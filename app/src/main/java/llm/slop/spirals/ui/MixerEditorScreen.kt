@@ -284,8 +284,28 @@ fun SourceStrip(
         modifier = modifier.padding(1.dp).wrapContentHeight().border(1.dp, AppText.copy(alpha = 0.1f)).padding(2.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Header
+        Text(
+            text = "Source $identity",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = AppText,
+            fontSize = 9.sp,
+            modifier = Modifier.padding(bottom = 2.dp)
+        )
+
         // Preview Window
-        Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).background(Color.Black).border(1.dp, AppText.copy(alpha = 0.2f))) {
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .background(Color.Black)
+            .border(1.dp, AppText.copy(alpha = 0.2f))
+            .clickable {
+                val newSlots = patch.slots.toMutableList()
+                newSlots[index] = slot.copy(enabled = !slot.enabled)
+                onPatchChange(patch.copy(slots = newSlots))
+            }
+        ) {
             StripPreview(monitorSource = "${index + 1}", patch = patch, mainRenderer = mainRenderer)
             
             Text(
@@ -296,12 +316,8 @@ fun SourceStrip(
 
             Text(
                 text = if (slot.enabled) "ON" else "OFF",
-                modifier = Modifier.align(onOffAlignment).padding(horizontal = 2.dp, vertical = 0.dp).clickable {
-                    val newSlots = patch.slots.toMutableList()
-                    newSlots[index] = slot.copy(enabled = !slot.enabled)
-                    onPatchChange(patch.copy(slots = newSlots))
-                },
-                style = TextStyle(color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f))
+                modifier = Modifier.align(onOffAlignment).padding(horizontal = 2.dp, vertical = 0.dp),
+                style = TextStyle(color = if (slot.enabled) AppAccent else Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f))
             )
         }
         
@@ -430,6 +446,13 @@ fun MonitorStrip(
         "B" -> patch.mixerB
         else -> patch.mixerF
     }
+    
+    val headerText = when(group) {
+        "A" -> "Mixer A"
+        "B" -> "Mixer B"
+        else -> "Final Mixer"
+    }
+
     val modeId = "M${group}_MODE"
     val balId = "M${group}_BAL"
     val mixId = "M${group}_MIX"
@@ -439,14 +462,33 @@ fun MonitorStrip(
         modifier = modifier.padding(1.dp).wrapContentHeight().border(1.dp, AppText.copy(alpha = 0.1f)).padding(2.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(modifier = Modifier.fillMaxWidth().aspectRatio(1f).background(Color.Black).border(1.dp, AppText.copy(alpha = 0.2f))) {
+        // Header
+        Text(
+            text = headerText,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = AppText,
+            fontSize = 9.sp,
+            modifier = Modifier.padding(bottom = 2.dp)
+        )
+
+        Box(modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .background(Color.Black)
+            .border(1.dp, AppText.copy(alpha = 0.2f))
+            .clickable {
+                if (group == "A") onToggleViewSet(false)
+                else if (group == "B") onToggleViewSet(true)
+            }
+        ) {
             StripPreview(monitorSource = group, patch = patch, mainRenderer = mainRenderer)
             Text(text = identity, modifier = Modifier.align(identityAlignment).padding(horizontal = 2.dp, vertical = 0.dp), style = TextStyle(color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f)))
 
             if (hasToggle) {
                 Row(modifier = Modifier.align(Alignment.TopCenter), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                     Text(text = "1/2", style = TextStyle(color = if (viewSet1A2) AppAccent else Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f)))
-                    Switch(checked = !viewSet1A2, onCheckedChange = { onToggleViewSet(!it) }, modifier = Modifier.padding(horizontal = 2.dp).graphicsLayer { scaleX = 0.6f; scaleY = 0.6f })
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(text = "3/4", style = TextStyle(color = if (!viewSet1A2) AppAccent else Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f)))
                 }
             }

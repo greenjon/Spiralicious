@@ -20,22 +20,22 @@ data class ModulatableParameterData(
 
 @Serializable
 data class MixerGroupData(
-    val mode: MixerMode = MixerMode.ADD,
-    val balance: ModulatableParameterData = ModulatableParameterData(0.5f), // Input balance
-    val mix: ModulatableParameterData = ModulatableParameterData(0.5f),    // Blend amount
-    val gain: ModulatableParameterData = ModulatableParameterData(1.0f)     // Output gain
+    val mode: ModulatableParameterData = ModulatableParameterData(0.0f), // baseValue is index of MixerMode
+    val balance: ModulatableParameterData = ModulatableParameterData(0.5f),
+    val mix: ModulatableParameterData = ModulatableParameterData(0.5f),
+    val gain: ModulatableParameterData = ModulatableParameterData(1.0f)
 )
 
 @Serializable
 data class MixerSlotData(
     val mandalaSetId: String? = null,
     val selectedMandalaId: String? = null,
-    val currentIndex: Int = 0,
+    val currentIndex: ModulatableParameterData = ModulatableParameterData(0.0f),
     val enabled: Boolean = true,
     val advanceMode: AdvanceMode = AdvanceMode.MANUAL,
     val advanceParams: Map<String, Float> = emptyMap(),
     val gain: ModulatableParameterData = ModulatableParameterData(1.0f),
-    val sourceIsSet: Boolean = true // Mandala | Mandala Set
+    val sourceIsSet: Boolean = true
 )
 
 @Serializable
@@ -43,8 +43,8 @@ data class MixerPatch(
     val id: String = UUID.randomUUID().toString(),
     var name: String,
     val slots: List<MixerSlotData>, // Fixed size 4
-    val mixerA: MixerGroupData = MixerGroupData(), // Mixes Slot 1 & 2
-    val mixerB: MixerGroupData = MixerGroupData(), // Mixes Slot 3 & 4
-    val mixerF: MixerGroupData = MixerGroupData(), // Mixes Group A & B
+    val mixerA: MixerGroupData = MixerGroupData(),
+    val mixerB: MixerGroupData = MixerGroupData(),
+    val mixerF: MixerGroupData = MixerGroupData(),
     val masterAlpha: Float = 1.0f
 )

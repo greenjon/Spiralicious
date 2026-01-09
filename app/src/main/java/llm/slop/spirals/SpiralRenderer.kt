@@ -9,6 +9,8 @@ import java.nio.ByteOrder
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.PI
+import kotlin.math.roundToInt
+import llm.slop.spirals.cv.ModulatableParameter
 
 val LocalSpiralRenderer = staticCompositionLocalOf<SpiralRenderer?> { null }
 
@@ -26,17 +28,65 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     // Mixer support
     @Volatile
     var mixerPatch: MixerPatch? = null
+        set(value) {
+            field = value
+            value?.let { syncMixerParameters(it) }
+        }
+        
     @Volatile
     var monitorSource: String = "F" // "1", "2", "3", "4", "A", "B", "F"
     
     // We maintain 4 internal sources for the mixer slots
     private val slotSources = Array(4) { MandalaVisualSource() }
 
+    // Internal ModulatableParameters for mixer components
+    private val mixerParams = mutableMapOf<String, ModulatableParameter>()
+
+    init {
+        for (i in 1..4) {
+            mixerParams["G$i"] = ModulatableParameter(1.0f)
+            mixerParams["PN$i"] = ModulatableParameter(0.0f)
+        }
+        listOf("A", "B", "F").forEach { g ->
+            mixerParams["M${g}_MODE"] = ModulatableParameter(0.0f)
+            mixerParams["M${g}_BAL"] = ModulatableParameter(0.5f)
+            mixerParams["M${g}_MIX"] = ModulatableParameter(0.5f)
+            mixerParams["M${g}_GAIN"] = ModulatableParameter(1.0f)
+        }
+    }
+
     fun getSlotSource(index: Int): MandalaVisualSource = slotSources[index]
     
     fun setSlotSource(index: Int, source: MandalaVisualSource) {
         if (index in 0..3) {
             slotSources[index] = source
+        }
+    }
+
+    fun getMixerParam(id: String): ModulatableParameter? = mixerParams[id]
+
+    private fun syncMixerParameters(patch: MixerPatch) {
+        for (i in 0..3) {
+            syncParam(mixerParams["G${i+1}"]!!, patch.slots[i].gain)
+            syncParam(mixerParams["PN${i+1}"]!!, patch.slots[i].currentIndex)
+        }
+        syncGroup(patch.mixerA, "A")
+        syncGroup(patch.mixerB, "B")
+        syncGroup(patch.mixerF, "F")
+    }
+
+    private fun syncGroup(group: MixerGroupData, prefix: String) {
+        syncParam(mixerParams["M${prefix}_MODE"]!!, group.mode)
+        syncParam(mixerParams["M${prefix}_BAL"]!!, group.balance)
+        syncParam(mixerParams["M${prefix}_MIX"]!!, group.mix)
+        syncParam(mixerParams["M${prefix}_GAIN"]!!, group.gain)
+    }
+
+    private fun syncParam(target: ModulatableParameter, source: ModulatableParameterData) {
+        target.baseValue = source.baseValue
+        if (target.modulators.size != source.modulators.size || target.modulators != source.modulators) {
+            target.modulators.clear()
+            target.modulators.addAll(source.modulators)
         }
     }
 
@@ -129,23 +179,32 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             "1", "2", "3", "4" -> {
                 val idx = monitor.toInt() - 1
                 if (patch.slots[idx].enabled) {
-                    renderSource(slotSources[idx], gain = patch.slots[idx].gain.baseValue)
+                    val gain = mixerParams["G$monitor"]?.evaluate() ?: 1.0f
+                    renderSource(slotSources[idx], gain = gain)
                 }
             }
             "A" -> {
-                renderHierarchicalGroup(patch.mixerA, slotSources[0], slotSources[1], patch.slots[0], patch.slots[1])
+                renderHierarchicalGroup("A", slotSources[0], slotSources[1], patch.slots[0], patch.slots[1])
             }
             "B" -> {
-                renderHierarchicalGroup(patch.mixerB, slotSources[2], slotSources[3], patch.slots[2], patch.slots[3])
+                renderHierarchicalGroup("B", slotSources[2], slotSources[3], patch.slots[2], patch.slots[3])
             }
             "F" -> {
-                // Approximate Final Mix by rendering both groups
-                renderHierarchicalGroup(patch.mixerA, slotSources[0], slotSources[1], patch.slots[0], patch.slots[1], groupGainScale = patch.mixerF.gain.baseValue * (1.0f - patch.mixerF.balance.baseValue) * 2.0f)
+                val gainF = mixerParams["MF_GAIN"]?.evaluate() ?: 1.0f
+                val balF = mixerParams["MF_BAL"]?.evaluate() ?: 0.5f
+                val mixF = mixerParams["MF_MIX"]?.evaluate() ?: 0.5f
+                val modeFIdx = ((mixerParams["MF_MODE"]?.evaluate() ?: 0f) * (MixerMode.values().size - 1)).roundToInt()
+                val modeF = MixerMode.values()[modeFIdx.coerceIn(0, MixerMode.values().size - 1)]
+
+                // Group A contribution
+                renderHierarchicalGroup("A", slotSources[0], slotSources[1], patch.slots[0], patch.slots[1], 
+                    groupGainScale = gainF * (1.0f - balF) * 2.0f)
                 
-                // For group B, we use balance and mix from mixerF
-                val groupBScale = patch.mixerF.gain.baseValue * patch.mixerF.balance.baseValue * 2.0f * patch.mixerF.mix.baseValue
-                setBlendMode(patch.mixerF.mode)
-                renderHierarchicalGroup(patch.mixerB, slotSources[2], slotSources[3], patch.slots[2], patch.slots[3], groupGainScale = groupBScale)
+                // Group B contribution
+                setBlendMode(modeF)
+                renderHierarchicalGroup("B", slotSources[2], slotSources[3], patch.slots[2], patch.slots[3], 
+                    groupGainScale = gainF * balF * 2.0f * mixF)
+                
                 GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
                 GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)
             }
@@ -154,25 +213,32 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     private fun renderHierarchicalGroup(
-        group: MixerGroupData,
+        prefix: String,
         src1: MandalaVisualSource,
         src2: MandalaVisualSource,
         slot1: MixerSlotData,
         slot2: MixerSlotData,
         groupGainScale: Float = 1.0f
     ) {
-        val totalGroupGain = group.gain.baseValue * groupGainScale
+        val gain = mixerParams["M${prefix}_GAIN"]?.evaluate() ?: 1.0f
+        val bal = mixerParams["M${prefix}_BAL"]?.evaluate() ?: 0.5f
+        val mix = mixerParams["M${prefix}_MIX"]?.evaluate() ?: 0.5f
+        val modeIdx = ((mixerParams["M${prefix}_MODE"]?.evaluate() ?: 0f) * (MixerMode.values().size - 1)).roundToInt()
+        val mode = MixerMode.values()[modeIdx.coerceIn(0, MixerMode.values().size - 1)]
+
+        val totalGroupGain = gain * groupGainScale
 
         if (slot1.enabled) {
-            val bal1 = (1.0f - group.balance.baseValue) * 2.0f
-            renderSource(src1, gain = slot1.gain.baseValue * bal1.coerceIn(0f, 1f) * totalGroupGain)
+            val bal1 = (1.0f - bal) * 2.0f
+            val slot1Gain = if (prefix == "A") mixerParams["G1"]!!.evaluate() else mixerParams["G3"]!!.evaluate()
+            renderSource(src1, gain = slot1Gain * bal1.coerceIn(0f, 1f) * totalGroupGain)
         }
         
         if (slot2.enabled) {
-            setBlendMode(group.mode)
-            val bal2 = group.balance.baseValue * 2.0f
-            val mixFactor = group.mix.baseValue
-            renderSource(src2, gain = slot2.gain.baseValue * bal2.coerceIn(0f, 1f) * mixFactor * totalGroupGain)
+            setBlendMode(mode)
+            val bal2 = bal * 2.0f
+            val slot2Gain = if (prefix == "A") mixerParams["G2"]!!.evaluate() else mixerParams["G4"]!!.evaluate()
+            renderSource(src2, gain = slot2Gain * bal2.coerceIn(0f, 1f) * mix * totalGroupGain)
             
             GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
             GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)

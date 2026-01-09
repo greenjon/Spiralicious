@@ -88,6 +88,10 @@ fun MixerEditorScreen(
                     val source = mainRenderer.getSlotSource(index)
                     PatchMapper.applyToVisualSource(pd, source)
                 }
+            } ?: run {
+                // If no patch is loaded, zero out the source to prevent "red mandala"
+                val source = mainRenderer.getSlotSource(index)
+                source.globalAlpha.baseValue = 0f
             }
         }
     }
@@ -306,7 +310,15 @@ fun SourceStrip(
             }
         ) {
             if (slot.enabled) {
-                StripPreview(monitorSource = "${index + 1}", patch = patch, mainRenderer = mainRenderer)
+                val isPopulated = if (slot.sourceIsSet) slot.mandalaSetId != null else slot.selectedMandalaId != null
+                
+                if (isPopulated) {
+                    StripPreview(monitorSource = "${index + 1}", patch = patch, mainRenderer = mainRenderer)
+                } else {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No source loaded", color = Color.White.copy(alpha = 0.5f), fontSize = 8.sp, textAlign = TextAlign.Center)
+                    }
+                }
                 
                 Text(
                     text = "ON",

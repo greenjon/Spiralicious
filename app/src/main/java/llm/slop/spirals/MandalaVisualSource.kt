@@ -26,7 +26,7 @@ class MandalaVisualSource : VisualSource {
         "Saturation" to ModulatableParameter(1.0f)
     )
 
-    override val globalAlpha = ModulatableParameter(1.0f)
+    override val globalAlpha = ModulatableParameter(0.0f) // Default to 0 to prevent "phantom" renders
     override val globalScale = ModulatableParameter(1.0f)
 
     var recipe: MandalaRatio = MandalaLibrary.MandalaRatios.first()
@@ -40,6 +40,9 @@ class MandalaVisualSource : VisualSource {
     private val hsvBuffer = FloatArray(3)
 
     override fun render(canvas: Canvas, width: Int, height: Int) {
+        val alpha = globalAlpha.value
+        if (alpha <= 0f) return // Skip rendering if invisible
+
         val l1 = parameters["L1"]!!.value * (width / 2f)
         val l2 = parameters["L2"]!!.value * (width / 2f)
         val l3 = parameters["L3"]!!.value * (width / 2f)
@@ -51,7 +54,6 @@ class MandalaVisualSource : VisualSource {
         val thickness = parameters["Thickness"]!!.value * 20f
         val hue = parameters["Hue"]!!.value * 360f
         val sat = parameters["Saturation"]!!.value
-        val alpha = globalAlpha.value
         val rotationDegrees = parameters["Rotation"]!!.value * 360f
 
         paint.strokeWidth = thickness

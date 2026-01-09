@@ -178,7 +178,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         when (monitor) {
             "1", "2", "3", "4" -> {
                 val idx = monitor.toInt() - 1
-                if (patch.slots[idx].enabled) {
+                if (patch.slots[idx].enabled && patch.slots[idx].isPopulated()) {
                     val gain = mixerParams["G$monitor"]?.evaluate() ?: 1.0f
                     renderSource(slotSources[idx], gain = gain)
                 }
@@ -228,13 +228,13 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
         val totalGroupGain = gain * groupGainScale
 
-        if (slot1.enabled) {
+        if (slot1.enabled && slot1.isPopulated()) {
             val bal1 = (1.0f - bal) * 2.0f
             val slot1Gain = if (prefix == "A") mixerParams["G1"]!!.evaluate() else mixerParams["G3"]!!.evaluate()
             renderSource(src1, gain = slot1Gain * bal1.coerceIn(0f, 1f) * totalGroupGain)
         }
         
-        if (slot2.enabled) {
+        if (slot2.enabled && slot2.isPopulated()) {
             setBlendMode(mode)
             val bal2 = bal * 2.0f
             val slot2Gain = if (prefix == "A") mixerParams["G2"]!!.evaluate() else mixerParams["G4"]!!.evaluate()

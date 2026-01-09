@@ -36,7 +36,9 @@ data class MixerSlotData(
     val advanceParams: Map<String, Float> = emptyMap(),
     val gain: ModulatableParameterData = ModulatableParameterData(1.0f),
     val sourceIsSet: Boolean = true
-)
+) {
+    fun isPopulated(): Boolean = if (sourceIsSet) mandalaSetId != null else selectedMandalaId != null
+}
 
 @Serializable
 data class MixerPatch(

@@ -305,13 +305,30 @@ fun SourceStrip(
                 onPatchChange(patch.copy(slots = newSlots))
             }
         ) {
-            StripPreview(monitorSource = "${index + 1}", patch = patch, mainRenderer = mainRenderer)
-            
-            Text(
-                text = if (slot.enabled) "ON" else "OFF",
-                modifier = Modifier.align(onOffAlignment).padding(horizontal = 2.dp, vertical = 0.dp),
-                style = TextStyle(color = if (slot.enabled) AppAccent else Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f))
-            )
+            if (slot.enabled) {
+                StripPreview(monitorSource = "${index + 1}", patch = patch, mainRenderer = mainRenderer)
+                
+                Text(
+                    text = "ON",
+                    modifier = Modifier.align(onOffAlignment).padding(horizontal = 2.dp, vertical = 0.dp),
+                    style = TextStyle(color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f))
+                )
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "OFF",
+                        style = TextStyle(color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f))
+                    )
+                    Text(
+                        text = "Tap to enable",
+                        style = TextStyle(color = Color.White.copy(alpha = 0.7f), fontSize = 8.sp, fontWeight = FontWeight.Normal, shadow = Shadow(color = Color.Black, blurRadius = 3f))
+                    )
+                }
+            }
         }
         
         Spacer(modifier = Modifier.height(4.dp))

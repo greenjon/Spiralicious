@@ -31,7 +31,7 @@ data class MixerSlotData(
     val mandalaSetId: String? = null,
     val selectedMandalaId: String? = null,
     val currentIndex: ModulatableParameterData = ModulatableParameterData(0.0f),
-    val enabled: Boolean = true,
+    val enabled: Boolean = false,
     val advanceMode: AdvanceMode = AdvanceMode.MANUAL,
     val advanceParams: Map<String, Float> = emptyMap(),
     val gain: ModulatableParameterData = ModulatableParameterData(1.0f),

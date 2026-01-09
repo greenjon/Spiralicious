@@ -301,7 +301,7 @@ fun SourceStrip(
         // Preview Window
         Box(modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(1f)
+            .aspectRatio(16 / 9f)
             .background(Color.Black)
             .border(1.dp, AppText.copy(alpha = 0.2f))
             .clickable {
@@ -495,7 +495,7 @@ fun MonitorStrip(
 
         Box(modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(1f)
+            .aspectRatio(16 / 9f)
             .background(Color.Black)
             .border(1.dp, AppText.copy(alpha = 0.2f))
             .clickable {

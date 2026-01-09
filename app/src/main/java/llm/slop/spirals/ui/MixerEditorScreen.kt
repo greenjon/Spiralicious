@@ -195,15 +195,15 @@ fun MixerEditorScreen(
                 .padding(horizontal = 4.dp)
         ) {
             if (viewSet1A2) {
-                SourceStrip(0, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 0 }, { showMandalaPickerForSlot = 0 }, allSets, "1", Alignment.BottomEnd, Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                MonitorStrip("A", currentPatch, { currentPatch = it }, mainRenderer, "A", Alignment.BottomCenter, true, viewSet1A2, { viewSet1A2 = it }, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                SourceStrip(1, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 1 }, { showMandalaPickerForSlot = 1 }, allSets, "2", Alignment.BottomStart, Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                SourceStrip(0, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 0 }, { showMandalaPickerForSlot = 0 }, allSets, "1", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                MonitorStrip("A", currentPatch, { currentPatch = it }, mainRenderer, true, viewSet1A2, { viewSet1A2 = it }, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                SourceStrip(1, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 1 }, { showMandalaPickerForSlot = 1 }, allSets, "2", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
             } else {
-                SourceStrip(2, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 2 }, { showMandalaPickerForSlot = 2 }, allSets, "3", Alignment.BottomEnd, Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                MonitorStrip("B", currentPatch, { currentPatch = it }, mainRenderer, "B", Alignment.BottomCenter, true, viewSet1A2, { viewSet1A2 = it }, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                SourceStrip(3, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 3 }, { showMandalaPickerForSlot = 3 }, allSets, "4", Alignment.BottomStart, Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                SourceStrip(2, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 2 }, { showMandalaPickerForSlot = 2 }, allSets, "3", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                MonitorStrip("B", currentPatch, { currentPatch = it }, mainRenderer, true, viewSet1A2, { viewSet1A2 = it }, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                SourceStrip(3, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 3 }, { showMandalaPickerForSlot = 3 }, allSets, "4", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
             }
-            MonitorStrip("F", currentPatch, { currentPatch = it }, mainRenderer, "F", Alignment.BottomCenter, false, viewSet1A2, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+            MonitorStrip("F", currentPatch, { currentPatch = it }, mainRenderer, false, viewSet1A2, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -269,7 +269,6 @@ fun SourceStrip(
     onPickMandala: () -> Unit,
     allSets: List<MandalaSetEntity>,
     identity: String,
-    identityAlignment: Alignment,
     onOffAlignment: Alignment,
     focusedId: String,
     onFocusChange: (String) -> Unit,
@@ -290,8 +289,8 @@ fun SourceStrip(
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = AppText,
-            fontSize = 9.sp,
-            modifier = Modifier.padding(bottom = 2.dp)
+            fontSize = 11.sp,
+            modifier = Modifier.padding(bottom = 0.dp)
         )
 
         // Preview Window
@@ -308,12 +307,6 @@ fun SourceStrip(
         ) {
             StripPreview(monitorSource = "${index + 1}", patch = patch, mainRenderer = mainRenderer)
             
-            Text(
-                text = identity,
-                modifier = Modifier.align(identityAlignment).padding(horizontal = 2.dp, vertical = 0.dp),
-                style = TextStyle(color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f))
-            )
-
             Text(
                 text = if (slot.enabled) "ON" else "OFF",
                 modifier = Modifier.align(onOffAlignment).padding(horizontal = 2.dp, vertical = 0.dp),
@@ -432,8 +425,6 @@ fun MonitorStrip(
     patch: MixerPatch,
     onPatchChange: (MixerPatch) -> Unit,
     mainRenderer: SpiralRenderer?,
-    identity: String,
-    identityAlignment: Alignment,
     hasToggle: Boolean,
     viewSet1A2: Boolean,
     onToggleViewSet: (Boolean) -> Unit,
@@ -468,8 +459,8 @@ fun MonitorStrip(
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
             color = AppText,
-            fontSize = 9.sp,
-            modifier = Modifier.padding(bottom = 2.dp)
+            fontSize = 11.sp,
+            modifier = Modifier.padding(bottom = 0.dp)
         )
 
         Box(modifier = Modifier
@@ -483,7 +474,6 @@ fun MonitorStrip(
             }
         ) {
             StripPreview(monitorSource = group, patch = patch, mainRenderer = mainRenderer)
-            Text(text = identity, modifier = Modifier.align(identityAlignment).padding(horizontal = 2.dp, vertical = 0.dp), style = TextStyle(color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f)))
 
             if (hasToggle) {
                 Row(modifier = Modifier.align(Alignment.TopCenter), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {

@@ -26,7 +26,7 @@ class MandalaVisualSource : VisualSource {
         "Saturation" to ModulatableParameter(1.0f)
     )
 
-    override val globalAlpha = ModulatableParameter(0.0f) // Default to 0 to prevent "phantom" renders
+    override val globalAlpha = ModulatableParameter(1.0f) 
     override val globalScale = ModulatableParameter(1.0f)
 
     var recipe: MandalaRatio = MandalaLibrary.MandalaRatios.first()

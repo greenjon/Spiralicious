@@ -21,9 +21,7 @@ data class ModulatableParameterData(
 @Serializable
 data class MixerGroupData(
     val mode: ModulatableParameterData = ModulatableParameterData(0.0f), // baseValue is index of MixerMode
-    val balance: ModulatableParameterData = ModulatableParameterData(0.5f),
-    val mix: ModulatableParameterData = ModulatableParameterData(0.5f),
-    val gain: ModulatableParameterData = ModulatableParameterData(1.0f)
+    val balance: ModulatableParameterData = ModulatableParameterData(0.5f)
 )
 
 @Serializable
@@ -34,7 +32,6 @@ data class MixerSlotData(
     val enabled: Boolean = false,
     val advanceMode: AdvanceMode = AdvanceMode.MANUAL,
     val advanceParams: Map<String, Float> = emptyMap(),
-    val gain: ModulatableParameterData = ModulatableParameterData(1.0f),
     val sourceIsSet: Boolean = true
 ) {
     fun isPopulated(): Boolean = if (sourceIsSet) mandalaSetId != null else selectedMandalaId != null
@@ -48,5 +45,6 @@ data class MixerPatch(
     val mixerA: MixerGroupData = MixerGroupData(),
     val mixerB: MixerGroupData = MixerGroupData(),
     val mixerF: MixerGroupData = MixerGroupData(),
+    val finalGain: ModulatableParameterData = ModulatableParameterData(1.0f),
     val masterAlpha: Float = 1.0f
 )

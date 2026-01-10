@@ -46,7 +46,6 @@ fun SourceStrip(
 ) {
     val slot = patch.slots[index]
     val slotId = "S${index + 1}"
-    val gainId = "G${index + 1}"
     val prevNextId = "PN${index + 1}"
 
     Column(
@@ -187,23 +186,6 @@ fun SourceStrip(
                 enabled = slot.sourceIsSet
             ) { Icon(Icons.Default.KeyboardArrowRight, null, tint = if (slot.sourceIsSet) arrowColor else arrowColor.copy(alpha = 0.2f), modifier = Modifier.size(32.dp)) }
         }
-        
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onFocusChange(gainId) }) {
-            KnobView(
-                currentValue = slot.gain.baseValue,
-                onValueChange = { newValue ->
-                    onFocusChange(gainId)
-                    val newSlots = patch.slots.toMutableList()
-                    newSlots[index] = slot.copy(gain = slot.gain.copy(baseValue = newValue))
-                    onPatchChange(patch.copy(slots = newSlots))
-                },
-                onInteractionFinished = {},
-                knobSize = 44.dp,
-                showValue = true,
-                focused = focusedId == gainId
-            )
-            Text("GAIN", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = if (focusedId == gainId) AppAccent else AppText)
-        }
     }
 }
 
@@ -234,8 +216,7 @@ fun MonitorStrip(
 
     val modeId = "M${group}_MODE"
     val balId = "M${group}_BAL"
-    val mixId = "M${group}_MIX"
-    val gainId = "M${group}_GAIN"
+    val finalGainId = "MF_GAIN"
     
     Column(
         modifier = modifier.padding(1.dp).wrapContentHeight().border(1.dp, AppText.copy(alpha = 0.1f)).padding(2.dp),
@@ -296,55 +277,38 @@ fun MonitorStrip(
         
         Spacer(modifier = Modifier.height(2.dp))
         
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onFocusChange(balId) }) {
-                Text("BAL", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = if (focusedId == balId) AppAccent else AppText)
-                KnobView(
-                    currentValue = groupData.balance.baseValue,
-                    onValueChange = { newValue ->
-                        onFocusChange(balId)
-                        val newGroup = groupData.copy(balance = groupData.balance.copy(baseValue = newValue))
-                        onPatchChange(updateGroup(patch, group, newGroup))
-                    },
-                    onInteractionFinished = {},
-                    knobSize = 44.dp,
-                    showValue = true,
-                    focused = focusedId == balId
-                )
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onFocusChange(mixId) }) {
-                Text("MIX", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = if (focusedId == mixId) AppAccent else AppText)
-                KnobView(
-                    currentValue = groupData.mix.baseValue,
-                    onValueChange = { newValue ->
-                        onFocusChange(mixId)
-                        val newGroup = groupData.copy(mix = groupData.mix.copy(baseValue = newValue))
-                        onPatchChange(updateGroup(patch, group, newGroup))
-                    },
-                    onInteractionFinished = {},
-                    knobSize = 44.dp,
-                    showValue = true,
-                    focused = focusedId == mixId
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(4.dp))
-        
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onFocusChange(gainId) }) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onFocusChange(balId) }) {
+            Text("BAL", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = if (focusedId == balId) AppAccent else AppText)
             KnobView(
-                currentValue = groupData.gain.baseValue,
+                currentValue = groupData.balance.baseValue,
                 onValueChange = { newValue ->
-                    onFocusChange(gainId)
-                    val newGroup = groupData.copy(gain = groupData.gain.copy(baseValue = newValue))
+                    onFocusChange(balId)
+                    val newGroup = groupData.copy(balance = groupData.balance.copy(baseValue = newValue))
                     onPatchChange(updateGroup(patch, group, newGroup))
                 },
                 onInteractionFinished = {},
                 knobSize = 44.dp,
                 showValue = true,
-                focused = focusedId == gainId
+                focused = focusedId == balId
             )
-            Text("GAIN", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = if (focusedId == gainId) AppAccent else AppText, fontWeight = FontWeight.Bold)
+        }
+        
+        if (group == "F") {
+            Spacer(modifier = Modifier.height(4.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onFocusChange(finalGainId) }) {
+                KnobView(
+                    currentValue = patch.finalGain.baseValue,
+                    onValueChange = { newValue ->
+                        onFocusChange(finalGainId)
+                        onPatchChange(patch.copy(finalGain = patch.finalGain.copy(baseValue = newValue)))
+                    },
+                    onInteractionFinished = {},
+                    knobSize = 44.dp,
+                    showValue = true,
+                    focused = focusedId == finalGainId
+                )
+                Text("GAIN", style = MaterialTheme.typography.labelSmall, fontSize = 9.sp, color = if (focusedId == finalGainId) AppAccent else AppText, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -359,10 +323,6 @@ fun MixerCvEditor(
     
     val focusedParamData = remember(patch, focusedId) {
         when {
-            focusedId.startsWith("G") -> {
-                val idx = (focusedId.last().digitToIntOrNull() ?: 1) - 1
-                if (idx in 0..3) patch.slots[idx].gain else null
-            }
             focusedId.startsWith("PN") -> {
                 val idx = (focusedId.last().digitToIntOrNull() ?: 1) - 1
                 if (idx in 0..3) patch.slots[idx].currentIndex else null
@@ -371,8 +331,6 @@ fun MixerCvEditor(
                 when(focusedId.removePrefix("MA_")) {
                     "MODE" -> patch.mixerA.mode
                     "BAL" -> patch.mixerA.balance
-                    "MIX" -> patch.mixerA.mix
-                    "GAIN" -> patch.mixerA.gain
                     else -> null
                 }
             }
@@ -380,8 +338,6 @@ fun MixerCvEditor(
                 when(focusedId.removePrefix("MB_")) {
                     "MODE" -> patch.mixerB.mode
                     "BAL" -> patch.mixerB.balance
-                    "MIX" -> patch.mixerB.mix
-                    "GAIN" -> patch.mixerB.gain
                     else -> null
                 }
             }
@@ -389,8 +345,7 @@ fun MixerCvEditor(
                 when(focusedId.removePrefix("MF_")) {
                     "MODE" -> patch.mixerF.mode
                     "BAL" -> patch.mixerF.balance
-                    "MIX" -> patch.mixerF.mix
-                    "GAIN" -> patch.mixerF.gain
+                    "GAIN" -> patch.finalGain
                     else -> null
                 }
             }
@@ -453,12 +408,6 @@ fun MixerCvEditor(
 private fun syncMixerParam(patch: MixerPatch, id: String, param: ModulatableParameter, onUpdate: (MixerPatch) -> Unit) {
     val data = ModulatableParameterData(baseValue = param.baseValue, modulators = param.modulators.toList())
     val newPatch = when {
-        id.startsWith("G") -> {
-            val idx = (id.last().digitToIntOrNull() ?: 1) - 1
-            val newSlots = patch.slots.toMutableList()
-            newSlots[idx] = newSlots[idx].copy(gain = data)
-            patch.copy(slots = newSlots)
-        }
         id.startsWith("PN") -> {
             val idx = (id.last().digitToIntOrNull() ?: 1) - 1
             val newSlots = patch.slots.toMutableList()
@@ -470,8 +419,6 @@ private fun syncMixerParam(patch: MixerPatch, id: String, param: ModulatablePara
             val newGroup = when(id.removePrefix("MA_")) {
                 "MODE" -> group.copy(mode = data)
                 "BAL" -> group.copy(balance = data)
-                "MIX" -> group.copy(mix = data)
-                "GAIN" -> group.copy(gain = data)
                 else -> group
             }
             patch.copy(mixerA = newGroup)
@@ -481,22 +428,19 @@ private fun syncMixerParam(patch: MixerPatch, id: String, param: ModulatablePara
             val newGroup = when(id.removePrefix("MB_")) {
                 "MODE" -> group.copy(mode = data)
                 "BAL" -> group.copy(balance = data)
-                "MIX" -> group.copy(mix = data)
-                "GAIN" -> group.copy(gain = data)
                 else -> group
             }
             patch.copy(mixerB = newGroup)
         }
         id.startsWith("MF_") -> {
             val group = patch.mixerF
-            val newGroup = when(id.removePrefix("MF_")) {
-                "MODE" -> group.copy(mode = data)
-                "BAL" -> group.copy(balance = data)
-                "MIX" -> group.copy(mix = data)
-                "GAIN" -> group.copy(gain = data)
-                else -> group
+            val (newGroup, finalGain) = when(id.removePrefix("MF_")) {
+                "MODE" -> group.copy(mode = data) to patch.finalGain
+                "BAL" -> group.copy(balance = data) to patch.finalGain
+                "GAIN" -> group to data
+                else -> group to patch.finalGain
             }
-            patch.copy(mixerF = newGroup)
+            patch.copy(mixerF = newGroup, finalGain = finalGain)
         }
         else -> patch
     }

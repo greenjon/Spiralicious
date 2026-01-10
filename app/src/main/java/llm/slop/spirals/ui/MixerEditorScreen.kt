@@ -43,7 +43,7 @@ fun MixerEditorScreen(
     var viewSet1A2 by remember { mutableStateOf(true) }
     
     // UI state for focusing parameters for CV patching
-    var focusedParameterId by remember { mutableStateOf("G1") }
+    var focusedParameterId by remember { mutableStateOf("PN1") }
 
     var showMenu by remember { mutableStateOf(false) }
     var showOpenDialog by remember { mutableStateOf(false) }

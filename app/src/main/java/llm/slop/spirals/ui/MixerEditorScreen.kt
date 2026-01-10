@@ -40,7 +40,6 @@ fun MixerEditorScreen(
 
     var currentPatch by remember { mutableStateOf(MixerPatch(name = "New Mixer", slots = List(4) { MixerSlotData() })) }
     var monitorSource by remember { mutableStateOf("F") } 
-    var viewSet1A2 by remember { mutableStateOf(true) }
     
     // UI state for focusing parameters for CV patching
     var focusedParameterId by remember { mutableStateOf("PN1") }
@@ -59,7 +58,7 @@ fun MixerEditorScreen(
         mainRenderer.monitorSource = monitorSource
         
         currentPatch.slots.forEachIndexed { index, slot ->
-            val patchEntity = if (slot.sourceIsSet) {
+            val patchEntity = if (slot.sourceType == VideoSourceType.MANDALA_SET) {
                 val setEntity = allSets.find { it.id == slot.mandalaSetId }
                 setEntity?.let { se ->
                     val orderedIds = Json.decodeFromString<List<String>>(se.jsonOrderedMandalaIds)
@@ -68,9 +67,9 @@ fun MixerEditorScreen(
                         allPatches.find { it.name == orderedIds[safeIndex] }
                     } else null
                 }
-            } else {
+            } else if (slot.sourceType == VideoSourceType.MANDALA) {
                 allPatches.find { it.name == slot.selectedMandalaId }
-            }
+            } else null
 
             val source = mainRenderer.getSlotSource(index)
             patchEntity?.let { pe ->
@@ -184,16 +183,20 @@ fun MixerEditorScreen(
                 .wrapContentHeight()
                 .padding(horizontal = 4.dp)
         ) {
-            if (viewSet1A2) {
-                SourceStrip(0, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 0 }, { showMandalaPickerForSlot = 0 }, allSets, "1", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                MonitorStrip("A", currentPatch, { currentPatch = it }, mainRenderer, true, viewSet1A2, { viewSet1A2 = it }, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                SourceStrip(1, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 1 }, { showMandalaPickerForSlot = 1 }, allSets, "2", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-            } else {
-                SourceStrip(2, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 2 }, { showMandalaPickerForSlot = 2 }, allSets, "3", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                MonitorStrip("B", currentPatch, { currentPatch = it }, mainRenderer, true, viewSet1A2, { viewSet1A2 = it }, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                SourceStrip(3, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 3 }, { showMandalaPickerForSlot = 3 }, allSets, "4", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+            Column(modifier = Modifier.weight(3f)) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    SourceStrip(0, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 0 }, { showMandalaPickerForSlot = 0 }, allSets, "1", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                    MonitorStrip("A", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                    SourceStrip(1, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 1 }, { showMandalaPickerForSlot = 1 }, allSets, "2", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                }
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    SourceStrip(2, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 2 }, { showMandalaPickerForSlot = 2 }, allSets, "3", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                    MonitorStrip("B", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                    SourceStrip(3, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 3 }, { showMandalaPickerForSlot = 3 }, allSets, "4", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                }
             }
-            MonitorStrip("F", currentPatch, { currentPatch = it }, mainRenderer, false, viewSet1A2, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+            MonitorStrip("F", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
         }
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -213,7 +216,7 @@ fun MixerEditorScreen(
         PickerDialog("Select Mandala Set", allSets.map { it.name to it.id }, { id ->
             val idx = showSetPickerForSlot!!
             val newSlots = currentPatch.slots.toMutableList()
-            newSlots[idx] = newSlots[idx].copy(mandalaSetId = id, currentIndex = ModulatableParameterData(0f), sourceIsSet = true)
+            newSlots[idx] = newSlots[idx].copy(mandalaSetId = id, currentIndex = ModulatableParameterData(0f), sourceType = VideoSourceType.MANDALA_SET)
             currentPatch = currentPatch.copy(slots = newSlots)
             showSetPickerForSlot = null
         }, { showSetPickerForSlot = null })
@@ -223,7 +226,7 @@ fun MixerEditorScreen(
         PickerDialog("Select Mandala", allPatches.map { it.name to it.name }, { id ->
             val idx = showMandalaPickerForSlot!!
             val newSlots = currentPatch.slots.toMutableList()
-            newSlots[idx] = newSlots[idx].copy(selectedMandalaId = id, sourceIsSet = false)
+            newSlots[idx] = newSlots[idx].copy(selectedMandalaId = id, sourceType = VideoSourceType.MANDALA)
             currentPatch = currentPatch.copy(slots = newSlots)
             showMandalaPickerForSlot = null
         }, { showMandalaPickerForSlot = null })

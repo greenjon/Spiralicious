@@ -8,12 +8,13 @@ uniform float uGlobalScale;
 uniform float uFillMode;
 
 out float vPhase;
+out vec2 vRawPos;
 
 void main() {
     if (uFillMode > 0.5) {
         vPhase = 0.0;
+        vRawPos = vec2(0.0);
         // Fullscreen quad using gl_VertexID (0 to 3)
-        // 0: (-1,-1), 1: (1,-1), 2: (-1,1), 3: (1,1)
         float x = float((gl_VertexID % 2) * 2 - 1);
         float y = float((gl_VertexID / 2) * 2 - 1);
         gl_Position = vec4(x, y, 0.0, 1.0);
@@ -21,9 +22,10 @@ void main() {
     }
 
     vPhase = aPosPhase.z;
+    vRawPos = aPosPhase.xy;
 
-    // Geometry is pre-calculated on CPU in normalized -1..1 range
-    vec2 pos = aPosPhase.xy * uGlobalScale;
+    // Geometry is pre-calculated on CPU in normalized range
+    vec2 pos = vRawPos * uGlobalScale;
     
     float cosR = cos(uGlobalRotation);
     float sinR = sin(uGlobalRotation);

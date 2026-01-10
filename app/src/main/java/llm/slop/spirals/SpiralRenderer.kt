@@ -104,6 +104,10 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var uAspectRatioLocation: Int = -1
     private var uGlobalScaleLocation: Int = -1
     private var uFillModeLocation: Int = -1
+    
+    private var uDepthLocation: Int = -1
+    private var uMinRLocation: Int = -1
+    private var uMaxRLocation: Int = -1
 
     private lateinit var vertexBuffer: FloatBuffer
 
@@ -121,6 +125,10 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         uAspectRatioLocation = GLES30.glGetUniformLocation(program, "uAspectRatio")
         uGlobalScaleLocation = GLES30.glGetUniformLocation(program, "uGlobalScale")
         uFillModeLocation = GLES30.glGetUniformLocation(program, "uFillMode")
+        
+        uDepthLocation = GLES30.glGetUniformLocation(program, "uDepth")
+        uMinRLocation = GLES30.glGetUniformLocation(program, "uMinR")
+        uMaxRLocation = GLES30.glGetUniformLocation(program, "uMaxR")
 
         // Pre-allocate buffer for (resolution + 1) points * 3 components (X, Y, Phase)
         val byteBuffer = ByteBuffer.allocateDirect((resolution + 1) * 3 * 4)
@@ -269,6 +277,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glUniform1f(uHueOffsetLocation, h)
         GLES30.glUniform1f(uHueSweepLocation, 0.0f)
         GLES30.glUniform1f(uAlphaLocation, a)
+        
+        GLES30.glUniform1f(uDepthLocation, 0.0f)
 
         GLES30.glBindVertexArray(vao)
         // Draw fullscreen quad via gl_VertexID in vertex shader
@@ -289,6 +299,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         
         val hueOffset = source.parameters["Hue Offset"]?.value ?: 0f
         val hueSweep = source.parameters["Hue Sweep"]?.value ?: 1.0f
+        val depth = source.parameters["Depth"]?.value ?: 0.35f
         val alpha = (opacityOverride ?: source.globalAlpha.value) * gain
 
         GLES30.glUniform1f(uFillModeLocation, 0.0f)
@@ -298,6 +309,10 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glUniform1f(uGlobalScaleLocation, finalScale)
         GLES30.glUniform1f(uGlobalRotationLocation, rotation)
         GLES30.glUniform1f(uAspectRatioLocation, aspectRatio)
+        
+        GLES30.glUniform1f(uDepthLocation, depth)
+        GLES30.glUniform1f(uMinRLocation, source.minR)
+        GLES30.glUniform1f(uMaxRLocation, source.maxR)
 
         // Upload new geometry data [X, Y, Phase]
         vertexBuffer.clear()

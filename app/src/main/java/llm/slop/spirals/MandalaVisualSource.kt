@@ -7,6 +7,8 @@ import llm.slop.spirals.cv.ModulatableParameter
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.PI
+import kotlin.math.sqrt
+import kotlin.math.max
 
 /**
  * Optimized VisualSource that avoids allocations in the render loop.
@@ -23,7 +25,8 @@ class MandalaVisualSource : VisualSource {
         "Rotation" to ModulatableParameter(0.0f),
         "Thickness" to ModulatableParameter(0.1f),
         "Hue Offset" to ModulatableParameter(0.0f),
-        "Hue Sweep" to ModulatableParameter(1.0f / 9.0f) // Default 1.0, scaled 0-9
+        "Hue Sweep" to ModulatableParameter(1.0f / 9.0f), // Default 1.0, scaled 0-9
+        "Depth" to ModulatableParameter(0.35f)
     )
 
     override val globalAlpha = ModulatableParameter(1.0f) 
@@ -43,6 +46,12 @@ class MandalaVisualSource : VisualSource {
     private val points = 2048
     val geometryBuffer = FloatArray((points + 1) * 3)
 
+    // Radial Brightness tracking
+    var minR: Float = 0f
+        private set
+    var maxR: Float = 1f
+        private set
+
     override fun update() {
         super.update()
         updateGeometry()
@@ -56,6 +65,9 @@ class MandalaVisualSource : VisualSource {
         
         val dt = (2.0 * PI) / points
         
+        var currentMinR = Float.MAX_VALUE
+        var currentMaxR = -Float.MAX_VALUE
+
         for (i in 0..points) {
             val t = i * dt
             val phase = i.toFloat() / points.toFloat()
@@ -71,6 +83,19 @@ class MandalaVisualSource : VisualSource {
             geometryBuffer[i * 3] = x
             geometryBuffer[i * 3 + 1] = y
             geometryBuffer[i * 3 + 2] = phase
+
+            val r = sqrt(x * x + y * y)
+            if (r < currentMinR) currentMinR = r
+            if (r > currentMaxR) currentMaxR = r
+        }
+
+        // Safety Check: If maxR - minR < 0.001f, force a fallback range
+        if (currentMaxR - currentMinR < 0.001f) {
+            minR = 0f
+            maxR = max(0.001f, currentMaxR)
+        } else {
+            minR = currentMinR
+            maxR = currentMaxR
         }
     }
 
@@ -87,11 +112,11 @@ class MandalaVisualSource : VisualSource {
         val thickness = parameters["Thickness"]!!.value * 20f
         val hueOffset = parameters["Hue Offset"]!!.value
         val hueSweep = parameters["Hue Sweep"]!!.value * 9.0f // Scale 0-1 to 0-9
+        val depth = parameters["Depth"]!!.value
         val rotationDegrees = parameters["Rotation"]!!.value * 360f
 
         paint.strokeWidth = thickness
         hsvBuffer[1] = 0.8f // Fixed Saturation as per blueprint
-        hsvBuffer[2] = 1.0f // Fixed Value
 
         val cx = width / 2f
         val cy = height / 2f
@@ -108,6 +133,14 @@ class MandalaVisualSource : VisualSource {
             
             val x2 = geometryBuffer[(i + 1) * 3]
             val y2 = geometryBuffer[(i + 1) * 3 + 1]
+
+            // Radial Brightness Logic for Canvas
+            val r = sqrt(x1 * x1 + y1 * y1)
+            val rNorm = ((r - minR) / max(0.001f, maxR - minR)).coerceIn(0f, 1f)
+            val f = Math.pow(rNorm.toDouble(), 0.7).toFloat()
+            val v = 0.85f * (1.0f - depth + depth * f)
+
+            hsvBuffer[2] = v
 
             // For Canvas, we update color per segment to match the new phase coloring
             val currentHue = ((hueOffset + phase * hueSweep) % 1.0f) * 360f

@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,7 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spirals.cv.*
 import llm.slop.spirals.cv.audio.*
 import llm.slop.spirals.ui.*
@@ -75,7 +75,8 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    fun AppRoot(vm: MandalaViewModel = viewModel()) {
+    fun AppRoot() {
+        val vm: MandalaViewModel by viewModels()
         var currentScreen by remember { mutableStateOf(AppScreen.MANDALA_EDITOR) }
         
         val scope = rememberCoroutineScope()
@@ -140,7 +141,7 @@ class MainActivity : ComponentActivity() {
         }
 
         CompositionLocalProvider(LocalSpiralRenderer provides renderer.value) {
-            Column(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(AppBackground)
@@ -184,24 +185,22 @@ class MainActivity : ComponentActivity() {
                 }
 
                 // Overlays
-                Box(modifier = Modifier.fillMaxSize()) {
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = showCvLab,
-                        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        CvLabScreen(
-                            audioEngine = audioEngine,
-                            sourceManager = sourceManager!!,
-                            audioSourceType = audioSourceType,
-                            onAudioSourceTypeChange = { audioSourceType = it },
-                            hasMicPermission = hasMicPermission,
-                            onMicPermissionGranted = { hasMicPermission = true },
-                            onInternalAudioRecordCreated = { currentInternalAudioRecord = it },
-                            onClose = { showCvLab = false }
-                        )
-                    }
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showCvLab,
+                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    CvLabScreen(
+                        audioEngine = audioEngine,
+                        sourceManager = sourceManager!!,
+                        audioSourceType = audioSourceType,
+                        onAudioSourceTypeChange = { audioSourceType = it },
+                        hasMicPermission = hasMicPermission,
+                        onMicPermissionGranted = { hasMicPermission = true },
+                        onInternalAudioRecordCreated = { currentInternalAudioRecord = it },
+                        onClose = { showCvLab = false }
+                    )
                 }
             }
         }
@@ -403,5 +402,3 @@ class MainActivity : ComponentActivity() {
     override fun onPause() { super.onPause(); spiralSurfaceView?.onPause(); audioEngine.stop() }
     override fun onResume() { super.onResume(); spiralSurfaceView?.onResume() }
 }
-
-fun Modifier.minHeight(height: androidx.compose.ui.unit.Dp) = this.defaultMinSize(minHeight = height)

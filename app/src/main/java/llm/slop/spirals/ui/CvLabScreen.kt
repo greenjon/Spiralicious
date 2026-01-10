@@ -28,6 +28,7 @@ import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 import kotlinx.coroutines.delay
+import kotlin.math.sin
 
 @Composable
 fun CvLabScreen(
@@ -70,6 +71,15 @@ fun CvLabScreen(
             frameTick++
             delay(16)
         }
+    }
+
+    // Secondary buffer for the synthesized beat visualization
+    val beatVisualBuffer = remember { CvHistoryBuffer(200) }
+    LaunchedEffect(frameTick) {
+        val beats = CvRegistry.getSynchronizedTotalBeats()
+        // Synthesize a sine wave synced to the beat phase
+        val value = (sin(beats * 2.0 * Math.PI).toFloat() + 1.0f) * 0.5f
+        beatVisualBuffer.add(value)
     }
 
     Column(
@@ -125,6 +135,10 @@ fun CvLabScreen(
 
         // Monitor all registry signals using the centralized history
         key(frameTick) {
+            DiagnosticScope("BEAT CLOCK (Synced Sine)", beatVisualBuffer)
+            
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = AppText.copy(alpha = 0.1f))
+
             DiagnosticScope("ACCENT (Weighted Flux + Decay)", CvRegistry.history["accent"]!!)
             DiagnosticScope("ONSET (Raw Spikes)", CvRegistry.history["onset"]!!)
             

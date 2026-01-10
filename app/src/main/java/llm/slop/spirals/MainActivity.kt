@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -69,6 +70,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         
         audioEngine = AudioEngine(this)
@@ -108,7 +110,12 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    Box(modifier = Modifier.fillMaxSize().background(AppBackground)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(AppBackground)
+                            .systemBarsPadding()
+                    ) {
                         when {
                             showSetEditor -> MandalaSetEditorScreen(
                                 vm = vm, 

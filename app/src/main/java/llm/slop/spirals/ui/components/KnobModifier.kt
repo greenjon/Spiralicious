@@ -4,6 +4,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -11,14 +12,18 @@ import kotlin.math.abs
 
 /**
  * A custom modifier that implements rotary knob logic via vertical dragging.
+ * Uses rememberUpdatedState to ensure that stale lambdas don't cause state resetting.
  */
 fun Modifier.knobInput(
     value: Float,
     config: KnobConfig,
     onValueChange: (Float) -> Unit,
     onInteractionFinished: () -> Unit = {}
-): Modifier = this.then(
-    Modifier.pointerInput(Unit) {
+): Modifier = composed {
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
+    val currentOnInteractionFinished by rememberUpdatedState(onInteractionFinished)
+
+    this.pointerInput(Unit) {
         awaitEachGesture {
             val down = awaitFirstDown()
             val startY = down.position.y
@@ -61,17 +66,17 @@ fun Modifier.knobInput(
                         
                         currentValue = nextValue
                         smoothedVelocity = newVelocity
-                        onValueChange(nextValue)
+                        currentOnValueChange(nextValue)
                         
                         lastY = currentY
                         lastTime = currentTime
                     }
                     event.changes.first().consume()
                 } else if (type == PointerEventType.Release || type == PointerEventType.Exit) {
-                    onInteractionFinished()
+                    currentOnInteractionFinished()
                     break
                 }
             }
         }
     }
-)
+}

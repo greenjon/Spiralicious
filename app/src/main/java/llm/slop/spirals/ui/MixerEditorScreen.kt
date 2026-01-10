@@ -23,6 +23,7 @@ import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.ui.theme.AppAccent
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,6 +52,15 @@ fun MixerEditorScreen(
     var showMandalaPickerForSlot by remember { mutableStateOf<Int?>(null) }
 
     val mainRenderer = LocalSpiralRenderer.current
+
+    // A simple tick that forces the UI to recompose at 60Hz so the scopes update
+    var frameTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            frameTick++
+            delay(16)
+        }
+    }
 
     LaunchedEffect(mainRenderer, currentPatch, monitorSource, allSets, allPatches) {
         if (mainRenderer == null) return@LaunchedEffect
@@ -162,15 +172,11 @@ fun MixerEditorScreen(
 
         // Oscilloscope
         Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
-            val monIdx = monitorSource.toIntOrNull()?.minus(1)
-            val targetSource = if (monIdx != null && monIdx in 0..3) {
-                mainRenderer?.getSlotSource(monIdx)
-            } else {
-                mainRenderer?.getSlotSource(0)
-            }
-            
-            if (targetSource != null) {
-                OscilloscopeView(history = targetSource.globalAlpha.history, modifier = Modifier.fillMaxSize())
+            key(frameTick) {
+                val targetParam = mainRenderer?.getMixerParam(focusedParameterId)
+                if (targetParam != null) {
+                    OscilloscopeView(history = targetParam.history, modifier = Modifier.fillMaxSize())
+                }
             }
         }
 

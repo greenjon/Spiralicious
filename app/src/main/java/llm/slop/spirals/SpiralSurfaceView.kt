@@ -3,6 +3,7 @@ package llm.slop.spirals
 import android.content.Context
 import android.opengl.GLSurfaceView
 import android.util.AttributeSet
+import llm.slop.spirals.models.MixerPatch
 
 class SpiralSurfaceView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(context, attrs) {
 

@@ -11,6 +11,7 @@ import javax.microedition.khronos.opengles.GL10
 import kotlin.math.PI
 import kotlin.math.roundToInt
 import llm.slop.spirals.cv.ModulatableParameter
+import llm.slop.spirals.models.*
 
 val LocalSpiralRenderer = staticCompositionLocalOf<SpiralRenderer?> { null }
 
@@ -293,6 +294,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         
         val hue = source.parameters["Hue"]?.value ?: 0f
         val sat = source.parameters["Saturation"]?.value ?: 1f
+        // NON-DESTRUCTIVE TAP: Use gain parameter only for shader uniform, don't touch source state
         val alpha = (opacityOverride ?: source.globalAlpha.value) * gain
 
         GLES30.glUniform4f(uOmegaLocation, o1, o2, o3, o4)

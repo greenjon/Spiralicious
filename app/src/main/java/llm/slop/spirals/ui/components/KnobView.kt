@@ -30,7 +30,8 @@ fun KnobView(
     isBipolar: Boolean = false,
     focused: Boolean = false,
     knobSize: Dp = 32.dp,
-    showValue: Boolean = false
+    showValue: Boolean = false,
+    displayTransform: (Float) -> String = { (it * 100).roundToInt().toString() }
 ) {
     Box(
         modifier = modifier
@@ -86,7 +87,7 @@ fun KnobView(
         
         if (showValue) {
             Text(
-                text = "${(currentValue * 100).roundToInt()}",
+                text = displayTransform(currentValue),
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = (knobSize.value * 0.25f).sp),
                 color = if (focused) AppAccent else AppText
             )

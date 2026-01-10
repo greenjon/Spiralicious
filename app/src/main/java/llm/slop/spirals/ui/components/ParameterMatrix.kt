@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import llm.slop.spirals.cv.ModulatableParameter
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppText
+import kotlin.math.roundToInt
 
 @Composable
 fun MandalaParameterMatrix(
@@ -120,7 +121,14 @@ private fun KnobCell(
                 isBipolar = false, // Parameters in matrix are typically unipolar 0-1
                 focused = isFocused,
                 knobSize = 44.dp,
-                showValue = true
+                showValue = true,
+                displayTransform = { 
+                    if (id == "Hue Sweep") {
+                        "%.2f".format(it * 9.0f)
+                    } else {
+                        (it * 100f).roundToInt().toString()
+                    }
+                }
             )
             if (!labelAbove) {
                 Text(

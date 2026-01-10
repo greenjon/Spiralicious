@@ -6,6 +6,7 @@ import android.opengl.GLSurfaceView
 import androidx.compose.runtime.staticCompositionLocalOf
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.FloatBuffer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.PI
@@ -96,17 +97,15 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     
     private var aspectRatio: Float = 1f
 
-    private var uOmegaLocation: Int = -1
-    private var uLLocation: Int = -1
-    private var uPhiLocation: Int = -1
-    private var uTLocation: Int = -1
+    private var uHueOffsetLocation: Int = -1
+    private var uHueSweepLocation: Int = -1
+    private var uAlphaLocation: Int = -1
     private var uGlobalRotationLocation: Int = -1
     private var uAspectRatioLocation: Int = -1
-    private var uTimeLocation: Int = -1
-    private var uThicknessLocation: Int = -1
     private var uGlobalScaleLocation: Int = -1
-    private var uColorLocation: Int = -1
     private var uFillModeLocation: Int = -1
+
+    private lateinit var vertexBuffer: FloatBuffer
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
@@ -115,33 +114,18 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
         program = ShaderHelper.buildProgram(context, R.raw.mandala_vertex, R.raw.mandala_fragment)
         
-        uOmegaLocation = GLES30.glGetUniformLocation(program, "uOmega")
-        uLLocation = GLES30.glGetUniformLocation(program, "uL")
-        uPhiLocation = GLES30.glGetUniformLocation(program, "uPhi")
-        uTLocation = GLES30.glGetUniformLocation(program, "uT")
+        uHueOffsetLocation = GLES30.glGetUniformLocation(program, "uHueOffset")
+        uHueSweepLocation = GLES30.glGetUniformLocation(program, "uHueSweep")
+        uAlphaLocation = GLES30.glGetUniformLocation(program, "uAlpha")
         uGlobalRotationLocation = GLES30.glGetUniformLocation(program, "uGlobalRotation")
         uAspectRatioLocation = GLES30.glGetUniformLocation(program, "uAspectRatio")
-        uTimeLocation = GLES30.glGetUniformLocation(program, "uTime")
-        uThicknessLocation = GLES30.glGetUniformLocation(program, "uThickness")
         uGlobalScaleLocation = GLES30.glGetUniformLocation(program, "uGlobalScale")
-        uColorLocation = GLES30.glGetUniformLocation(program, "uColor")
         uFillModeLocation = GLES30.glGetUniformLocation(program, "uFillMode")
 
-        val totalVertices = resolution * 2
-        val vertexData = FloatArray(totalVertices * 2)
-        for (i in 0 until resolution) {
-            val u = i.toFloat() / (resolution - 1)
-            vertexData[i * 4 + 0] = u
-            vertexData[i * 4 + 1] = -1.0f
-            vertexData[i * 4 + 2] = u
-            vertexData[i * 4 + 3] = 1.0f
-        }
-
-        val byteBuffer = ByteBuffer.allocateDirect(vertexData.size * 4)
+        // Pre-allocate buffer for (resolution + 1) points * 3 components (X, Y, Phase)
+        val byteBuffer = ByteBuffer.allocateDirect((resolution + 1) * 3 * 4)
         byteBuffer.order(ByteOrder.nativeOrder())
-        val floatBuffer = byteBuffer.asFloatBuffer()
-        floatBuffer.put(vertexData)
-        floatBuffer.position(0)
+        vertexBuffer = byteBuffer.asFloatBuffer()
 
         val vaoArray = IntArray(1)
         GLES30.glGenVertexArrays(1, vaoArray, 0)
@@ -152,12 +136,13 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glGenBuffers(1, vboArray, 0)
         vbo = vboArray[0]
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, vbo)
-        GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, vertexData.size * 4, floatBuffer, GLES30.GL_STATIC_DRAW)
+        
+        // Initial empty buffer allocation
+        GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, (resolution + 1) * 3 * 4, null, GLES30.GL_STREAM_DRAW)
 
+        // Phase 2.3: Update the Vertex Attribute Pointer to 3 components (X, Y, Phase)
         GLES30.glEnableVertexAttribArray(0)
-        GLES30.glVertexAttribPointer(0, 1, GLES30.GL_FLOAT, false, 8, 0)
-        GLES30.glEnableVertexAttribArray(1)
-        GLES30.glVertexAttribPointer(1, 1, GLES30.GL_FLOAT, false, 8, 4)
+        GLES30.glVertexAttribPointer(0, 3, GLES30.GL_FLOAT, false, 3 * 4, 0)
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -197,12 +182,10 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 val modeFIdx = ((mixerParams["MF_MODE"]?.evaluate() ?: 0f) * (MixerMode.values().size - 1)).roundToInt()
                 val modeF = MixerMode.values()[modeFIdx.coerceIn(0, MixerMode.values().size - 1)]
 
-                // Group A contribution: full volume at bal=0, full volume at bal=0.5, zero at bal=1
                 val balA = ((1.0f - balF) * 2.0f).coerceIn(0f, 1f)
                 renderHierarchicalGroup("A", slotSources[0], slotSources[1], patch.slots[0], patch.slots[1], 
                     groupGainScale = gainF * balA)
                 
-                // Group B contribution: zero at bal=0, full volume at bal=0.5, full volume at bal=1
                 setBlendMode(modeF)
                 val balB = (balF * 2.0f).coerceIn(0f, 1f)
                 renderHierarchicalGroup("B", slotSources[2], slotSources[3], patch.slots[2], patch.slots[3], 
@@ -222,8 +205,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             }
             VideoSourceType.COLOR -> {
                 val h = mixerParams["H${index+1}"]?.evaluate() ?: 0f
-                val s = mixerParams["S${index+1}"]?.evaluate() ?: 0f
-                renderColor(h, s, gain)
+                renderColor(h, gain)
             }
         }
     }
@@ -282,12 +264,15 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         }
     }
 
-    private fun renderColor(h: Float, s: Float, a: Float) {
+    private fun renderColor(h: Float, a: Float) {
         GLES30.glUniform1f(uFillModeLocation, 1.0f)
-        GLES30.glUniform4f(uColorLocation, h, s, 1.0f, a)
+        GLES30.glUniform1f(uHueOffsetLocation, h)
+        GLES30.glUniform1f(uHueSweepLocation, 0.0f)
+        GLES30.glUniform1f(uAlphaLocation, a)
 
         GLES30.glBindVertexArray(vao)
-        GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, resolution * 2)
+        // Draw fullscreen quad via gl_VertexID in vertex shader
+        GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
         
         GLES30.glUniform1f(uFillModeLocation, 0.0f)
     }
@@ -297,38 +282,32 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         
         source.update()
         
-        val p1 = source.parameters["L1"]?.value ?: 0f
-        val p2 = source.parameters["L2"]?.value ?: 0f
-        val p3 = source.parameters["L3"]?.value ?: 0f
-        val p4 = source.parameters["L4"]?.value ?: 0f
-        
-        val o1 = source.recipe.a.toFloat()
-        val o2 = source.recipe.b.toFloat()
-        val o3 = source.recipe.c.toFloat()
-        val o4 = source.recipe.d.toFloat()
-        
-        val thick = (source.parameters["Thickness"]?.value ?: 0f) * 0.02f
+        // Phase 2.4: Update Uniforms
         val localScale = source.parameters["Scale"]?.value ?: 0.125f
         val finalScale = localScale * source.globalScale.value * 8.0f
-        
         val rotation = (source.parameters["Rotation"]?.value ?: 0f) * 2.0f * PI.toFloat()
         
-        val hue = source.parameters["Hue"]?.value ?: 0f
-        val sat = source.parameters["Saturation"]?.value ?: 1f
-        // NON-DESTRUCTIVE TAP: Use gain parameter only for shader uniform, don't touch source state
+        val hueOffset = source.parameters["Hue Offset"]?.value ?: 0f
+        val hueSweep = source.parameters["Hue Sweep"]?.value ?: 1.0f
         val alpha = (opacityOverride ?: source.globalAlpha.value) * gain
 
         GLES30.glUniform1f(uFillModeLocation, 0.0f)
-        GLES30.glUniform4f(uOmegaLocation, o1, o2, o3, o4)
-        GLES30.glUniform4f(uLLocation, p1, p2, p3, p4)
-        GLES30.glUniform1f(uTLocation, (2.0 * PI).toFloat())
-        GLES30.glUniform1f(uThicknessLocation, thick)
+        GLES30.glUniform1f(uHueOffsetLocation, hueOffset)
+        GLES30.glUniform1f(uHueSweepLocation, hueSweep)
+        GLES30.glUniform1f(uAlphaLocation, alpha)
         GLES30.glUniform1f(uGlobalScaleLocation, finalScale)
         GLES30.glUniform1f(uGlobalRotationLocation, rotation)
-        GLES30.glUniform4f(uColorLocation, hue, sat, 1.0f, alpha)
         GLES30.glUniform1f(uAspectRatioLocation, aspectRatio)
 
+        // Upload new geometry data [X, Y, Phase]
+        vertexBuffer.clear()
+        vertexBuffer.put(source.geometryBuffer)
+        vertexBuffer.position(0)
+
+        GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, vbo)
+        GLES30.glBufferSubData(GLES30.GL_ARRAY_BUFFER, 0, source.geometryBuffer.size * 4, vertexBuffer)
+
         GLES30.glBindVertexArray(vao)
-        GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, resolution * 2)
+        GLES30.glDrawArrays(GLES30.GL_LINE_STRIP, 0, resolution + 1)
     }
 }

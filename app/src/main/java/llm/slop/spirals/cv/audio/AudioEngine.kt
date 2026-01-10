@@ -1,6 +1,7 @@
 package llm.slop.spirals.cv.audio
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.util.Log
@@ -12,7 +13,9 @@ import kotlin.math.max
  * The core analysis engine. Splits audio into bands and updates the CvRegistry.
  * Implements Spectral Flux (onset detection) and Automatic BPM Detection.
  */
-class AudioEngine {
+class AudioEngine(context: Context) {
+    val sourceManager = AudioSourceManager(context)
+    
     private val sampleRate = 44100
     private val channelConfig = AudioFormat.CHANNEL_IN_MONO
     private val audioFormat = AudioFormat.ENCODING_PCM_FLOAT

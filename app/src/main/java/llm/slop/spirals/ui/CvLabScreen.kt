@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import llm.slop.spirals.MandalaVisualSource
 import llm.slop.spirals.cv.*
 import llm.slop.spirals.cv.audio.AudioEngine
 import llm.slop.spirals.cv.audio.AudioSourceManager

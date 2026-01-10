@@ -1,11 +1,15 @@
 #version 300 es
 precision highp float;
 
-uniform vec4 uColor; // (Hue, Sat, Val, Alpha)
+uniform float uHueOffset;
+uniform float uHueSweep;
+uniform float uAlpha;
+
+in float vPhase;
 
 out vec4 fragColor;
 
-// Helper to convert HSV to RGB
+// Branchless HSV to RGB
 vec3 hsv2rgb(vec3 c) {
     vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
     vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
@@ -13,10 +17,11 @@ vec3 hsv2rgb(vec3 c) {
 }
 
 void main() {
-    // uColor.x = Hue (0-1), uColor.y = Sat (0-1), uColor.z = Val (fixed 1.0), uColor.w = Alpha
-    vec3 rgb = hsv2rgb(vec3(uColor.x, uColor.y, 1.0));
+    float hue = fract(uHueOffset + (vPhase * uHueSweep));
     
-    // PRE-MULTIPLIED ALPHA:
-    // This is crucial for consistent gain application across all blending modes (ADD, SCREEN, etc.)
-    fragColor = vec4(rgb * uColor.w, uColor.w);
+    // Perceptual tuning: Saturation 0.8, Value 1.0
+    vec3 rgb = hsv2rgb(vec3(hue, 0.8, 1.0));
+    
+    // Pre-multiplied alpha for blending consistency
+    fragColor = vec4(rgb * uAlpha, uAlpha);
 }

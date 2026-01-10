@@ -7,15 +7,15 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.media.AudioFormat
-import android.media.AudioRecord
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
-import androidx.compose.animation.*
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,167 +29,121 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
-import llm.slop.spirals.cv.*
-import llm.slop.spirals.cv.audio.*
-import llm.slop.spirals.ui.*
+import androidx.lifecycle.viewmodel.compose.viewModel
+import llm.slop.spirals.cv.audio.AudioEngine
+import llm.slop.spirals.cv.audio.AudioSourceType
+import llm.slop.spirals.ui.CvLabScreen
+import llm.slop.spirals.ui.InstrumentEditorScreen
+import llm.slop.spirals.ui.MixerEditorScreen
+import llm.slop.spirals.ui.MandalaSetEditorScreen
 import llm.slop.spirals.ui.components.MandalaParameterMatrix
 import llm.slop.spirals.ui.components.OscilloscopeView
+import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
-import llm.slop.spirals.ui.theme.AppAccent
-import kotlinx.coroutines.launch
+import llm.slop.spirals.ui.theme.SpiralsTheme
 import kotlinx.coroutines.delay
-
-enum class AppScreen {
-    MANDALA_EDITOR,
-    MANDALA_SET_EDITOR,
-    MIXER_EDITOR
-}
+import kotlinx.coroutines.launch
+import llm.slop.spirals.cv.CvModulator
+import llm.slop.spirals.cv.Waveform
+import llm.slop.spirals.cv.ModulationOperator
+import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
-    private var spiralSurfaceView: SpiralSurfaceView? = null
-    private val visualSource = MandalaVisualSource()
-    
-    private val audioEngine = AudioEngine()
-    private var sourceManager: AudioSourceManager? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        sourceManager = AudioSourceManager(this)
-        
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.light(AppBackground.toArgb(), AppBackground.toArgb()),
-            navigationBarStyle = SystemBarStyle.light(AppBackground.toArgb(), AppBackground.toArgb())
-        )
-        
-        setContent {
-            MaterialTheme(colorScheme = lightColorScheme(
-                background = AppBackground,
-                surface = AppBackground,
-                surfaceVariant = AppBackground
-            )) {
-                AppRoot() 
-            }
+    private lateinit var audioEngine: AudioEngine
+    private var spiralSurfaceView: SpiralSurfaceView? = null
+    private var sourceManager: MandalaVisualSource? = null
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            // Permission granted
         }
     }
 
-    @Composable
-    fun AppRoot() {
-        val vm: MandalaViewModel by viewModels()
-        var currentScreen by remember { mutableStateOf(AppScreen.MANDALA_EDITOR) }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
         
-        val scope = rememberCoroutineScope()
+        audioEngine = AudioEngine(this)
+        sourceManager = MandalaVisualSource()
         
-        var lastLoadedPatch by remember { mutableStateOf<PatchData?>(null) }
-        var manualChangeTrigger by remember { mutableIntStateOf(0) }
-        var isDirty by remember { mutableStateOf(false) }
-        
-        // UI Navigation State
-        var showCvLab by remember { mutableStateOf(false) }
+        spiralSurfaceView = SpiralSurfaceView(this)
+        val renderer = spiralSurfaceView!!.renderer
+        renderer.visualSource = sourceManager
 
-        // Audio State
-        var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
-        var currentInternalAudioRecord by remember { mutableStateOf<AudioRecord?>(null) }
-        val context = LocalContext.current
-        var hasMicPermission by remember {
-            mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
-        }
-
-        val renderer = remember { mutableStateOf<SpiralRenderer?>(null) }
-
-        // Shared preview content
-        val previewContent = @Composable { 
-            AndroidView(
-                factory = { ctx -> 
-                    SpiralSurfaceView(ctx).also { 
-                        spiralSurfaceView = it
-                        renderer.value = it.renderer
-                        it.setVisualSource(visualSource)
-                    }
-                },
-                modifier = Modifier.fillMaxSize()
-            )
-        }
-
-        // Global Lifecycle
-        LaunchedEffect(Unit) { CvRegistry.startSync(scope) }
-        
-        // Throttled Dirty Check
-        LaunchedEffect(lastLoadedPatch, manualChangeTrigger) {
-            isDirty = PatchMapper.isDirty(visualSource, lastLoadedPatch)
-        }
-
-        LaunchedEffect(audioSourceType, hasMicPermission, currentInternalAudioRecord) {
-            when (audioSourceType) {
-                AudioSourceType.MIC, AudioSourceType.UNPROCESSED -> {
-                    if (hasMicPermission) {
-                        val record = sourceManager?.buildAudioRecord(
-                            audioSourceType, 44100, AudioFormat.ENCODING_PCM_FLOAT, 
-                            AudioFormat.CHANNEL_IN_MONO, 
-                            AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT)
-                        )
-                        audioEngine.start(scope, record)
-                    } else { audioEngine.stop() }
+        setContent {
+            SpiralsTheme {
+                val vm: MandalaViewModel = viewModel()
+                val currentPatch by vm.currentPatch.collectAsState()
+                val scope = rememberCoroutineScope()
+                
+                var showCvLab by remember { mutableStateOf(false) }
+                var showSetEditor by remember { mutableStateOf(false) }
+                var showMixerEditor by remember { mutableStateOf(false) }
+                var hasMicPermission by remember { 
+                    mutableStateOf(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) 
                 }
-                AudioSourceType.INTERNAL -> {
-                    if (currentInternalAudioRecord != null) {
-                        audioEngine.start(scope, currentInternalAudioRecord)
-                    } else { audioEngine.stop() }
-                }
-            }
-        }
+                
+                var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
 
-        CompositionLocalProvider(LocalSpiralRenderer provides renderer.value) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(AppBackground)
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
-            ) {
-                 when (currentScreen) {
-                    AppScreen.MANDALA_EDITOR -> {
-                        MandalaEditorScreen(
-                            vm = vm,
-                            visualSource = visualSource,
-                            isDirty = isDirty,
-                            lastLoadedPatch = lastLoadedPatch,
-                            onPatchLoaded = { lastLoadedPatch = it },
-                            onInteraction = { manualChangeTrigger++ },
-                            onNavigateToSetEditor = { currentScreen = AppScreen.MANDALA_SET_EDITOR },
-                            onNavigateToMixerEditor = { currentScreen = AppScreen.MIXER_EDITOR },
-                            onShowCvLab = { showCvLab = true },
-                            previewContent = previewContent
+                LaunchedEffect(hasMicPermission) {
+                    if (!hasMicPermission) {
+                        requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                }
+
+                CompositionLocalProvider(LocalSpiralRenderer provides renderer) {
+                    val previewContent = @Composable {
+                        AndroidView(
+                            factory = { spiralSurfaceView!! },
+                            modifier = Modifier.fillMaxSize(),
+                            update = {}
                         )
                     }
-                    AppScreen.MANDALA_SET_EDITOR -> {
-                        MandalaSetEditorScreen(
-                            onClose = { currentScreen = AppScreen.MANDALA_EDITOR },
-                            onNavigateToMixerEditor = { currentScreen = AppScreen.MIXER_EDITOR },
-                            onShowCvLab = { showCvLab = true },
-                            previewContent = previewContent,
-                            visualSource = visualSource
-                        )
-                    }
-                    AppScreen.MIXER_EDITOR -> {
-                        MixerEditorScreen(
-                            vm = vm,
-                            onClose = { currentScreen = AppScreen.MANDALA_EDITOR },
-                            onNavigateToSetEditor = { currentScreen = AppScreen.MANDALA_SET_EDITOR },
-                            onNavigateToMandalaEditor = { currentScreen = AppScreen.MANDALA_EDITOR },
-                            onShowCvLab = { showCvLab = true },
-                            previewContent = previewContent
-                        )
+
+                    Box(modifier = Modifier.fillMaxSize().background(AppBackground)) {
+                        when {
+                            showSetEditor -> MandalaSetEditorScreen(
+                                vm = vm, 
+                                onClose = { showSetEditor = false },
+                                onNavigateToMixerEditor = { showMixerEditor = true; showSetEditor = false },
+                                onShowCvLab = { showCvLab = true; showSetEditor = false },
+                                previewContent = previewContent,
+                                visualSource = sourceManager!!
+                            )
+                            showMixerEditor -> MixerEditorScreen(
+                                vm = vm, 
+                                onClose = { showMixerEditor = false },
+                                onNavigateToSetEditor = { showSetEditor = true; showMixerEditor = false },
+                                onNavigateToMandalaEditor = { showMixerEditor = false },
+                                onShowCvLab = { showCvLab = true; showMixerEditor = false },
+                                previewContent = previewContent
+                            )
+                            else -> MandalaEditorScreen(
+                                vm = vm,
+                                visualSource = sourceManager!!,
+                                isDirty = PatchMapper.isDirty(sourceManager!!, currentPatch),
+                                lastLoadedPatch = currentPatch,
+                                onPatchLoaded = { vm.setCurrentPatch(it) },
+                                onInteraction = { /* Generic interaction trigger */ },
+                                onNavigateToSetEditor = { showSetEditor = true },
+                                onNavigateToMixerEditor = { showMixerEditor = true },
+                                onShowCvLab = { showCvLab = true },
+                                previewContent = previewContent
+                            )
+                        }
                     }
                 }
 
                 // Overlays
-                androidx.compose.animation.AnimatedVisibility(
+                AnimatedVisibility(
                     visible = showCvLab,
                     enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                     exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
@@ -197,12 +151,14 @@ class MainActivity : ComponentActivity() {
                 ) {
                     CvLabScreen(
                         audioEngine = audioEngine,
-                        sourceManager = sourceManager!!,
+                        sourceManager = audioEngine.sourceManager,
                         audioSourceType = audioSourceType,
                         onAudioSourceTypeChange = { audioSourceType = it },
                         hasMicPermission = hasMicPermission,
                         onMicPermissionGranted = { hasMicPermission = true },
-                        onInternalAudioRecordCreated = { currentInternalAudioRecord = it },
+                        onInternalAudioRecordCreated = { record ->
+                            audioEngine.start(scope, record)
+                        },
                         onClose = { showCvLab = false }
                     )
                 }
@@ -232,7 +188,6 @@ class MainActivity : ComponentActivity() {
         var showRenameDialog by remember { mutableStateOf(false) }
         var patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
 
-        // Optimized Lifecycle: Ensure renderer is pointing to our visualSource when this screen is active
         val renderer = LocalSpiralRenderer.current
         DisposableEffect(renderer) {
             renderer?.visualSource = visualSource
@@ -242,7 +197,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Optimized Dirty Check Logic
         val isModified = remember(isDirty, patchName, lastLoadedPatch) {
             isDirty || patchName != (lastLoadedPatch?.name ?: "New Patch")
         }
@@ -251,7 +205,6 @@ class MainActivity : ComponentActivity() {
         }
 
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header Row
             VisualSourceHeader(
                 title = headerTitle,
                 onMenuClick = { showMenu = true },
@@ -260,7 +213,7 @@ class MainActivity : ComponentActivity() {
                         DropdownMenuItem(text = { Text("New", color = AppText) }, onClick = { 
                             val defaultRecipe = MandalaLibrary.MandalaRatios.first()
                             visualSource.recipe = defaultRecipe
-                            onPatchLoaded(PatchData("New Patch", defaultRecipe.id, emptyList<ParameterData>()))
+                            onPatchLoaded(PatchData("New Patch", defaultRecipe.id, emptyList()))
                             showMenu = false 
                         })
                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
@@ -300,22 +253,18 @@ class MainActivity : ComponentActivity() {
                         }, leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = AppText) })
                         DropdownMenuItem(text = { Text("Delete", color = Color.Red) }, onClick = { 
                             lastLoadedPatch?.let { vm.deletePatch(it.name) }
-                            onPatchLoaded(PatchData("New Patch", MandalaLibrary.MandalaRatios.first().id, emptyList<ParameterData>()))
+                            onPatchLoaded(PatchData("New Patch", MandalaLibrary.MandalaRatios.first().id, emptyList()))
                             showMenu = false 
                         }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) })
                     }
                 }
             )
 
-            // Main content area
             Column(modifier = Modifier.weight(1f).fillMaxSize()) {
-                // Monitor Area
                 Column(modifier = Modifier.wrapContentHeight().fillMaxWidth().padding(horizontal = 8.dp)) {
-                    // Mandala Preview
                     Box(modifier = Modifier.fillMaxWidth().aspectRatio(16 / 9f).background(Color.Black).border(1.dp, AppText.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
                         previewContent()
                         
-                        // Recipe Overlay
                         Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
                             Surface(color = AppBackground.copy(alpha = 0.7f), shape = MaterialTheme.shapes.extraSmall, modifier = Modifier.clickable { recipeExpanded = true }) {
                                 Text(text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)", style = MaterialTheme.typography.labelSmall, color = AppAccent, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp) )
@@ -334,7 +283,6 @@ class MainActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Monitor Row
                     var monitorTick by remember { mutableIntStateOf(0) }
                     LaunchedEffect(Unit) {
                         while (true) {
@@ -358,26 +306,31 @@ class MainActivity : ComponentActivity() {
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Parameter Matrix
                     MandalaParameterMatrix(labels = visualSource.parameters.keys.toList(), parameters = visualSource.parameters.values.toList(), focusedParameterId = focusedParameterId, onFocusRequest = { focusedParameterId = it }, onInteractionFinished = onInteraction)
                 }
 
-                // Instrument Editor Area (Filling remaining space)
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     InstrumentEditorScreen(source = visualSource, vm = vm, focusedId = focusedParameterId, onFocusChange = { focusedParameterId = it }, onInteractionFinished = onInteraction)
                 }
             }
         }
 
-        // Dialogs
         if (showRenameDialog) {
-            RenamePatchDialog(initialName = patchName, onRename = { patchName = it }, onDismiss = { showRenameDialog = false })
+            RenamePatchDialog(patchName, onRename = { newName ->
+                patchName = newName
+                lastLoadedPatch?.let { 
+                    val updated = it.copy(name = newName)
+                    vm.savePatch(updated)
+                    vm.setCurrentPatch(updated)
+                }
+                showRenameDialog = false
+            }, onDismiss = { showRenameDialog = false })
         }
 
         if (showOpenDialog) {
             OpenPatchDialog(vm, onPatchSelected = { 
                 PatchMapper.applyToVisualSource(it, visualSource)
-                onPatchLoaded(it)
+                vm.setCurrentPatch(it)
                 showOpenDialog = false 
             }, onDismiss = { showOpenDialog = false })
         }
@@ -413,6 +366,67 @@ fun VisualSourceHeader(
                 Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
             }
             menuContent()
+        }
+    }
+}
+
+@Composable
+fun RenamePatchDialog(initialName: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf(initialName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename Patch", color = AppText) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                singleLine = true,
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = AppAccent,
+                    unfocusedTextColor = AppText,
+                    focusedTextColor = AppText,
+                    cursorColor = AppAccent
+                )
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { 
+                onRename(name)
+            }) {
+                Text("RENAME", color = AppAccent)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                onDismiss()
+            }) {
+                Text("CANCEL", color = AppText)
+            }
+        },
+        containerColor = AppBackground
+    )
+}
+
+@Composable
+fun OpenPatchDialog(vm: MandalaViewModel, onPatchSelected: (PatchData) -> Unit, onDismiss: () -> Unit) {
+    val allPatches by vm.allPatches.collectAsState(initial = emptyList())
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = MaterialTheme.shapes.medium, color = AppBackground) {
+            Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
+                Text("Saved Patches", style = MaterialTheme.typography.titleLarge, color = AppText)
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    allPatches.forEach { entity ->
+                        Row(modifier = Modifier.fillMaxWidth().clickable { 
+                            val data = PatchMapper.fromJson(entity.jsonSettings)
+                            if (data != null) onPatchSelected(data)
+                        }.padding(12.dp)) {
+                            Text(entity.name, style = MaterialTheme.typography.bodyLarge, color = AppText)
+                        }
+                    }
+                }
+                if (allPatches.isEmpty()) Text("No patches saved yet.", color = AppText.copy(alpha = 0.5f))
+            }
         }
     }
 }

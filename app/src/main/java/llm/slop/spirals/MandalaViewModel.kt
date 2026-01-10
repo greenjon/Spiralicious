@@ -3,8 +3,10 @@ package llm.slop.spirals
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -18,6 +20,13 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     private val patchDao = db.mandalaPatchDao()
     private val setDao = db.mandalaSetDao()
     private val mixerDao = db.mixerPatchDao()
+
+    private val _currentPatch = MutableStateFlow<PatchData?>(null)
+    val currentPatch: StateFlow<PatchData?> = _currentPatch.asStateFlow()
+
+    fun setCurrentPatch(patch: PatchData?) {
+        _currentPatch.value = patch
+    }
 
     val tags: StateFlow<Map<String, List<String>>> = tagDao.getAllTags()
         .map { list -> list.groupBy({ it.id }, { it.tag }) }

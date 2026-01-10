@@ -1,54 +1,35 @@
 #version 300 es
 
-layout(location = 0) in float u;
-layout(location = 1) in float side; // -1.0 or 1.0
+layout(location = 0) in vec3 aPosPhase; // [X, Y, Phase]
 
-uniform vec4 uOmega; 
-uniform vec4 uL;     
-uniform vec4 uPhi;   
-uniform float uT;
 uniform float uGlobalRotation;
 uniform float uAspectRatio;
-uniform float uThickness;
 uniform float uGlobalScale;
-uniform float uFillMode; // 0.0 = Mandala, 1.0 = Fullscreen Fill
+uniform float uFillMode;
 
-vec2 getPos(float uVal) {
-    float t = uVal * uT;
-    float x = uL.x * cos(uOmega.x * t + uPhi.x) +
-              uL.y * cos(uOmega.y * t + uPhi.y) +
-              uL.z * cos(uOmega.z * t + uPhi.z) +
-              uL.w * cos(uOmega.w * t + uPhi.w); 
-
-    float y = uL.x * sin(uOmega.x * t + uPhi.x) +
-              uL.y * sin(uOmega.y * t + uPhi.y) +
-              uL.z * sin(uOmega.z * t + uPhi.z) +
-              uL.w * sin(uOmega.w * t + uPhi.w); 
-    return vec2(x * uGlobalScale, y * uGlobalScale);
-}
+out float vPhase;
 
 void main() {
     if (uFillMode > 0.5) {
-        // Simple quad fill using the existing attributes
-        gl_Position = vec4(u * 2.0 - 1.0, side, 0.0, 1.0);
+        vPhase = 0.0;
+        // Fullscreen quad using gl_VertexID (0 to 3)
+        // 0: (-1,-1), 1: (1,-1), 2: (-1,1), 3: (1,1)
+        float x = float((gl_VertexID % 2) * 2 - 1);
+        float y = float((gl_VertexID / 2) * 2 - 1);
+        gl_Position = vec4(x, y, 0.0, 1.0);
         return;
     }
 
-    vec2 pos = getPos(u);
+    vPhase = aPosPhase.z;
+
+    // Geometry is pre-calculated on CPU in normalized -1..1 range
+    vec2 pos = aPosPhase.xy * uGlobalScale;
     
-    float eps = 0.0001;
-    vec2 posNext = getPos(u + eps);
-    vec2 tangent = normalize(posNext - pos);
-    vec2 normal = vec2(-tangent.y, tangent.x);
-
-    // Thickness also scaled by global scale to maintain proportion
-    vec2 finalPos = pos + normal * uThickness * side * uGlobalScale;
-
     float cosR = cos(uGlobalRotation);
     float sinR = sin(uGlobalRotation);
     
-    float rotX = finalPos.x * cosR - finalPos.y * sinR;
-    float rotY = finalPos.x * sinR + finalPos.y * cosR;
+    float rotX = pos.x * cosR - pos.y * sinR;
+    float rotY = pos.x * sinR + pos.y * cosR;
 
     if (uAspectRatio > 1.0) {
         rotX /= uAspectRatio;
@@ -56,6 +37,5 @@ void main() {
         rotY *= uAspectRatio;
     }
 
-    // Centered at (0,0) for the new 16:9 preview window
     gl_Position = vec4(rotX, rotY, 0.0, 1.0);
 }

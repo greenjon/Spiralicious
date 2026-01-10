@@ -197,14 +197,16 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 val modeFIdx = ((mixerParams["MF_MODE"]?.evaluate() ?: 0f) * (MixerMode.values().size - 1)).roundToInt()
                 val modeF = MixerMode.values()[modeFIdx.coerceIn(0, MixerMode.values().size - 1)]
 
-                // Group A contribution
+                // Group A contribution: full volume at bal=0, full volume at bal=0.5, zero at bal=1
+                val balA = ((1.0f - balF) * 2.0f).coerceIn(0f, 1f)
                 renderHierarchicalGroup("A", slotSources[0], slotSources[1], patch.slots[0], patch.slots[1], 
-                    groupGainScale = gainF * (1.0f - balF) * 2.0f)
+                    groupGainScale = gainF * balA)
                 
-                // Group B contribution
+                // Group B contribution: zero at bal=0, full volume at bal=0.5, full volume at bal=1
                 setBlendMode(modeF)
+                val balB = (balF * 2.0f).coerceIn(0f, 1f)
                 renderHierarchicalGroup("B", slotSources[2], slotSources[3], patch.slots[2], patch.slots[3], 
-                    groupGainScale = gainF * balF * 2.0f)
+                    groupGainScale = gainF * balB)
                 
                 GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
                 GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)
@@ -239,16 +241,16 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         val mode = MixerMode.values()[modeIdx.coerceIn(0, MixerMode.values().size - 1)]
 
         if (slot1.enabled && slot1.isPopulated()) {
-            val bal1 = (1.0f - bal) * 2.0f
+            val bal1 = ((1.0f - bal) * 2.0f).coerceIn(0f, 1f)
             val idx = if (prefix == "A") 0 else 2
-            renderSlot(idx, slot1, gain = bal1.coerceIn(0f, 1f) * groupGainScale)
+            renderSlot(idx, slot1, gain = bal1 * groupGainScale)
         }
         
         if (slot2.enabled && slot2.isPopulated()) {
             setBlendMode(mode)
-            val bal2 = bal * 2.0f
+            val bal2 = (bal * 2.0f).coerceIn(0f, 1f)
             val idx = if (prefix == "A") 1 else 3
-            renderSlot(idx, slot2, gain = bal2.coerceIn(0f, 1f) * groupGainScale)
+            renderSlot(idx, slot2, gain = bal2 * groupGainScale)
             
             GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
             GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)

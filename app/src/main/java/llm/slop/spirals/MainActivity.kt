@@ -1,11 +1,15 @@
 package llm.slop.spirals
 
 import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.media.AudioFormat
 import android.media.AudioRecord
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -29,7 +33,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import llm.slop.spirals.cv.*
 import llm.slop.spirals.cv.audio.*
@@ -40,6 +43,7 @@ import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.ui.theme.AppAccent
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 
 enum class AppScreen {
     MANDALA_EDITOR,
@@ -228,34 +232,30 @@ class MainActivity : ComponentActivity() {
         var showRenameDialog by remember { mutableStateOf(false) }
         var patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
 
-        // Ensure renderer is pointing to our visualSource when this screen is active
+        // Optimized Lifecycle: Ensure renderer is pointing to our visualSource when this screen is active
         val renderer = LocalSpiralRenderer.current
-        LaunchedEffect(renderer) {
+        DisposableEffect(renderer) {
             renderer?.visualSource = visualSource
             renderer?.mixerPatch = null
+            onDispose {
+                renderer?.visualSource = null
+            }
+        }
+
+        // Optimized Dirty Check Logic
+        val isModified = remember(isDirty, patchName, lastLoadedPatch) {
+            isDirty || patchName != (lastLoadedPatch?.name ?: "New Patch")
+        }
+        val headerTitle = remember(patchName, isModified) {
+            "$patchName${if (isModified) " *" else ""}"
         }
 
         Column(modifier = Modifier.fillMaxSize()) {
             // Header Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "$patchName${if (isDirty || patchName != (lastLoadedPatch?.name ?: "New Patch")) " *" else ""}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = AppText,
-                    modifier = Modifier.padding(4.dp)
-                )
-                
-                Spacer(modifier = Modifier.weight(1f))
-                
-                Box {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
-                    }
+            VisualSourceHeader(
+                title = headerTitle,
+                onMenuClick = { showMenu = true },
+                menuContent = {
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }, containerColor = AppBackground) {
                         DropdownMenuItem(text = { Text("New", color = AppText) }, onClick = { 
                             val defaultRecipe = MandalaLibrary.MandalaRatios.first()
@@ -286,6 +286,13 @@ class MainActivity : ComponentActivity() {
                             }
                             showMenu = false 
                         })
+                        DropdownMenuItem(text = { Text("Copy to Clipboard", color = AppText) }, onClick = { 
+                            val data = PatchMapper.fromVisualSource(patchName, visualSource)
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Mandala Patch", PatchMapper.toJson(data)))
+                            Toast.makeText(context, "Patch copied to clipboard", Toast.LENGTH_SHORT).show()
+                            showMenu = false 
+                        }, leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = AppText) })
                         DropdownMenuItem(text = { Text("Share", color = AppText) }, onClick = { 
                             val data = PatchMapper.fromVisualSource(patchName, visualSource)
                             context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) }, "Share Patch"))
@@ -298,7 +305,7 @@ class MainActivity : ComponentActivity() {
                         }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) })
                     }
                 }
-            }
+            )
 
             // Main content area
             Column(modifier = Modifier.weight(1f).fillMaxSize()) {
@@ -328,9 +335,22 @@ class MainActivity : ComponentActivity() {
                     Spacer(modifier = Modifier.height(4.dp))
 
                     // Monitor Row
-                    val focusedParam = visualSource.parameters[focusedParameterId] ?: visualSource.globalAlpha
+                    var monitorTick by remember { mutableIntStateOf(0) }
+                    LaunchedEffect(Unit) {
+                        while (true) {
+                            monitorTick++
+                            delay(16)
+                        }
+                    }
+
+                    val focusedParam = remember(focusedParameterId, visualSource) {
+                        visualSource.parameters[focusedParameterId] ?: visualSource.globalAlpha
+                    }
+                    
                     Box(modifier = Modifier.fillMaxWidth().height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
-                        OscilloscopeView(history = focusedParam.history, modifier = Modifier.fillMaxSize())
+                        key(monitorTick) {
+                            OscilloscopeView(history = focusedParam.history, modifier = Modifier.fillMaxSize())
+                        }
                         Surface(color = AppBackground.copy(alpha = 0.8f), modifier = Modifier.align(Alignment.TopStart).padding(4.dp), shape = MaterialTheme.shapes.extraSmall) {
                             Text(text = focusedParameterId, style = MaterialTheme.typography.labelSmall, color = AppAccent, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
                         }
@@ -363,42 +383,36 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @Composable
-    fun OpenPatchDialog(vm: MandalaViewModel, onPatchSelected: (PatchData) -> Unit, onDismiss: () -> Unit) {
-        val patches by vm.allPatches.collectAsState(initial = emptyList())
-        Dialog(onDismissRequest = onDismiss) {
-            Surface(shape = MaterialTheme.shapes.medium, color = AppBackground) {
-                Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
-                    Text("Saved Patches", style = MaterialTheme.typography.titleLarge, color = AppText)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                        patches.forEach { entity ->
-                            Row(modifier = Modifier.fillMaxWidth().clickable { 
-                                val patchData = PatchMapper.fromJson(entity.jsonSettings)
-                                if (patchData != null) onPatchSelected(patchData) 
-                            }.padding(12.dp)) {
-                                Text(entity.name, style = MaterialTheme.typography.bodyLarge, color = AppText)
-                            }
-                        }
-                    }
-                    if (patches.isEmpty()) Text("No patches saved yet.", color = AppText.copy(alpha = 0.5f))
-                }
-            }
-        }
-    }
-
-    @Composable
-    fun RenamePatchDialog(initialName: String, onRename: (String) -> Unit, onDismiss: () -> Unit) {
-        var name by remember { mutableStateOf(initialName) }
-        AlertDialog(onDismissRequest = onDismiss, title = { Text("Rename Patch", color = AppText) }, text = {
-            OutlinedTextField(value = name, onValueChange = { name = it }, singleLine = true, colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = AppAccent, unfocusedTextColor = AppText, focusedTextColor = AppText, cursorColor = AppAccent))
-        }, confirmButton = {
-            TextButton(onClick = { onRename(name); onDismiss() }) { Text("RENAME", color = AppAccent) }
-        }, dismissButton = {
-            TextButton(onClick = onDismiss) { Text("CANCEL", color = AppText) }
-        }, containerColor = AppBackground)
-    }
-
     override fun onPause() { super.onPause(); spiralSurfaceView?.onPause(); audioEngine.stop() }
     override fun onResume() { super.onResume(); spiralSurfaceView?.onResume() }
+}
+
+@Composable
+fun VisualSourceHeader(
+    title: String,
+    onMenuClick: () -> Unit,
+    menuContent: @Composable BoxScope.() -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = AppText,
+            modifier = Modifier.padding(4.dp)
+        )
+        
+        Spacer(modifier = Modifier.weight(1f))
+        
+        Box {
+            IconButton(onClick = onMenuClick) {
+                Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
+            }
+            menuContent()
+        }
+    }
 }

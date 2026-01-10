@@ -11,6 +11,7 @@ uniform float uGlobalRotation;
 uniform float uAspectRatio;
 uniform float uThickness;
 uniform float uGlobalScale;
+uniform float uFillMode; // 0.0 = Mandala, 1.0 = Fullscreen Fill
 
 vec2 getPos(float uVal) {
     float t = uVal * uT;
@@ -27,6 +28,12 @@ vec2 getPos(float uVal) {
 }
 
 void main() {
+    if (uFillMode > 0.5) {
+        // Simple quad fill using the existing attributes
+        gl_Position = vec4(u * 2.0 - 1.0, side, 0.0, 1.0);
+        return;
+    }
+
     vec2 pos = getPos(u);
     
     float eps = 0.0001;

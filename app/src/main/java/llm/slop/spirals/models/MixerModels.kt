@@ -12,6 +12,10 @@ enum class MixerMode {
     ADD, SCREEN, MULT, MAX, XFADE
 }
 
+enum class VideoSourceType {
+    MANDALA, MANDALA_SET, COLOR
+}
+
 @Serializable
 data class ModulatableParameterData(
     val baseValue: Float = 0.0f,
@@ -32,9 +36,16 @@ data class MixerSlotData(
     val enabled: Boolean = false,
     val advanceMode: AdvanceMode = AdvanceMode.MANUAL,
     val advanceParams: Map<String, Float> = emptyMap(),
-    val sourceIsSet: Boolean = true
+    val sourceIsSet: Boolean = true, // Legacy support, prefer sourceType
+    val sourceType: VideoSourceType = if (sourceIsSet) VideoSourceType.MANDALA_SET else VideoSourceType.MANDALA,
+    val hue: ModulatableParameterData = ModulatableParameterData(0.0f),
+    val saturation: ModulatableParameterData = ModulatableParameterData(0.0f)
 ) {
-    fun isPopulated(): Boolean = if (sourceIsSet) mandalaSetId != null else selectedMandalaId != null
+    fun isPopulated(): Boolean = when(sourceType) {
+        VideoSourceType.MANDALA_SET -> mandalaSetId != null
+        VideoSourceType.MANDALA -> selectedMandalaId != null
+        VideoSourceType.COLOR -> true
+    }
 }
 
 @Serializable

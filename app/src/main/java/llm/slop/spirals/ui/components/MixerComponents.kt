@@ -47,6 +47,8 @@ fun SourceStrip(
     val slot = patch.slots[index]
     val slotId = "S${index + 1}"
     val prevNextId = "PN${index + 1}"
+    val hueId = "H${index + 1}"
+    val satId = "S${index + 1}"
 
     Column(
         modifier = modifier.padding(1.dp).wrapContentHeight().border(1.dp, AppText.copy(alpha = 0.1f)).padding(2.dp),
@@ -106,85 +108,138 @@ fun SourceStrip(
         
         Spacer(modifier = Modifier.height(4.dp))
         
-        Text(
-            text = if (slot.sourceIsSet) "Mandala Set" else "Mandala",
-            style = MaterialTheme.typography.labelSmall,
-            color = if (focusedId == slotId) AppAccent else AppText.copy(alpha = 0.7f),
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.clickable {
-                onFocusChange(slotId)
-                val newSlots = patch.slots.toMutableList()
-                newSlots[index] = slot.copy(sourceIsSet = !slot.sourceIsSet)
-                onPatchChange(patch.copy(slots = newSlots))
-            }.padding(2.dp)
-        )
-        
-        val displayName = if (slot.sourceIsSet) {
-            allSets.find { it.id == slot.mandalaSetId }?.name ?: "Pick Set"
-        } else {
-            slot.selectedMandalaId ?: "Pick Man"
+        var typeExpanded by remember { mutableStateOf(false) }
+        Box(modifier = Modifier.clickable { onFocusChange(slotId); typeExpanded = true }) {
+            Text(
+                text = when(slot.sourceType) {
+                    VideoSourceType.MANDALA -> "Mandala"
+                    VideoSourceType.MANDALA_SET -> "Mandala Set"
+                    VideoSourceType.COLOR -> "Color"
+                },
+                style = MaterialTheme.typography.labelSmall,
+                color = if (focusedId == slotId) AppAccent else AppText.copy(alpha = 0.7f),
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(2.dp)
+            )
+            DropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }, containerColor = AppBackground) {
+                VideoSourceType.values().forEach { type ->
+                    DropdownMenuItem(text = { Text(type.name.replace("_", " "), fontSize = 11.sp) }, onClick = {
+                        val newSlots = patch.slots.toMutableList()
+                        newSlots[index] = slot.copy(sourceType = type)
+                        onPatchChange(patch.copy(slots = newSlots))
+                        typeExpanded = false
+                    })
+                }
+            }
         }
         
-        Button(
-            onClick = { if (slot.sourceIsSet) onPickSet() else onPickMandala() },
-            modifier = Modifier.fillMaxWidth().height(28.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = AppText.copy(alpha = 0.1f)),
-            shape = MaterialTheme.shapes.extraSmall
-        ) {
-            Text(displayName, style = MaterialTheme.typography.labelSmall, color = AppText, maxLines = 1, textAlign = TextAlign.Center, fontSize = 8.sp)
-        }
-        
-        Spacer(modifier = Modifier.height(4.dp))
+        when(slot.sourceType) {
+            VideoSourceType.MANDALA, VideoSourceType.MANDALA_SET -> {
+                val displayName = if (slot.sourceType == VideoSourceType.MANDALA_SET) {
+                    allSets.find { it.id == slot.mandalaSetId }?.name ?: "Pick Set"
+                } else {
+                    slot.selectedMandalaId ?: "Pick Man"
+                }
+                
+                Button(
+                    onClick = { if (slot.sourceType == VideoSourceType.MANDALA_SET) onPickSet() else onPickMandala() },
+                    modifier = Modifier.fillMaxWidth().height(28.dp),
+                    contentPadding = PaddingValues(horizontal = 2.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AppText.copy(alpha = 0.1f)),
+                    shape = MaterialTheme.shapes.extraSmall
+                ) {
+                    Text(displayName, style = MaterialTheme.typography.labelSmall, color = AppText, maxLines = 1, textAlign = TextAlign.Center, fontSize = 8.sp)
+                }
+                
+                Spacer(modifier = Modifier.height(4.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth().clickable { onFocusChange(prevNextId) },
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val arrowColor = if (focusedId == prevNextId) AppAccent else AppText
-            IconButton(
-                onClick = {
-                    onFocusChange(prevNextId)
-                    if (slot.sourceIsSet) {
-                        val set = allSets.find { it.id == slot.mandalaSetId }
-                        set?.let {
-                            val ids = Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds)
-                            if (ids.isNotEmpty()) {
-                                val nextIdx = if (slot.currentIndex.baseValue <= 0) ids.size - 1 else slot.currentIndex.baseValue.toInt() - 1
-                                val newSlots = patch.slots.toMutableList()
-                                newSlots[index] = slot.copy(currentIndex = slot.currentIndex.copy(baseValue = nextIdx.toFloat()))
-                                onPatchChange(patch.copy(slots = newSlots))
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { onFocusChange(prevNextId) },
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val arrowColor = if (focusedId == prevNextId) AppAccent else AppText
+                    IconButton(
+                        onClick = {
+                            onFocusChange(prevNextId)
+                            if (slot.sourceType == VideoSourceType.MANDALA_SET) {
+                                val set = allSets.find { it.id == slot.mandalaSetId }
+                                set?.let {
+                                    val ids = Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds)
+                                    if (ids.isNotEmpty()) {
+                                        val nextIdx = if (slot.currentIndex.baseValue <= 0) ids.size - 1 else slot.currentIndex.baseValue.toInt() - 1
+                                        val newSlots = patch.slots.toMutableList()
+                                        newSlots[index] = slot.copy(currentIndex = slot.currentIndex.copy(baseValue = nextIdx.toFloat()))
+                                        onPatchChange(patch.copy(slots = newSlots))
+                                    }
+                                }
                             }
-                        }
-                    }
-                },
-                modifier = Modifier.size(36.dp),
-                enabled = slot.sourceIsSet
-            ) { Icon(Icons.Default.KeyboardArrowLeft, null, tint = if (slot.sourceIsSet) arrowColor else arrowColor.copy(alpha = 0.2f), modifier = Modifier.size(32.dp)) }
-            
-            Spacer(modifier = Modifier.width(8.dp))
+                        },
+                        modifier = Modifier.size(36.dp),
+                        enabled = slot.sourceType == VideoSourceType.MANDALA_SET
+                    ) { Icon(Icons.Default.KeyboardArrowLeft, null, tint = if (slot.sourceType == VideoSourceType.MANDALA_SET) arrowColor else arrowColor.copy(alpha = 0.2f), modifier = Modifier.size(32.dp)) }
+                    
+                    Spacer(modifier = Modifier.width(8.dp))
 
-            IconButton(
-                onClick = {
-                    onFocusChange(prevNextId)
-                    if (slot.sourceIsSet) {
-                        val set = allSets.find { it.id == slot.mandalaSetId }
-                        set?.let {
-                            val ids = Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds)
-                            if (ids.isNotEmpty()) {
-                                val nextIdx = (slot.currentIndex.baseValue.toInt() + 1) % ids.size
-                                val newSlots = patch.slots.toMutableList()
-                                newSlots[index] = slot.copy(currentIndex = slot.currentIndex.copy(baseValue = nextIdx.toFloat()))
-                                onPatchChange(patch.copy(slots = newSlots))
+                    IconButton(
+                        onClick = {
+                            onFocusChange(prevNextId)
+                            if (slot.sourceType == VideoSourceType.MANDALA_SET) {
+                                val set = allSets.find { it.id == slot.mandalaSetId }
+                                set?.let {
+                                    val ids = Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds)
+                                    if (ids.isNotEmpty()) {
+                                        val nextIdx = (slot.currentIndex.baseValue.toInt() + 1) % ids.size
+                                        val newSlots = patch.slots.toMutableList()
+                                        newSlots[index] = slot.copy(currentIndex = slot.currentIndex.copy(baseValue = nextIdx.toFloat()))
+                                        onPatchChange(patch.copy(slots = newSlots))
+                                    }
+                                }
                             }
-                        }
+                        },
+                        modifier = Modifier.size(36.dp),
+                        enabled = slot.sourceType == VideoSourceType.MANDALA_SET
+                    ) { Icon(Icons.Default.KeyboardArrowRight, null, tint = if (slot.sourceType == VideoSourceType.MANDALA_SET) arrowColor else arrowColor.copy(alpha = 0.2f), modifier = Modifier.size(32.dp)) }
+                }
+            }
+            VideoSourceType.COLOR -> {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onFocusChange(hueId) }) {
+                        Text("HUE", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = if (focusedId == hueId) AppAccent else AppText)
+                        KnobView(
+                            currentValue = slot.hue.baseValue,
+                            onValueChange = { newValue ->
+                                onFocusChange(hueId)
+                                val newSlots = patch.slots.toMutableList()
+                                newSlots[index] = slot.copy(hue = slot.hue.copy(baseValue = newValue))
+                                onPatchChange(patch.copy(slots = newSlots))
+                            },
+                            onInteractionFinished = {},
+                            knobSize = 36.dp,
+                            showValue = true,
+                            focused = focusedId == hueId
+                        )
                     }
-                },
-                modifier = Modifier.size(36.dp),
-                enabled = slot.sourceIsSet
-            ) { Icon(Icons.Default.KeyboardArrowRight, null, tint = if (slot.sourceIsSet) arrowColor else arrowColor.copy(alpha = 0.2f), modifier = Modifier.size(32.dp)) }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onFocusChange(satId) }) {
+                        Text("SAT", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = if (focusedId == satId) AppAccent else AppText)
+                        KnobView(
+                            currentValue = slot.saturation.baseValue,
+                            onValueChange = { newValue ->
+                                onFocusChange(satId)
+                                val newSlots = patch.slots.toMutableList()
+                                newSlots[index] = slot.copy(saturation = slot.saturation.copy(baseValue = newValue))
+                                onPatchChange(patch.copy(slots = newSlots))
+                            },
+                            onInteractionFinished = {},
+                            knobSize = 36.dp,
+                            showValue = true,
+                            focused = focusedId == satId
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
         }
     }
 }
@@ -327,6 +382,14 @@ fun MixerCvEditor(
                 val idx = (focusedId.last().digitToIntOrNull() ?: 1) - 1
                 if (idx in 0..3) patch.slots[idx].currentIndex else null
             }
+            focusedId.startsWith("H") -> {
+                val idx = (focusedId.last().digitToIntOrNull() ?: 1) - 1
+                if (idx in 0..3) patch.slots[idx].hue else null
+            }
+            focusedId.startsWith("S") && !focusedId.startsWith("S_") && focusedId.length <= 2 -> {
+                val idx = (focusedId.last().digitToIntOrNull() ?: 1) - 1
+                if (idx in 0..3) patch.slots[idx].saturation else null
+            }
             focusedId.startsWith("MA_") -> {
                 when(focusedId.removePrefix("MA_")) {
                     "MODE" -> patch.mixerA.mode
@@ -412,6 +475,18 @@ private fun syncMixerParam(patch: MixerPatch, id: String, param: ModulatablePara
             val idx = (id.last().digitToIntOrNull() ?: 1) - 1
             val newSlots = patch.slots.toMutableList()
             newSlots[idx] = newSlots[idx].copy(currentIndex = data)
+            patch.copy(slots = newSlots)
+        }
+        id.startsWith("H") -> {
+            val idx = (id.last().digitToIntOrNull() ?: 1) - 1
+            val newSlots = patch.slots.toMutableList()
+            newSlots[idx] = newSlots[idx].copy(hue = data)
+            patch.copy(slots = newSlots)
+        }
+        id.startsWith("S") && !id.startsWith("S_") && id.length <= 2 -> {
+            val idx = (id.last().digitToIntOrNull() ?: 1) - 1
+            val newSlots = patch.slots.toMutableList()
+            newSlots[idx] = newSlots[idx].copy(saturation = data)
             patch.copy(slots = newSlots)
         }
         id.startsWith("MA_") -> {

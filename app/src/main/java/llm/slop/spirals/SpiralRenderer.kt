@@ -46,6 +46,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     init {
         for (i in 1..4) {
             mixerParams["PN$i"] = ModulatableParameter(0.0f)
+            mixerParams["H$i"] = ModulatableParameter(0.0f)
+            mixerParams["S$i"] = ModulatableParameter(0.0f)
         }
         listOf("A", "B", "F").forEach { g ->
             mixerParams["M${g}_MODE"] = ModulatableParameter(0.0f)
@@ -67,6 +69,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private fun syncMixerParameters(patch: MixerPatch) {
         for (i in 0..3) {
             syncParam(mixerParams["PN${i+1}"]!!, patch.slots[i].currentIndex)
+            syncParam(mixerParams["H${i+1}"]!!, patch.slots[i].hue)
+            syncParam(mixerParams["S${i+1}"]!!, patch.slots[i].saturation)
         }
         syncGroup(patch.mixerA, "A")
         syncGroup(patch.mixerB, "B")
@@ -102,6 +106,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var uThicknessLocation: Int = -1
     private var uGlobalScaleLocation: Int = -1
     private var uColorLocation: Int = -1
+    private var uFillModeLocation: Int = -1
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f)
@@ -120,6 +125,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         uThicknessLocation = GLES30.glGetUniformLocation(program, "uThickness")
         uGlobalScaleLocation = GLES30.glGetUniformLocation(program, "uGlobalScale")
         uColorLocation = GLES30.glGetUniformLocation(program, "uColor")
+        uFillModeLocation = GLES30.glGetUniformLocation(program, "uFillMode")
 
         val totalVertices = resolution * 2
         val vertexData = FloatArray(totalVertices * 2)
@@ -176,7 +182,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             "1", "2", "3", "4" -> {
                 val idx = monitor.toInt() - 1
                 if (patch.slots[idx].enabled && patch.slots[idx].isPopulated()) {
-                    renderSource(slotSources[idx])
+                    renderSlot(idx, patch.slots[idx])
                 }
             }
             "A" -> {
@@ -207,6 +213,19 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         }
     }
 
+    private fun renderSlot(index: Int, slot: MixerSlotData, gain: Float = 1.0f) {
+        when(slot.sourceType) {
+            VideoSourceType.MANDALA, VideoSourceType.MANDALA_SET -> {
+                renderSource(slotSources[index], gain = gain)
+            }
+            VideoSourceType.COLOR -> {
+                val h = mixerParams["H${index+1}"]?.evaluate() ?: 0f
+                val s = mixerParams["S${index+1}"]?.evaluate() ?: 0f
+                renderColor(h, s, gain)
+            }
+        }
+    }
+
     private fun renderHierarchicalGroup(
         prefix: String,
         src1: MandalaVisualSource,
@@ -221,13 +240,15 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
         if (slot1.enabled && slot1.isPopulated()) {
             val bal1 = (1.0f - bal) * 2.0f
-            renderSource(src1, gain = bal1.coerceIn(0f, 1f) * groupGainScale)
+            val idx = if (prefix == "A") 0 else 2
+            renderSlot(idx, slot1, gain = bal1.coerceIn(0f, 1f) * groupGainScale)
         }
         
         if (slot2.enabled && slot2.isPopulated()) {
             setBlendMode(mode)
             val bal2 = bal * 2.0f
-            renderSource(src2, gain = bal2.coerceIn(0f, 1f) * groupGainScale)
+            val idx = if (prefix == "A") 1 else 3
+            renderSlot(idx, slot2, gain = bal2.coerceIn(0f, 1f) * groupGainScale)
             
             GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
             GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)
@@ -259,6 +280,16 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         }
     }
 
+    private fun renderColor(h: Float, s: Float, a: Float) {
+        GLES30.glUniform1f(uFillModeLocation, 1.0f)
+        GLES30.glUniform4f(uColorLocation, h, s, 1.0f, a)
+
+        GLES30.glBindVertexArray(vao)
+        GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, resolution * 2)
+        
+        GLES30.glUniform1f(uFillModeLocation, 0.0f)
+    }
+
     private fun renderSource(source: MandalaVisualSource?, gain: Float = 1.0f, opacityOverride: Float? = null) {
         if (source == null) return
         
@@ -285,6 +316,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         // NON-DESTRUCTIVE TAP: Use gain parameter only for shader uniform, don't touch source state
         val alpha = (opacityOverride ?: source.globalAlpha.value) * gain
 
+        GLES30.glUniform1f(uFillModeLocation, 0.0f)
         GLES30.glUniform4f(uOmegaLocation, o1, o2, o3, o4)
         GLES30.glUniform4f(uLLocation, p1, p2, p3, p4)
         GLES30.glUniform1f(uTLocation, (2.0 * PI).toFloat())

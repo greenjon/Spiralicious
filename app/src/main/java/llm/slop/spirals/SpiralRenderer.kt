@@ -10,6 +10,8 @@ import java.nio.FloatBuffer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.PI
+import kotlin.math.exp
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import llm.slop.spirals.cv.ModulatableParameter
 import llm.slop.spirals.models.*
@@ -21,9 +23,28 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var program: Int = 0
     private var vao: Int = 0
     private var vbo: Int = 0
+    
+    // Trail Post-Processing
+    private var trailProgram: Int = 0
+    private var trailVao: Int = 0
+    private var trailVbo: Int = 0
+    private var uTrailAlphaLocation: Int = -1
+    private var uTrailTextureLocation: Int = -1
 
     private val resolution = 2048
     
+    // Ghost Trails FBO Ring Buffer
+    private val ghostTextures = IntArray(8)
+    private val ghostFramebuffers = IntArray(8)
+    private var currentFrameFBO: Int = 0
+    private var currentFrameTexture: Int = 0
+    private var ghostIndex = 0
+    private var screenWidth = 0
+    private var screenHeight = 0
+    
+    // Snapshot Trigger State
+    private var isSnapshotArmed: Boolean = true
+
     @Volatile
     var visualSource: MandalaVisualSource? = null
 
@@ -117,6 +138,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
 
         program = ShaderHelper.buildProgram(context, R.raw.mandala_vertex, R.raw.mandala_fragment)
+        trailProgram = ShaderHelper.buildProgram(context, R.raw.trail_vertex, R.raw.trail_fragment)
         
         uHueOffsetLocation = GLES30.glGetUniformLocation(program, "uHueOffset")
         uHueSweepLocation = GLES30.glGetUniformLocation(program, "uHueSweep")
@@ -129,6 +151,9 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         uDepthLocation = GLES30.glGetUniformLocation(program, "uDepth")
         uMinRLocation = GLES30.glGetUniformLocation(program, "uMinR")
         uMaxRLocation = GLES30.glGetUniformLocation(program, "uMaxR")
+        
+        uTrailAlphaLocation = GLES30.glGetUniformLocation(trailProgram, "uAlpha")
+        uTrailTextureLocation = GLES30.glGetUniformLocation(trailProgram, "uTexture")
 
         // Pre-allocate buffer for (resolution + 1) points * 3 components (X, Y, Phase)
         val byteBuffer = ByteBuffer.allocateDirect((resolution + 1) * 3 * 4)
@@ -144,66 +169,160 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glGenBuffers(1, vboArray, 0)
         vbo = vboArray[0]
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, vbo)
-        
-        // Initial empty buffer allocation
         GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, (resolution + 1) * 3 * 4, null, GLES30.GL_STREAM_DRAW)
-
-        // Phase 2.3: Update the Vertex Attribute Pointer to 3 components (X, Y, Phase)
         GLES30.glEnableVertexAttribArray(0)
         GLES30.glVertexAttribPointer(0, 3, GLES30.GL_FLOAT, false, 3 * 4, 0)
+
+        // Setup Fullscreen Quad for Trails
+        val trailVaoArray = IntArray(1)
+        GLES30.glGenVertexArrays(1, trailVaoArray, 0)
+        trailVao = trailVaoArray[0]
+        GLES30.glBindVertexArray(trailVao)
+        
+        val trailVboArray = IntArray(1)
+        GLES30.glGenBuffers(1, trailVboArray, 0)
+        trailVbo = trailVboArray[0]
+        GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, trailVbo)
+        
+        // Flipped quad coordinates to fix the "Upside Down" problem
+        val quadCoords = floatArrayOf(
+            -1f, -1f,  // Bottom Left
+             1f, -1f,  // Bottom Right
+            -1f,  1f,  // Top Left
+             1f,  1f   // Top Right
+        )
+        val quadBuffer = ByteBuffer.allocateDirect(quadCoords.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
+        quadBuffer.put(quadCoords).position(0)
+        GLES30.glBufferData(GLES30.GL_ARRAY_BUFFER, quadCoords.size * 4, quadBuffer, GLES30.GL_STATIC_DRAW)
+        GLES30.glEnableVertexAttribArray(0)
+        GLES30.glVertexAttribPointer(0, 2, GLES30.GL_FLOAT, false, 0, 0)
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES30.glViewport(0, 0, width, height)
         aspectRatio = width.toFloat() / height.toFloat()
+        screenWidth = width
+        screenHeight = height
+        setupGhostFBOs(width, height)
+    }
+
+    private fun setupGhostFBOs(width: Int, height: Int) {
+        deleteGhostFBOs()
+        
+        GLES30.glGenFramebuffers(8, ghostFramebuffers, 0)
+        GLES30.glGenTextures(8, ghostTextures, 0)
+        
+        for (i in 0..7) {
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, ghostTextures[i])
+            GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, width, height, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, null)
+            GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
+            GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
+            
+            GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, ghostFramebuffers[i])
+            GLES30.glFramebufferTexture2D(GLES30.GL_FRAMEBUFFER, GLES30.GL_COLOR_ATTACHMENT0, GLES30.GL_TEXTURE_2D, ghostTextures[i], 0)
+            
+            GLES30.glClearColor(0f, 0f, 0f, 0f)
+            GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+        }
+        
+        val fboArr = IntArray(1)
+        val texArr = IntArray(1)
+        GLES30.glGenFramebuffers(1, fboArr, 0)
+        GLES30.glGenTextures(1, texArr, 0)
+        currentFrameFBO = fboArr[0]
+        currentFrameTexture = texArr[0]
+        
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, currentFrameTexture)
+        GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, width, height, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, null)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
+        GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, currentFrameFBO)
+        GLES30.glFramebufferTexture2D(GLES30.GL_FRAMEBUFFER, GLES30.GL_COLOR_ATTACHMENT0, GLES30.GL_TEXTURE_2D, currentFrameTexture, 0)
+        
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
+    }
+
+    private fun deleteGhostFBOs() {
+        if (ghostFramebuffers[0] != 0) {
+            GLES30.glDeleteFramebuffers(8, ghostFramebuffers, 0)
+            GLES30.glDeleteTextures(8, ghostTextures, 0)
+            ghostFramebuffers.fill(0)
+        }
+        if (currentFrameFBO != 0) {
+            GLES30.glDeleteFramebuffers(1, intArrayOf(currentFrameFBO), 0)
+            GLES30.glDeleteTextures(1, intArrayOf(currentFrameTexture), 0)
+            currentFrameFBO = 0
+        }
     }
 
     override fun onDrawFrame(gl: GL10?) {
+        if (program == 0 || screenWidth == 0) return
+
+        val source = visualSource
+        val currentGate = source?.parameters?.get("Snapshot Trigger")?.value ?: 0f
+        val trailsParam = source?.parameters?.get("Trails")?.value ?: 0f
+
+        // Phase A: Render Current to offscreen FBO
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, currentFrameFBO)
+        GLES30.glClearColor(0f, 0f, 0f, 0f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-        if (program == 0) return
+        
         GLES30.glUseProgram(program)
-
-        val patch = mixerPatch
-        val monitor = monitorSource
-
-        if (patch == null) {
-            renderSource(visualSource)
-            return
+        renderSource(source)
+        
+        // Phase B: Gated Snapshot Update (Edge Trigger)
+        var shouldCapture = false
+        if (currentGate > 0.5f) {
+            if (isSnapshotArmed) {
+                shouldCapture = true
+                isSnapshotArmed = false
+            }
+        } else {
+            isSnapshotArmed = true
         }
 
-        when (monitor) {
-            "1", "2", "3", "4" -> {
-                val idx = monitor.toInt() - 1
-                if (patch.slots[idx].enabled && patch.slots[idx].isPopulated()) {
-                    renderSlot(idx, patch.slots[idx])
-                }
-            }
-            "A" -> {
-                renderHierarchicalGroup("A", slotSources[0], slotSources[1], patch.slots[0], patch.slots[1])
-            }
-            "B" -> {
-                renderHierarchicalGroup("B", slotSources[2], slotSources[3], patch.slots[2], patch.slots[3])
-            }
-            "F" -> {
-                val gainF = mixerParams["MF_GAIN"]?.evaluate() ?: 1.0f
-                val balF = mixerParams["MF_BAL"]?.evaluate() ?: 0.5f
-                val modeFIdx = ((mixerParams["MF_MODE"]?.evaluate() ?: 0f) * (MixerMode.values().size - 1)).roundToInt()
-                val modeF = MixerMode.values()[modeFIdx.coerceIn(0, MixerMode.values().size - 1)]
-
-                val balA = ((1.0f - balF) * 2.0f).coerceIn(0f, 1f)
-                renderHierarchicalGroup("A", slotSources[0], slotSources[1], patch.slots[0], patch.slots[1], 
-                    groupGainScale = gainF * balA)
-                
-                setBlendMode(modeF)
-                val balB = (balF * 2.0f).coerceIn(0f, 1f)
-                renderHierarchicalGroup("B", slotSources[2], slotSources[3], patch.slots[2], patch.slots[3], 
-                    groupGainScale = gainF * balB)
-                
-                GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
-                GLES30.glBlendEquation(GLES30.GL_FUNC_ADD)
-            }
-            else -> renderSource(visualSource)
+        if (shouldCapture && trailsParam > 0.01f) {
+            ghostIndex = (ghostIndex + 1) % 8
+            GLES30.glBindFramebuffer(GLES30.GL_READ_FRAMEBUFFER, currentFrameFBO)
+            GLES30.glBindFramebuffer(GLES30.GL_DRAW_FRAMEBUFFER, ghostFramebuffers[ghostIndex])
+            GLES30.glBlitFramebuffer(0, 0, screenWidth, screenHeight, 0, 0, screenWidth, screenHeight, GLES30.GL_COLOR_BUFFER_BIT, GLES30.GL_NEAREST)
         }
+
+        // Phase C: Composite to Screen
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
+        GLES30.glClearColor(0f, 0f, 0f, 1f)
+        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+        
+        if (trailsParam > 0.01f) {
+            GLES30.glUseProgram(trailProgram)
+            GLES30.glBindVertexArray(trailVao)
+            GLES30.glEnable(GLES30.GL_BLEND)
+            GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE) // Additive for glow
+            
+            for (i in 7 downTo 1) {
+                val idx = (ghostIndex - i + 8) % 8
+                // Gaussian Decay for "echo" look
+                val decayAlpha = trailsParam * exp(-(i.toFloat() * i.toFloat()) / 12.0f)
+                
+                GLES30.glUniform1f(uTrailAlphaLocation, decayAlpha)
+                GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+                GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, ghostTextures[idx])
+                GLES30.glUniform1i(uTrailTextureLocation, 0)
+                
+                GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
+            }
+        }
+
+        // Phase D: Draw Present
+        GLES30.glUseProgram(trailProgram)
+        GLES30.glBindVertexArray(trailVao)
+        GLES30.glEnable(GLES30.GL_BLEND)
+        GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
+        GLES30.glUniform1f(uTrailAlphaLocation, 1.0f)
+        GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, currentFrameTexture)
+        GLES30.glUniform1i(uTrailTextureLocation, 0)
+        GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
     }
 
     private fun renderSlot(index: Int, slot: MixerSlotData, gain: Float = 1.0f) {

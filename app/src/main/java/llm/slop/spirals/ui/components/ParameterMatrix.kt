@@ -23,13 +23,13 @@ fun MandalaParameterMatrix(
     onInteractionFinished: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Row 1: L1 - L4 (Specific to Mandala "Arms")
-    val row1Ids = listOf("L1", "L2", "L3", "L4")
+    // Row 1: L1 - L4 + Scale, Rotation
+    val row1Ids = listOf("L1", "L2", "L3", "L4", "Scale", "Rotation")
     val row1Indices = row1Ids.map { labels.indexOf(it) }.filter { it != -1 }
     val row1Params = row1Indices.map { parameters[it] }
 
-    // Row 2: Everything else (expected to be 5 knobs)
-    val remainingIndices = parameters.indices.filter { !row1Indices.contains(it) }
+    // Row 2: Everything else
+    val remainingIndices = parameters.indices.filter { !row1Ids.contains(labels[it]) }
     val remainingLabels = remainingIndices.map { labels[it] }
     val remainingParams = remainingIndices.map { parameters[it] }
 
@@ -37,9 +37,9 @@ fun MandalaParameterMatrix(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // TOP ROW: 4 knobs centered over the 4 gaps below
+        // TOP ROW
         Row(
-            modifier = Modifier.fillMaxWidth(0.815f),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -57,7 +57,7 @@ fun MandalaParameterMatrix(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // BOTTOM ROW: 5 knobs
+        // BOTTOM ROW
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceAround,
@@ -123,10 +123,10 @@ private fun KnobCell(
                 knobSize = 44.dp,
                 showValue = true,
                 displayTransform = { 
-                    if (id == "Hue Sweep") {
-                        "%.2f".format(it * 9.0f)
-                    } else {
-                        (it * 100f).roundToInt().toString()
+                    when (id) {
+                        "Hue Sweep" -> "%.2f".format(it * 9.0f)
+                        "Scale" -> "%.2f".format(it * 8.0f)
+                        else -> (it * 100f).roundToInt().toString()
                     }
                 }
             )

@@ -26,7 +26,9 @@ class MandalaVisualSource : VisualSource {
         "Thickness" to ModulatableParameter(0.1f),
         "Hue Offset" to ModulatableParameter(0.0f),
         "Hue Sweep" to ModulatableParameter(1.0f / 9.0f), // Default 1.0, scaled 0-9
-        "Depth" to ModulatableParameter(0.35f)
+        "Depth" to ModulatableParameter(0.35f),
+        "Trails" to ModulatableParameter(0.0f),
+        "Snapshot Trigger" to ModulatableParameter(0.0f)
     )
 
     override val globalAlpha = ModulatableParameter(1.0f) 

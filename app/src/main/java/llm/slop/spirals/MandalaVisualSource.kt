@@ -28,7 +28,10 @@ class MandalaVisualSource : VisualSource {
         "Hue Sweep" to ModulatableParameter(1.0f / 9.0f), // Default 1.0, scaled 0-9
         "Depth" to ModulatableParameter(0.35f),
         "Trails" to ModulatableParameter(0.0f),
-        "Snapshot Trigger" to ModulatableParameter(0.0f)
+        "Snap Count" to ModulatableParameter(0.5f), // Mapped 2-16
+        "Snap Mode" to ModulatableParameter(0.0f),  // <0.5 Behind, >0.5 Above
+        "Snap Blend" to ModulatableParameter(0.0f), // <0.5 Normal, >0.5 Additive
+        "Snap Trigger" to ModulatableParameter(0.0f)
     )
 
     override val globalAlpha = ModulatableParameter(1.0f) 

@@ -34,8 +34,9 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private val resolution = 2048
     
     // Ghost Trails FBO Ring Buffer
-    private val ghostTextures = IntArray(8)
-    private val ghostFramebuffers = IntArray(8)
+    private val MAX_GHOSTS = 16
+    private val ghostTextures = IntArray(MAX_GHOSTS)
+    private val ghostFramebuffers = IntArray(MAX_GHOSTS)
     private var currentFrameFBO: Int = 0
     private var currentFrameTexture: Int = 0
     private var ghostIndex = 0
@@ -44,6 +45,13 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     
     // Snapshot Trigger State
     private var isSnapshotArmed: Boolean = true
+    
+    // Dirty Guard State
+    private var lastL1 = -1f
+    private var lastL2 = -1f
+    private var lastL3 = -1f
+    private var lastL4 = -1f
+    private var lastRotation = -1f
 
     @Volatile
     var visualSource: MandalaVisualSource? = null
@@ -184,12 +192,11 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         trailVbo = trailVboArray[0]
         GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, trailVbo)
         
-        // Flipped quad coordinates to fix the "Upside Down" problem
         val quadCoords = floatArrayOf(
-            -1f, -1f,  // Bottom Left
-             1f, -1f,  // Bottom Right
-            -1f,  1f,  // Top Left
-             1f,  1f   // Top Right
+            -1f, -1f,
+             1f, -1f,
+            -1f,  1f,
+             1f,  1f 
         )
         val quadBuffer = ByteBuffer.allocateDirect(quadCoords.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
         quadBuffer.put(quadCoords).position(0)
@@ -209,10 +216,10 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private fun setupGhostFBOs(width: Int, height: Int) {
         deleteGhostFBOs()
         
-        GLES30.glGenFramebuffers(8, ghostFramebuffers, 0)
-        GLES30.glGenTextures(8, ghostTextures, 0)
+        GLES30.glGenFramebuffers(MAX_GHOSTS, ghostFramebuffers, 0)
+        GLES30.glGenTextures(MAX_GHOSTS, ghostTextures, 0)
         
-        for (i in 0..7) {
+        for (i in 0 until MAX_GHOSTS) {
             GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, ghostTextures[i])
             GLES30.glTexImage2D(GLES30.GL_TEXTURE_2D, 0, GLES30.GL_RGBA, width, height, 0, GLES30.GL_RGBA, GLES30.GL_UNSIGNED_BYTE, null)
             GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
@@ -244,8 +251,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     private fun deleteGhostFBOs() {
         if (ghostFramebuffers[0] != 0) {
-            GLES30.glDeleteFramebuffers(8, ghostFramebuffers, 0)
-            GLES30.glDeleteTextures(8, ghostTextures, 0)
+            GLES30.glDeleteFramebuffers(MAX_GHOSTS, ghostFramebuffers, 0)
+            GLES30.glDeleteTextures(MAX_GHOSTS, ghostTextures, 0)
             ghostFramebuffers.fill(0)
         }
         if (currentFrameFBO != 0) {
@@ -259,8 +266,11 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         if (program == 0 || screenWidth == 0) return
 
         val source = visualSource
-        val currentGate = source?.parameters?.get("Snapshot Trigger")?.value ?: 0f
+        val currentGate = source?.parameters?.get("Snap Trigger")?.value ?: 0f
         val trailsParam = source?.parameters?.get("Trails")?.value ?: 0f
+        val snapCount = ((source?.parameters?.get("Snap Count")?.value ?: 0.5f) * 14f + 2f).toInt().coerceIn(2, 16)
+        val snapMode = source?.parameters?.get("Snap Mode")?.value ?: 0f
+        val snapBlend = source?.parameters?.get("Snap Blend")?.value ?: 0f
 
         // Phase A: Render Current to offscreen FBO
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, currentFrameFBO)
@@ -270,10 +280,20 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glUseProgram(program)
         renderSource(source)
         
+        // Dirty Guard Logic
+        val l1 = source?.parameters?.get("L1")?.value ?: 0f
+        val l2 = source?.parameters?.get("L2")?.value ?: 0f
+        val l3 = source?.parameters?.get("L3")?.value ?: 0f
+        val l4 = source?.parameters?.get("L4")?.value ?: 0f
+        val rot = source?.parameters?.get("Rotation")?.value ?: 0f
+        val isStatic = l1 == lastL1 && l2 == lastL2 && l3 == lastL3 && l4 == lastL4 && rot == lastRotation
+        
+        lastL1 = l1; lastL2 = l2; lastL3 = l3; lastL4 = l4; lastRotation = rot
+
         // Phase B: Gated Snapshot Update (Edge Trigger)
         var shouldCapture = false
         if (currentGate > 0.5f) {
-            if (isSnapshotArmed) {
+            if (isSnapshotArmed && !isStatic) {
                 shouldCapture = true
                 isSnapshotArmed = false
             }
@@ -282,47 +302,57 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         }
 
         if (shouldCapture && trailsParam > 0.01f) {
-            ghostIndex = (ghostIndex + 1) % 8
+            ghostIndex = (ghostIndex + 1) % MAX_GHOSTS
             GLES30.glBindFramebuffer(GLES30.GL_READ_FRAMEBUFFER, currentFrameFBO)
             GLES30.glBindFramebuffer(GLES30.GL_DRAW_FRAMEBUFFER, ghostFramebuffers[ghostIndex])
             GLES30.glBlitFramebuffer(0, 0, screenWidth, screenHeight, 0, 0, screenWidth, screenHeight, GLES30.GL_COLOR_BUFFER_BIT, GLES30.GL_NEAREST)
         }
 
-        // Phase C: Composite to Screen
+        // Phase C & D: Composite to Screen
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
         GLES30.glClearColor(0f, 0f, 0f, 1f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
         
-        if (trailsParam > 0.01f) {
-            GLES30.glUseProgram(trailProgram)
-            GLES30.glBindVertexArray(trailVao)
-            GLES30.glEnable(GLES30.GL_BLEND)
-            GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE) // Additive for glow
-            
-            for (i in 7 downTo 1) {
-                val idx = (ghostIndex - i + 8) % 8
-                // Gaussian Decay for "echo" look
-                val decayAlpha = trailsParam * exp(-(i.toFloat() * i.toFloat()) / 12.0f)
+        GLES30.glUseProgram(trailProgram)
+        GLES30.glBindVertexArray(trailVao)
+        GLES30.glEnable(GLES30.GL_BLEND)
+        
+        // Set Blend Mode
+        if (snapBlend >= 0.5f) {
+            GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE) // Additive
+        } else {
+            GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA) // Normal
+        }
+
+        val drawGhosts = {
+            for (i in (snapCount - 1) downTo 1) {
+                val idx = (ghostIndex - i + MAX_GHOSTS) % MAX_GHOSTS
+                // Gaussian Decay scaled to Snap Count
+                val decayAlpha = trailsParam * exp(-(i.toFloat() * i.toFloat()) / (snapCount.toFloat() * 1.5f))
                 
                 GLES30.glUniform1f(uTrailAlphaLocation, decayAlpha)
                 GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
                 GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, ghostTextures[idx])
                 GLES30.glUniform1i(uTrailTextureLocation, 0)
-                
                 GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
             }
         }
 
-        // Phase D: Draw Present
-        GLES30.glUseProgram(trailProgram)
-        GLES30.glBindVertexArray(trailVao)
-        GLES30.glEnable(GLES30.GL_BLEND)
-        GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
-        GLES30.glUniform1f(uTrailAlphaLocation, 1.0f)
-        GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, currentFrameTexture)
-        GLES30.glUniform1i(uTrailTextureLocation, 0)
-        GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
+        val drawCurrent = {
+            GLES30.glUniform1f(uTrailAlphaLocation, 1.0f)
+            GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, currentFrameTexture)
+            GLES30.glUniform1i(uTrailTextureLocation, 0)
+            GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
+        }
+
+        if (snapMode < 0.5f) {
+            drawGhosts()
+            drawCurrent()
+        } else {
+            drawCurrent()
+            drawGhosts()
+        }
     }
 
     private fun renderSlot(index: Int, slot: MixerSlotData, gain: Float = 1.0f) {

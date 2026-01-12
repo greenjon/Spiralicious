@@ -2,6 +2,7 @@ package llm.slop.spirals
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -15,15 +16,21 @@ enum class StartupMode {
 }
 
 class AppConfig(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("app_config", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = context.applicationContext.getSharedPreferences("app_config", Context.MODE_PRIVATE)
 
     var startupMode: StartupMode
-        get() = StartupMode.valueOf(prefs.getString("startup_mode", StartupMode.LAST_WORKSPACE.name)!!)
-        set(value) = prefs.edit().putString("startup_mode", value.name).apply()
+        get() = prefs.getString("startup_mode", StartupMode.LAST_WORKSPACE.name)?.let {
+            try {
+                StartupMode.valueOf(it)
+            } catch (_: IllegalArgumentException) {
+                StartupMode.LAST_WORKSPACE
+            }
+        } ?: StartupMode.LAST_WORKSPACE
+        set(value) = prefs.edit { putString("startup_mode", value.name) }
 
     var lastNavStackJson: String?
         get() = prefs.getString("last_nav_stack", null)
-        set(value) = prefs.edit().putString("last_nav_stack", value).apply()
+        set(value) = prefs.edit { putString("last_nav_stack", value) }
 
     fun saveNavStack(stack: List<NavLayer>) {
         try {

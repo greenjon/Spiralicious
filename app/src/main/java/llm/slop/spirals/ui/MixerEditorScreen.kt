@@ -8,7 +8,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -46,7 +45,6 @@ fun MixerEditorScreen(
     // UI state for focusing parameters for CV patching
     var focusedParameterId by remember { mutableStateOf("PN1") }
 
-    var showMenu by remember { mutableStateOf(false) }
     var showOpenDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showSetPickerForSlot by remember { mutableStateOf<Int?>(null) }
@@ -72,7 +70,11 @@ fun MixerEditorScreen(
             val patchEntity = if (slot.sourceType == VideoSourceType.MANDALA_SET) {
                 val setEntity = allSets.find { it.id == slot.mandalaSetId }
                 setEntity?.let { se ->
-                    val orderedIds = Json.decodeFromString<List<String>>(se.jsonOrderedMandalaIds)
+                    val orderedIds = try {
+                        Json.decodeFromString<List<String>>(se.jsonOrderedMandalaIds)
+                    } catch (e: Exception) {
+                        emptyList()
+                    }
                     if (orderedIds.isNotEmpty()) {
                         val safeIndex = slot.currentIndex.baseValue.toInt().coerceIn(0, orderedIds.size - 1)
                         allPatches.find { it.name == orderedIds[safeIndex] }
@@ -185,12 +187,11 @@ fun MixerEditorScreen(
     }
 
     // Picker Dialogs
-    if (showSetPickerForSlot != null) {
+    showSetPickerForSlot?.let { idx ->
         PickerDialog(
             title = "Select Mandala Set",
             items = allSets.map { it.name to it.id },
             onSelect = { id ->
-                val idx = showSetPickerForSlot!!
                 val newSlots = currentPatch.slots.toMutableList()
                 newSlots[idx] = newSlots[idx].copy(mandalaSetId = id, currentIndex = ModulatableParameterData(0f), sourceType = VideoSourceType.MANDALA_SET)
                 currentPatch = currentPatch.copy(slots = newSlots)
@@ -204,12 +205,11 @@ fun MixerEditorScreen(
         )
     }
 
-    if (showMandalaPickerForSlot != null) {
+    showMandalaPickerForSlot?.let { idx ->
         PickerDialog(
             title = "Select Mandala",
             items = allPatches.map { it.name to it.name },
             onSelect = { id ->
-                val idx = showMandalaPickerForSlot!!
                 val newSlots = currentPatch.slots.toMutableList()
                 newSlots[idx] = newSlots[idx].copy(selectedMandalaId = id, sourceType = VideoSourceType.MANDALA)
                 currentPatch = currentPatch.copy(slots = newSlots)
@@ -228,7 +228,11 @@ fun MixerEditorScreen(
             title = "Open Mixer Patch",
             items = allMixerPatches.map { it.name to it.jsonSettings },
             onSelect = { json ->
-                currentPatch = Json.decodeFromString(json)
+                try {
+                    currentPatch = Json.decodeFromString(json)
+                } catch (e: Exception) {
+                    // Log error
+                }
                 showOpenDialog = false
             },
             onDismiss = { showOpenDialog = false }

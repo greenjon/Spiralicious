@@ -12,6 +12,8 @@ class SpiralSurfaceView(context: Context, attrs: AttributeSet? = null) : GLSurfa
     init {
         setEGLContextClientVersion(3)
         setRenderer(renderer)
+        // Note: RENDERMODE_CONTINUOUSLY is safe as the renderer doesn't leak 'this' 
+        // until after the View is fully initialized.
         renderMode = RENDERMODE_CONTINUOUSLY
     }
     

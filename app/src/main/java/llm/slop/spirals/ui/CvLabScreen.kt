@@ -18,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import llm.slop.spirals.MandalaVisualSource
 import llm.slop.spirals.cv.*
 import llm.slop.spirals.cv.audio.AudioEngine
 import llm.slop.spirals.cv.audio.AudioSourceManager
@@ -51,17 +50,19 @@ fun CvLabScreen(
     val projectionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            val projection = sourceManager.getMediaProjection(result.resultCode, result.data!!)
-            val record = sourceManager.buildAudioRecord(
-                AudioSourceType.INTERNAL,
-                44100,
-                AudioFormat.ENCODING_PCM_FLOAT,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT),
-                projection
-            )
-            if (record != null) onInternalAudioRecordCreated(record)
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.let { data ->
+                val projection = sourceManager.getMediaProjection(result.resultCode, data)
+                val record = sourceManager.buildAudioRecord(
+                    AudioSourceType.INTERNAL,
+                    44100,
+                    AudioFormat.ENCODING_PCM_FLOAT,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioRecord.getMinBufferSize(44100, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT),
+                    projection
+                )
+                if (record != null) onInternalAudioRecordCreated(record)
+            }
         }
     }
 
@@ -140,13 +141,13 @@ fun CvLabScreen(
             
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = AppText.copy(alpha = 0.1f))
 
-            DiagnosticScope("ACCENT (Weighted Flux + Decay)", CvRegistry.history["accent"]!!)
-            DiagnosticScope("ONSET (Raw Spikes)", CvRegistry.history["onset"]!!)
+            CvRegistry.history["accent"]?.let { DiagnosticScope("ACCENT (Weighted Flux + Decay)", it) }
+            CvRegistry.history["onset"]?.let { DiagnosticScope("ONSET (Raw Spikes)", it) }
             
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = AppText.copy(alpha = 0.1f))
             
-            DiagnosticScope("AMP (Master Envelope)", CvRegistry.history["amp"]!!)
-            DiagnosticScope("BASS FLUX", CvRegistry.history["bassFlux"]!!)
+            CvRegistry.history["amp"]?.let { DiagnosticScope("AMP (Master Envelope)", it) }
+            CvRegistry.history["bassFlux"]?.let { DiagnosticScope("BASS FLUX", it) }
         }
 
         Spacer(modifier = Modifier.height(100.dp))

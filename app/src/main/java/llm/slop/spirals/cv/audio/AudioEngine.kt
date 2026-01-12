@@ -14,7 +14,8 @@ import kotlin.math.max
  * Implements Spectral Flux (onset detection) and Automatic BPM Detection.
  */
 class AudioEngine(context: Context) {
-    val sourceManager = AudioSourceManager(context)
+    private val appContext = context.applicationContext
+    val sourceManager = AudioSourceManager(appContext)
     
     private val sampleRate = 44100
     private val channelConfig = AudioFormat.CHANNEL_IN_MONO

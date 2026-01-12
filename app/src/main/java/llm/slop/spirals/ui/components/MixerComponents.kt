@@ -125,7 +125,7 @@ fun SourceStrip(
                 modifier = Modifier.padding(2.dp)
             )
             DropdownMenu(expanded = typeExpanded, onDismissRequest = { typeExpanded = false }, containerColor = AppBackground) {
-                VideoSourceType.values().forEach { type ->
+                VideoSourceType.entries.forEach { type ->
                     DropdownMenuItem(text = { Text(type.name.replace("_", " "), fontSize = 11.sp) }, onClick = {
                         val newSlots = patch.slots.toMutableList()
                         newSlots[index] = slot.copy(sourceType = type)
@@ -168,7 +168,7 @@ fun SourceStrip(
                             if (slot.sourceType == VideoSourceType.MANDALA_SET) {
                                 val set = allSets.find { it.id == slot.mandalaSetId }
                                 set?.let {
-                                    val ids = Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds)
+                                    val ids = try { Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds) } catch(e: Exception) { emptyList() }
                                     if (ids.isNotEmpty()) {
                                         val nextIdx = if (slot.currentIndex.baseValue <= 0) ids.size - 1 else slot.currentIndex.baseValue.toInt() - 1
                                         val newSlots = patch.slots.toMutableList()
@@ -190,7 +190,7 @@ fun SourceStrip(
                             if (slot.sourceType == VideoSourceType.MANDALA_SET) {
                                 val set = allSets.find { it.id == slot.mandalaSetId }
                                 set?.let {
-                                    val ids = Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds)
+                                    val ids = try { Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds) } catch(e: Exception) { emptyList() }
                                     if (ids.isNotEmpty()) {
                                         val nextIdx = (slot.currentIndex.baseValue.toInt() + 1) % ids.size
                                         val newSlots = patch.slots.toMutableList()
@@ -313,8 +313,9 @@ fun MonitorStrip(
         
         var modeExpanded by remember { mutableStateOf(false) }
         Box(modifier = Modifier.clickable { onFocusChange(modeId) }) {
+            val modeEntries = MixerMode.entries
             Text(
-                text = MixerMode.values()[groupData.mode.baseValue.toInt()].name,
+                text = modeEntries[groupData.mode.baseValue.toInt().coerceIn(0, modeEntries.size - 1)].name,
                 style = MaterialTheme.typography.labelSmall,
                 color = if (focusedId == modeId) AppAccent else AppText.copy(alpha = 0.7f),
                 fontSize = 9.sp,
@@ -322,7 +323,7 @@ fun MonitorStrip(
                 modifier = Modifier.clickable { onFocusChange(modeId); modeExpanded = true }.padding(2.dp)
             )
             DropdownMenu(expanded = modeExpanded, onDismissRequest = { modeExpanded = false }, containerColor = AppBackground) {
-                MixerMode.values().forEachIndexed { index, m ->
+                MixerMode.entries.forEachIndexed { index, m ->
                     DropdownMenuItem(text = { Text(m.name, fontSize = 11.sp) }, onClick = {
                         val newGroup = groupData.copy(mode = groupData.mode.copy(baseValue = index.toFloat()))
                         onPatchChange(updateGroup(patch, group, newGroup))
@@ -440,7 +441,7 @@ fun MixerCvEditor(
         }
     }
     
-    var refreshCount by remember { mutableStateOf(0) }
+    var refreshCount by remember { mutableIntStateOf(0) }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
         Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {

@@ -7,7 +7,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -93,7 +92,8 @@ fun MandalaSetEditorScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            if (currentSet == null) {
+            val activeSet = currentSet
+            if (activeSet == null) {
                 Column {
                     Text("Existing Sets:", style = MaterialTheme.typography.titleMedium, color = AppText)
                     Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
@@ -126,7 +126,7 @@ fun MandalaSetEditorScreen(
                                 shape = MaterialTheme.shapes.extraSmall,
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                             ) {
-                                Text(currentSet?.selectionPolicy?.name ?: "Policy", style = MaterialTheme.typography.labelSmall, color = AppText)
+                                Text(activeSet.selectionPolicy.name, style = MaterialTheme.typography.labelSmall, color = AppText)
                                 Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = AppText)
                             }
                             DropdownMenu(
@@ -134,11 +134,11 @@ fun MandalaSetEditorScreen(
                                 onDismissRequest = { policyExpanded = false },
                                 containerColor = AppBackground
                             ) {
-                                SelectionPolicy.values().forEach { policy ->
+                                SelectionPolicy.entries.forEach { policy ->
                                     DropdownMenuItem(
                                         text = { Text(policy.name, style = MaterialTheme.typography.labelSmall) },
                                         onClick = { 
-                                            currentSet = currentSet?.copy(selectionPolicy = policy)
+                                            currentSet = activeSet.copy(selectionPolicy = policy)
                                             policyExpanded = false 
                                         }
                                     )
@@ -150,10 +150,10 @@ fun MandalaSetEditorScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     SetChipList(
-                        chipIds = currentSet!!.orderedMandalaIds,
+                        chipIds = activeSet.orderedMandalaIds,
                         onChipTapped = { focusedMandalaId = it },
                         onChipReordered = { newOrder -> 
-                            currentSet = currentSet?.copy(orderedMandalaIds = newOrder.toMutableList())
+                            currentSet = activeSet.copy(orderedMandalaIds = newOrder.toMutableList())
                         }
                     )
                 }

@@ -118,7 +118,7 @@ fun ModulatorRow(
                 val rawCv = when (sourceId) {
                     "beatPhase" -> {
                         val beats = CvRegistry.getSynchronizedTotalBeats()
-                        val localPhase = ((beats / subdivision) + phaseOffset) % 1.0
+                        val localPhase = ((beats / subdivision.toDouble()) + phaseOffset.toDouble()) % 1.0
                         val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
                         calculatePreviewWave(waveform, positivePhase, slope)
                     }
@@ -129,7 +129,7 @@ fun ModulatorRow(
                             LfoSpeedMode.MEDIUM -> subdivision * 900.0
                             LfoSpeedMode.SLOW -> subdivision * 86400.0
                         }.coerceAtLeast(0.001)
-                        val localPhase = ((seconds / period) + phaseOffset) % 1.0
+                        val localPhase = ((seconds / period) + phaseOffset.toDouble()) % 1.0
                         val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
                         calculatePreviewWave(waveform, positivePhase, slope)
                     }
@@ -250,7 +250,7 @@ fun ModulatorRow(
                             Spacer(modifier = Modifier.width(4.dp))
                             
                             IconButton(onClick = {
-                                val nextWave = Waveform.values()[(waveform.ordinal + 1) % Waveform.values().size]
+                                val nextWave = Waveform.entries[(waveform.ordinal + 1) % Waveform.entries.size]
                                 waveform = nextWave
                                 onUpdate(CvModulator(sourceId, operator, weight, bypassed, nextWave, subdivision, phaseOffset, slope, lfoSpeedMode))
                                 onInteractionFinished()
@@ -318,7 +318,7 @@ fun ModulatorRow(
                                     text = speedLabel,
                                     modifier = Modifier
                                         .clickable { 
-                                            val nextMode = LfoSpeedMode.values()[(lfoSpeedMode.ordinal + 1) % LfoSpeedMode.values().size]
+                                            val nextMode = LfoSpeedMode.entries[(lfoSpeedMode.ordinal + 1) % LfoSpeedMode.entries.size]
                                             lfoSpeedMode = nextMode
                                             onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope, nextMode))
                                             onInteractionFinished()
@@ -340,7 +340,7 @@ fun ModulatorRow(
                             currentValue = weight,
                             onValueChange = { newValue ->
                                 weight = newValue
-                                onUpdate(CvModulator(sourceId, operator, newValue, bypassed, waveform, subdivision, phaseOffset, slope, lfoSpeedMode))
+                                if (!isNew) onUpdate(CvModulator(sourceId, operator, newValue, bypassed, waveform, subdivision, phaseOffset, slope, lfoSpeedMode))
                             },
                             onInteractionFinished = onInteractionFinished,
                             isBipolar = true,
@@ -359,7 +359,7 @@ fun ModulatorRow(
                                     currentValue = subdivision,
                                     onValueChange = { newValue ->
                                         subdivision = newValue
-                                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, newValue, phaseOffset, slope, lfoSpeedMode))
+                                        if (!isNew) onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, newValue, phaseOffset, slope, lfoSpeedMode))
                                     },
                                     onInteractionFinished = onInteractionFinished,
                                     isBipolar = false,
@@ -389,7 +389,7 @@ fun ModulatorRow(
                                 currentValue = phaseOffset,
                                 onValueChange = { newValue ->
                                     phaseOffset = newValue
-                                    onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope, lfoSpeedMode))
+                                    if (!isNew) onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope, lfoSpeedMode))
                                 },
                                 onInteractionFinished = onInteractionFinished,
                                 isBipolar = false,
@@ -408,7 +408,7 @@ fun ModulatorRow(
                                     currentValue = slope,
                                     onValueChange = { newValue ->
                                         slope = newValue
-                                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, newValue, lfoSpeedMode))
+                                        if (!isNew) onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, newValue, lfoSpeedMode))
                                     },
                                     onInteractionFinished = onInteractionFinished,
                                     isBipolar = false,

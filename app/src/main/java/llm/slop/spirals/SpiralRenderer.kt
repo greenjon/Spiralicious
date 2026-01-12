@@ -119,19 +119,19 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     private fun syncMixerParameters(patch: MixerPatch) {
         for (i in 0..3) {
-            syncParam(mixerParams["PN${i+1}"]!!, patch.slots[i].currentIndex)
-            syncParam(mixerParams["H${i+1}"]!!, patch.slots[i].hue)
-            syncParam(mixerParams["S${i+1}"]!!, patch.slots[i].saturation)
+            mixerParams["PN${i+1}"]?.let { syncParam(it, patch.slots[i].currentIndex) }
+            mixerParams["H${i+1}"]?.let { syncParam(it, patch.slots[i].hue) }
+            mixerParams["S${i+1}"]?.let { syncParam(it, patch.slots[i].saturation) }
         }
         syncGroup(patch.mixerA, "A")
         syncGroup(patch.mixerB, "B")
         syncGroup(patch.mixerF, "F")
-        syncParam(mixerParams["MF_GAIN"]!!, patch.finalGain)
+        mixerParams["MF_GAIN"]?.let { syncParam(it, patch.finalGain) }
     }
 
     private fun syncGroup(group: MixerGroupData, prefix: String) {
-        syncParam(mixerParams["M${prefix}_MODE"]!!, group.mode)
-        syncParam(mixerParams["M${prefix}_BAL"]!!, group.balance)
+        mixerParams["M${prefix}_MODE"]?.let { syncParam(it, group.mode) }
+        mixerParams["M${prefix}_BAL"]?.let { syncParam(it, group.balance) }
     }
 
     private fun syncParam(target: ModulatableParameter, source: ModulatableParameterData) {
@@ -392,8 +392,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             "F" -> {
                 val gainF = mixerParams["MF_GAIN"]?.value ?: 1.0f
                 val balF = mixerParams["MF_BAL"]?.value ?: 0.5f
-                val modeFIdx = ((mixerParams["MF_MODE"]?.value ?: 0f) * (MixerMode.values().size - 1)).roundToInt()
-                val modeF = MixerMode.values()[modeFIdx.coerceIn(0, MixerMode.values().size - 1)]
+                val modeFIdx = ((mixerParams["MF_MODE"]?.value ?: 0f) * (MixerMode.entries.size - 1)).roundToInt()
+                val modeF = MixerMode.entries[modeFIdx.coerceIn(0, MixerMode.entries.size - 1)]
 
                 val balA = ((1.0f - balF) * 2.0f).coerceIn(0f, 1f)
                 renderHierarchicalGroupTrails("A", slotSources[0], slotSources[1], patch.slots[0], patch.slots[1], 
@@ -553,8 +553,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         groupGainScale: Float = 1.0f
     ) {
         val bal = mixerParams["M${prefix}_BAL"]?.value ?: 0.5f
-        val modeIdx = ((mixerParams["M${prefix}_MODE"]?.value ?: 0f) * (MixerMode.values().size - 1)).roundToInt()
-        val mode = MixerMode.values()[modeIdx.coerceIn(0, MixerMode.values().size - 1)]
+        val modeIdx = ((mixerParams["M${prefix}_MODE"]?.value ?: 0f) * (MixerMode.entries.size - 1)).roundToInt()
+        val mode = MixerMode.entries[modeIdx.coerceIn(0, MixerMode.entries.size - 1)]
 
         if (slot1.enabled && slot1.isPopulated()) {
             val bal1 = ((1.0f - bal) * 2.0f).coerceIn(0f, 1f)

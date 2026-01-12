@@ -26,37 +26,47 @@ fun MandalaParameterMatrix(
 ) {
     // Row 1: Primary Geometry (Arms + Scale)
     val row1Ids = listOf("L1", "L2", "L3", "L4", "Scale")
-    val row1Params = row1Ids.mapNotNull { id ->
-        val idx = labels.indexOf(id)
-        if (idx != -1) id to parameters[idx] else null
+    val row1Params = remember(labels, parameters) {
+        row1Ids.mapNotNull { id ->
+            val idx = labels.indexOf(id)
+            if (idx != -1) id to parameters[idx] else null
+        }
     }
 
     // Row 2: Secondary Geometry & Color
     val row2Ids = listOf("Rotation", "Thickness", "Hue Offset", "Hue Sweep", "Depth")
-    val row2Params = row2Ids.mapNotNull { id ->
-        val idx = labels.indexOf(id)
-        if (idx != -1) id to parameters[idx] else null
+    val row2Params = remember(labels, parameters) {
+        row2Ids.mapNotNull { id ->
+            val idx = labels.indexOf(id)
+            if (idx != -1) id to parameters[idx] else null
+        }
     }
 
     // Row 3: Snapshot & Trails
     val row3Ids = listOf("Trails", "Snap Count", "Snap Mode", "Snap Blend", "Snap Trigger")
-    val row3Params = row3Ids.mapNotNull { id ->
-        val idx = labels.indexOf(id)
-        if (idx != -1) id to parameters[idx] else null
+    val row3Params = remember(labels, parameters) {
+        row3Ids.mapNotNull { id ->
+            val idx = labels.indexOf(id)
+            if (idx != -1) id to parameters[idx] else null
+        }
     }
 
     // Row 4: Feedback Engine
     val row4Ids = listOf("FB Decay", "FB Gain", "FB Zoom", "FB Rotate", "FB Shift", "FB Blur")
-    val row4Params = row4Ids.mapNotNull { id ->
-        val idx = labels.indexOf(id)
-        if (idx != -1) id to parameters[idx] else null
+    val row4Params = remember(labels, parameters) {
+        row4Ids.mapNotNull { id ->
+            val idx = labels.indexOf(id)
+            if (idx != -1) id to parameters[idx] else null
+        }
     }
 
     // Capture any parameters not explicitly grouped above
     val handledIds = row1Ids + row2Ids + row3Ids + row4Ids
-    val extraParams = labels.indices
-        .filter { !handledIds.contains(labels[it]) }
-        .map { labels[it] to parameters[it] }
+    val extraParams = remember(labels, parameters) {
+        labels.indices
+            .filter { !handledIds.contains(labels[it]) }
+            .map { labels[it] to parameters[it] }
+    }
 
     Column(
         modifier = modifier.fillMaxWidth(),

@@ -84,10 +84,10 @@ class MandalaVisualSource : VisualSource {
         
         // Optimization: Use mathematical heuristic for bounds instead of a 2048-point loop
         // maxR is the sum of absolute arm lengths (the maximum possible reach)
-        val l1 = abs(parameters["L1"]!!.value)
-        val l2 = abs(parameters["L2"]!!.value)
-        val l3 = abs(parameters["L3"]!!.value)
-        val l4 = abs(parameters["L4"]!!.value)
+        val l1 = abs(parameters["L1"]?.value ?: 0f)
+        val l2 = abs(parameters["L2"]?.value ?: 0f)
+        val l3 = abs(parameters["L3"]?.value ?: 0f)
+        val l4 = abs(parameters["L4"]?.value ?: 0f)
         
         maxR = max(0.001f, l1 + l2 + l3 + l4)
         minR = 0f // Stable base for depth effect
@@ -103,17 +103,17 @@ class MandalaVisualSource : VisualSource {
         if (alpha <= 0f) return
 
         val canvasScaleFactor = width / 2f
-        val scale = parameters["Scale"]!!.value * globalScale.value * 8.0f
-        val thickness = parameters["Thickness"]!!.value * 20f
-        val hueOffset = parameters["Hue Offset"]!!.value
-        val hueSweep = parameters["Hue Sweep"]!!.value * 9.0f 
-        val depth = parameters["Depth"]!!.value
-        val rotationDegrees = parameters["Rotation"]!!.value * 360f
+        val scale = (parameters["Scale"]?.value ?: 0.125f) * globalScale.value * 8.0f
+        val thickness = (parameters["Thickness"]?.value ?: 0.1f) * 20f
+        val hueOffset = parameters["Hue Offset"]?.value ?: 0f
+        val hueSweep = (parameters["Hue Sweep"]?.value ?: (1.0f / 9.0f)) * 9.0f 
+        val depth = parameters["Depth"]?.value ?: 0.35f
+        val rotationDegrees = (parameters["Rotation"]?.value ?: 0f) * 360f
 
-        val l1 = parameters["L1"]!!.value
-        val l2 = parameters["L2"]!!.value
-        val l3 = parameters["L3"]!!.value
-        val l4 = parameters["L4"]!!.value
+        val l1 = parameters["L1"]?.value ?: 0.4f
+        val l2 = parameters["L2"]?.value ?: 0.3f
+        val l3 = parameters["L3"]?.value ?: 0.2f
+        val l4 = parameters["L4"]?.value ?: 0.1f
 
         paint.strokeWidth = thickness
         hsvBuffer[1] = 0.8f 

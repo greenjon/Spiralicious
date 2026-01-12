@@ -16,8 +16,9 @@ enum class AudioSourceType {
 /**
  * Manages audio source configuration and MediaProjection flow.
  */
-class AudioSourceManager(private val context: Context) {
-    private val projectionManager = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+class AudioSourceManager(context: Context) {
+    private val appContext = context.applicationContext
+    private val projectionManager = appContext.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
     fun createProjectionIntent(): Intent = projectionManager.createScreenCaptureIntent()
 

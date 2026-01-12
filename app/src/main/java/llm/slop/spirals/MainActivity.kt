@@ -1,13 +1,9 @@
 package llm.slop.spirals
 
 import android.Manifest
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.widget.Toast
 import android.media.AudioFormat
 import android.media.AudioRecord
 import androidx.activity.ComponentActivity
@@ -53,14 +49,9 @@ import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.ui.theme.SpiralsTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import llm.slop.spirals.cv.CvModulator
-import llm.slop.spirals.cv.Waveform
-import llm.slop.spirals.cv.ModulationOperator
 import llm.slop.spirals.cv.CvRegistry
 import llm.slop.spirals.models.MixerPatch
 import kotlinx.serialization.json.Json
-import java.util.UUID
-import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
 
@@ -70,22 +61,22 @@ class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            // Permission granted
-        }
+    ) { _ ->
+        // Permission result handled via State in Compose
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         
-        audioEngine = AudioEngine(this)
-        sourceManager = MandalaVisualSource()
+        audioEngine = AudioEngine(applicationContext)
+        val manager = MandalaVisualSource()
+        sourceManager = manager
         
-        spiralSurfaceView = SpiralSurfaceView(this)
-        val renderer = spiralSurfaceView!!.renderer
-        renderer.visualSource = sourceManager
+        val surfaceView = SpiralSurfaceView(applicationContext)
+        spiralSurfaceView = surfaceView
+        val renderer = surfaceView.renderer
+        renderer.visualSource = manager
 
         setContent {
             SpiralsTheme {
@@ -140,7 +131,7 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalSpiralRenderer provides renderer) {
                     val previewContent = @Composable {
                         AndroidView(
-                            factory = { spiralSurfaceView!! },
+                            factory = { surfaceView },
                             modifier = Modifier.fillMaxSize(),
                             update = {}
                         )
@@ -243,14 +234,14 @@ class MainActivity : ComponentActivity() {
                                         onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
                                         onShowCvLab = { showCvLab = true },
                                         previewContent = previewContent,
-                                        visualSource = sourceManager!!
+                                        visualSource = manager
                                     )
                                 }
                                 LayerType.MANDALA -> {
                                     MandalaEditorScreen(
                                         vm = vm,
-                                        visualSource = sourceManager!!,
-                                        isDirty = PatchMapper.isDirty(sourceManager!!, currentPatch),
+                                        visualSource = manager,
+                                        isDirty = PatchMapper.isDirty(manager, currentPatch),
                                         lastLoadedPatch = currentPatch,
                                         onPatchLoaded = { vm.setCurrentPatch(it) },
                                         onInteraction = { /* Generic interaction trigger */ },
@@ -353,7 +344,7 @@ class MainActivity : ComponentActivity() {
                     
                     Spacer(modifier = Modifier.height(12.dp))
                     
-                    StartupMode.values().forEach { mode ->
+                    StartupMode.entries.forEach { mode ->
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -398,13 +389,10 @@ class MainActivity : ComponentActivity() {
         previewContent: @Composable () -> Unit,
         showHeader: Boolean = true
     ) {
-        val scope = rememberCoroutineScope()
-        val context = LocalContext.current
         var focusedParameterId by remember { mutableStateOf("L1") }
         var recipeExpanded by remember { mutableStateOf(false) }
-        var showMenu by remember { mutableStateOf(false) }
         var showOpenDialog by remember { mutableStateOf(false) }
-        var patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
+        val patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
 
         val renderer = LocalSpiralRenderer.current
         DisposableEffect(renderer) {
@@ -418,8 +406,8 @@ class MainActivity : ComponentActivity() {
         // Keep ViewModel updated with current work-in-progress for cascade saving
         LaunchedEffect(visualSource.recipe, visualSource.parameters.values.map { it.value }) {
             val patchData = PatchMapper.fromVisualSource(patchName, visualSource)
-            val navStack = vm.navStack.value
-            val index = navStack.indexOfLast { it.type == LayerType.MANDALA }
+            val stack = vm.navStack.value
+            val index = stack.indexOfLast { it.type == LayerType.MANDALA }
             if (index != -1) {
                 val realDirty = PatchMapper.isDirty(visualSource, lastLoadedPatch)
                 vm.updateLayerData(index, patchData, isDirty = realDirty)

@@ -45,8 +45,15 @@ fun MandalaParameterMatrix(
         if (idx != -1) id to parameters[idx] else null
     }
 
+    // Row 4: Feedback Engine
+    val row4Ids = listOf("FB Decay", "FB Gain", "FB Zoom", "FB Rotate", "FB Shift", "FB Blur")
+    val row4Params = row4Ids.mapNotNull { id ->
+        val idx = labels.indexOf(id)
+        if (idx != -1) id to parameters[idx] else null
+    }
+
     // Capture any parameters not explicitly grouped above
-    val handledIds = row1Ids + row2Ids + row3Ids
+    val handledIds = row1Ids + row2Ids + row3Ids + row4Ids
     val extraParams = labels.indices
         .filter { !handledIds.contains(labels[it]) }
         .map { labels[it] to parameters[it] }
@@ -102,6 +109,26 @@ fun MandalaParameterMatrix(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             row3Params.forEach { (id, param) ->
+                KnobCell(
+                    id = id,
+                    param = param,
+                    isFocused = id == focusedParameterId,
+                    onFocusRequest = onFocusRequest,
+                    onInteractionFinished = onInteractionFinished,
+                    labelAbove = false
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // ROW 4: Feedback
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            row4Params.forEach { (id, param) ->
                 KnobCell(
                     id = id,
                     param = param,
@@ -187,6 +214,9 @@ private fun KnobCell(
                         "Snap Count" -> (it * 14f + 2f).roundToInt().toString()
                         "Snap Mode" -> if (it < 0.5f) "BHND" else "ABOV"
                         "Snap Blend" -> if (it < 0.5f) "NORM" else "ADD"
+                        "FB Zoom" -> "%.1f%%".format((it - 0.5f) * 10f)
+                        "FB Rotate" -> "%.1f°".format((it - 0.5f) * 10f)
+                        "FB Shift" -> "%.0f°".format(it * 360f)
                         else -> (it * 100f).roundToInt().toString()
                     }
                 }

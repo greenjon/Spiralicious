@@ -1,0 +1,74 @@
+#version 300 es
+precision highp float;
+
+in vec2 vTexCoord;
+out vec4 fragColor;
+
+uniform sampler2D uTextureLive;
+uniform sampler2D uTextureHistory;
+
+uniform float uDecay;
+uniform float uGain;
+uniform float uZoom;   
+uniform float uRotate; 
+uniform float uHueShift;
+uniform float uBlur;
+
+vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+}
+
+vec3 rgb2hsv(vec3 c) {
+    vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+    float d = q.x - min(q.w, q.y);
+    float e = 1.0e-10;
+    return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+void main() {
+    // 1. Transform History Coordinates (Zoom/Rotate)
+    vec2 uv = vTexCoord - 0.5;
+    uv *= (1.0 - uZoom);
+    float s = sin(uRotate);
+    float c = cos(uRotate);
+    uv = vec2(uv.x * c - uv.y * s, uv.x * s + uv.y * c);
+    vec2 historyCoord = uv + 0.5;
+    
+    vec4 history;
+    if (uBlur > 0.01) {
+        float b = uBlur * 0.004;
+        history = texture(uTextureHistory, historyCoord) * 0.4;
+        history += texture(uTextureHistory, historyCoord + vec2(b, b)) * 0.15;
+        history += texture(uTextureHistory, historyCoord + vec2(-b, b)) * 0.15;
+        history += texture(uTextureHistory, historyCoord + vec2(b, -b)) * 0.15;
+        history += texture(uTextureHistory, historyCoord + vec2(-b, -b)) * 0.15;
+    } else {
+        history = texture(uTextureHistory, historyCoord);
+    }
+    
+    // 2. Color Shift the History
+    if (uHueShift != 0.0 && history.a > 0.01) {
+        vec3 hsv = rgb2hsv(history.rgb);
+        hsv.x = fract(hsv.x + uHueShift);
+        history.rgb = hsv2rgb(hsv);
+    }
+    
+    // 3. Sample Live
+    vec4 live = texture(uTextureLive, vTexCoord);
+    
+    // 4. The Mix Logic (Prevents White-Out)
+    // We scale the input by Gain.
+    // We add history scaled by Decay, but we use the Live Alpha to "mask" the history.
+    // This prevents recursive brightness buildup where the shapes overlap.
+    float gain = uGain;
+    float decay = uDecay;
+    
+    vec3 composite = live.rgb * gain + history.rgb * decay * (1.0 - live.a * gain);
+    float alpha = max(live.a * gain, history.a * decay);
+    
+    fragColor = clamp(vec4(composite, alpha), 0.0, 1.0);
+}

@@ -8,6 +8,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Toast
+import android.media.AudioFormat
+import android.media.AudioRecord
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -53,6 +55,7 @@ import kotlinx.coroutines.launch
 import llm.slop.spirals.cv.CvModulator
 import llm.slop.spirals.cv.Waveform
 import llm.slop.spirals.cv.ModulationOperator
+import llm.slop.spirals.cv.CvRegistry
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
@@ -94,6 +97,32 @@ class MainActivity : ComponentActivity() {
                 }
                 
                 var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
+
+                // 1. Start the CV Sync Registry immediately
+                LaunchedEffect(Unit) {
+                    CvRegistry.startSync(this)
+                }
+
+                // 2. Automatically start/stop Audio Engine based on source selection
+                LaunchedEffect(audioSourceType, hasMicPermission) {
+                    if (audioSourceType == AudioSourceType.MIC || audioSourceType == AudioSourceType.UNPROCESSED) {
+                        if (hasMicPermission) {
+                            val sampleRate = 44100
+                            val encoding = AudioFormat.ENCODING_PCM_FLOAT
+                            val channelConfig = AudioFormat.CHANNEL_IN_MONO
+                            val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, encoding)
+                            
+                            val record = audioEngine.sourceManager.buildAudioRecord(
+                                type = audioSourceType,
+                                sampleRate = sampleRate,
+                                encoding = encoding,
+                                channelConfig = channelConfig,
+                                bufferSize = bufferSize
+                            )
+                            audioEngine.start(this, record)
+                        }
+                    }
+                }
 
                 LaunchedEffect(hasMicPermission) {
                     if (!hasMicPermission) {

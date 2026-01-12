@@ -9,29 +9,36 @@ import kotlin.math.sin
 import kotlin.math.PI
 import kotlin.math.sqrt
 import kotlin.math.max
+import kotlin.math.abs
 
 /**
  * Optimized VisualSource that avoids allocations in the render loop.
  * Renders exactly one complete closed loop based on integer frequencies.
  */
 class MandalaVisualSource : VisualSource {
-    // Note: Use a Map that preserves insertion order if you want the UI to follow this order
     override val parameters = linkedMapOf(
         "L1" to ModulatableParameter(0.4f),
         "L2" to ModulatableParameter(0.3f),
         "L3" to ModulatableParameter(0.2f),
         "L4" to ModulatableParameter(0.1f),
-        "Scale" to ModulatableParameter(0.125f), // Default 0.125 * 8x = 1.0 Unity
+        "Scale" to ModulatableParameter(0.125f), 
         "Rotation" to ModulatableParameter(0.0f),
         "Thickness" to ModulatableParameter(0.1f),
         "Hue Offset" to ModulatableParameter(0.0f),
-        "Hue Sweep" to ModulatableParameter(1.0f / 9.0f), // Default 1.0, scaled 0-9
+        "Hue Sweep" to ModulatableParameter(1.0f / 9.0f), 
         "Depth" to ModulatableParameter(0.35f),
         "Trails" to ModulatableParameter(0.0f),
-        "Snap Count" to ModulatableParameter(0.5f), // Mapped 2-16
-        "Snap Mode" to ModulatableParameter(0.0f),  // <0.5 Behind, >0.5 Above
-        "Snap Blend" to ModulatableParameter(0.0f), // <0.5 Normal, >0.5 Additive
-        "Snap Trigger" to ModulatableParameter(0.0f)
+        "Snap Count" to ModulatableParameter(0.5f), 
+        "Snap Mode" to ModulatableParameter(0.0f),  
+        "Snap Blend" to ModulatableParameter(0.0f), 
+        "Snap Trigger" to ModulatableParameter(0.0f),
+        // Feedback Engine Parameters
+        "FB Decay" to ModulatableParameter(0.0f),
+        "FB Gain" to ModulatableParameter(1.0f),
+        "FB Zoom" to ModulatableParameter(0.5f),   // 0.5 = 0%
+        "FB Rotate" to ModulatableParameter(0.5f), // 0.5 = 0 degrees
+        "FB Shift" to ModulatableParameter(0.0f),
+        "FB Blur" to ModulatableParameter(0.0f)
     )
 
     override val globalAlpha = ModulatableParameter(1.0f) 
@@ -44,12 +51,11 @@ class MandalaVisualSource : VisualSource {
         style = Paint.Style.STROKE
     }
 
-    // Pre-allocated buffers to avoid GC pressure
     private val hsvBuffer = FloatArray(3)
     
-    // Phase 1.2: Store triplets: [x, y, phase]
     private val points = 2048
-    val geometryBuffer = FloatArray((points + 1) * 3)
+    // Static buffer for GPU expansion: [Phase, Side] pairs
+    val expansionBuffer = FloatArray((points + 1) * 2 * 2)
 
     // Radial Brightness tracking
     var minR: Float = 0f
@@ -57,71 +63,60 @@ class MandalaVisualSource : VisualSource {
     var maxR: Float = 1f
         private set
 
-    override fun update() {
-        super.update()
-        updateGeometry()
+    // Optimization flags
+    var isDirty = true
+    private var lastRecipeId = ""
+
+    init {
+        for (i in 0..points) {
+            val phase = i.toFloat() / points.toFloat()
+            // Left vertex
+            expansionBuffer[i * 4 + 0] = phase
+            expansionBuffer[i * 4 + 1] = -1.0f 
+            // Right vertex
+            expansionBuffer[i * 4 + 2] = phase
+            expansionBuffer[i * 4 + 3] = 1.0f
+        }
     }
 
-    private fun updateGeometry() {
-        val l1 = parameters["L1"]!!.value
-        val l2 = parameters["L2"]!!.value
-        val l3 = parameters["L3"]!!.value
-        val l4 = parameters["L4"]!!.value
+    override fun update() {
+        super.update()
         
-        val dt = (2.0 * PI) / points
+        // Optimization: Use mathematical heuristic for bounds instead of a 2048-point loop
+        // maxR is the sum of absolute arm lengths (the maximum possible reach)
+        val l1 = abs(parameters["L1"]!!.value)
+        val l2 = abs(parameters["L2"]!!.value)
+        val l3 = abs(parameters["L3"]!!.value)
+        val l4 = abs(parameters["L4"]!!.value)
         
-        var currentMinR = Float.MAX_VALUE
-        var currentMaxR = -Float.MAX_VALUE
+        maxR = max(0.001f, l1 + l2 + l3 + l4)
+        minR = 0f // Stable base for depth effect
 
-        for (i in 0..points) {
-            val t = i * dt
-            val phase = i.toFloat() / points.toFloat()
-            
-            val angle1 = t * recipe.a
-            val angle2 = t * recipe.b
-            val angle3 = t * recipe.c
-            val angle4 = t * recipe.d
-
-            val x = (l1 * cos(angle1) + l2 * cos(angle2) + l3 * cos(angle3) + l4 * cos(angle4)).toFloat()
-            val y = (l1 * sin(angle1) + l2 * sin(angle2) + l3 * sin(angle3) + l4 * sin(angle4)).toFloat()
-            
-            geometryBuffer[i * 3] = x
-            geometryBuffer[i * 3 + 1] = y
-            geometryBuffer[i * 3 + 2] = phase
-
-            val r = sqrt(x * x + y * y)
-            if (r < currentMinR) currentMinR = r
-            if (r > currentMaxR) currentMaxR = r
-        }
-
-        // Safety Check: If maxR - minR < 0.001f, force a fallback range
-        if (currentMaxR - currentMinR < 0.001f) {
-            minR = 0f
-            maxR = max(0.001f, currentMaxR)
-        } else {
-            minR = currentMinR
-            maxR = currentMaxR
+        if (recipe.id != lastRecipeId) {
+            lastRecipeId = recipe.id
+            isDirty = true
         }
     }
 
     override fun render(canvas: Canvas, width: Int, height: Int) {
         val alpha = globalAlpha.value
-        if (alpha <= 0f) return // Skip rendering if invisible
+        if (alpha <= 0f) return
 
-        // Scale geometry for Canvas - mandala is normalized 0..1 arm lengths
         val canvasScaleFactor = width / 2f
-        
-        // Match the 8x scaling logic from the OpenGL renderer
         val scale = parameters["Scale"]!!.value * globalScale.value * 8.0f
-        
         val thickness = parameters["Thickness"]!!.value * 20f
         val hueOffset = parameters["Hue Offset"]!!.value
-        val hueSweep = parameters["Hue Sweep"]!!.value * 9.0f // Scale 0-1 to 0-9
+        val hueSweep = parameters["Hue Sweep"]!!.value * 9.0f 
         val depth = parameters["Depth"]!!.value
         val rotationDegrees = parameters["Rotation"]!!.value * 360f
 
+        val l1 = parameters["L1"]!!.value
+        val l2 = parameters["L2"]!!.value
+        val l3 = parameters["L3"]!!.value
+        val l4 = parameters["L4"]!!.value
+
         paint.strokeWidth = thickness
-        hsvBuffer[1] = 0.8f // Fixed Saturation as per blueprint
+        hsvBuffer[1] = 0.8f 
 
         val cx = width / 2f
         val cy = height / 2f
@@ -131,33 +126,31 @@ class MandalaVisualSource : VisualSource {
         canvas.rotate(rotationDegrees)
         canvas.scale(scale * canvasScaleFactor, scale * canvasScaleFactor)
 
-        for (i in 0 until points) {
-            val x1 = geometryBuffer[i * 3]
-            val y1 = geometryBuffer[i * 3 + 1]
-            val phase = geometryBuffer[i * 3 + 2]
-            
-            val x2 = geometryBuffer[(i + 1) * 3]
-            val y2 = geometryBuffer[(i + 1) * 3 + 1]
+        val dt = (2.0 * PI) / points
+        var prevX = (l1 + l2 + l3 + l4)
+        var prevY = 0f
 
-            // Radial Brightness Logic for Canvas
-            val r = sqrt(x1 * x1 + y1 * y1)
-            val rNorm = ((r - minR) / max(0.001f, maxR - minR)).coerceIn(0f, 1f)
+        for (i in 1..points) {
+            val t = i * dt
+            val phase = i.toFloat() / points.toFloat()
+            
+            val x = (l1 * cos(t * recipe.a) + l2 * cos(t * recipe.b) + l3 * cos(t * recipe.c) + l4 * cos(t * recipe.d)).toFloat()
+            val y = (l1 * sin(t * recipe.a) + l2 * sin(t * recipe.b) + l3 * sin(t * recipe.c) + l4 * sin(t * recipe.d)).toFloat()
+
+            // Visual Parity with GPU Depth Heuristic
+            val r = sqrt(x * x + y * y)
+            val rNorm = (r / maxR).coerceIn(0f, 1f)
             val f = Math.pow(rNorm.toDouble(), 0.7).toFloat()
             val v = 0.85f * (1.0f - depth + depth * f)
 
             hsvBuffer[2] = v
-
-            // For Canvas, we update color per segment to match the new phase coloring
-            val currentHue = ((hueOffset + phase * hueSweep) % 1.0f) * 360f
-            hsvBuffer[0] = currentHue
-            val baseColor = Color.HSVToColor(hsvBuffer)
-            paint.color = Color.argb(
-                (alpha * 255).toInt(),
-                Color.red(baseColor),
-                Color.green(baseColor),
-                Color.blue(baseColor)
-            )
-            canvas.drawLine(x1, y1, x2, y2, paint)
+            hsvBuffer[0] = ((hueOffset + phase * hueSweep) % 1.0f) * 360f
+            val color = Color.HSVToColor(hsvBuffer)
+            paint.color = Color.argb((alpha * 255).toInt(), Color.red(color), Color.green(color), Color.blue(color))
+            
+            canvas.drawLine(prevX, prevY, x, y, paint)
+            prevX = x
+            prevY = y
         }
 
         canvas.restore()

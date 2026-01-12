@@ -46,6 +46,7 @@ import llm.slop.spirals.ui.MixerEditorScreen
 import llm.slop.spirals.ui.MandalaSetEditorScreen
 import llm.slop.spirals.ui.components.MandalaParameterMatrix
 import llm.slop.spirals.ui.components.OscilloscopeView
+import llm.slop.spirals.ui.components.EditorBreadcrumbs
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
@@ -86,12 +87,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             SpiralsTheme {
                 val vm: MandalaViewModel = viewModel()
+                val navStack by vm.navStack.collectAsState()
+                val currentLayer = navStack.last()
                 val currentPatch by vm.currentPatch.collectAsState()
                 val scope = rememberCoroutineScope()
                 
                 var showCvLab by remember { mutableStateOf(false) }
-                var showSetEditor by remember { mutableStateOf(false) }
-                var showMixerEditor by remember { mutableStateOf(false) }
                 var hasMicPermission by remember { 
                     mutableStateOf(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) 
                 }
@@ -139,41 +140,56 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    Box(
+                    Column(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(AppBackground)
                             .systemBarsPadding()
                     ) {
-                        when {
-                            showSetEditor -> MandalaSetEditorScreen(
-                                vm = vm, 
-                                onClose = { showSetEditor = false },
-                                onNavigateToMixerEditor = { showMixerEditor = true; showSetEditor = false },
-                                onShowCvLab = { showCvLab = true; showSetEditor = false },
-                                previewContent = previewContent,
-                                visualSource = sourceManager!!
-                            )
-                            showMixerEditor -> MixerEditorScreen(
-                                vm = vm, 
-                                onClose = { showMixerEditor = false },
-                                onNavigateToSetEditor = { showSetEditor = true; showMixerEditor = false },
-                                onNavigateToMandalaEditor = { showMixerEditor = false },
-                                onShowCvLab = { showCvLab = true; showMixerEditor = false },
-                                previewContent = previewContent
-                            )
-                            else -> MandalaEditorScreen(
-                                vm = vm,
-                                visualSource = sourceManager!!,
-                                isDirty = PatchMapper.isDirty(sourceManager!!, currentPatch),
-                                lastLoadedPatch = currentPatch,
-                                onPatchLoaded = { vm.setCurrentPatch(it) },
-                                onInteraction = { /* Generic interaction trigger */ },
-                                onNavigateToSetEditor = { showSetEditor = true },
-                                onNavigateToMixerEditor = { showMixerEditor = true },
-                                onShowCvLab = { showCvLab = true },
-                                previewContent = previewContent
-                            )
+                        var showHeaderMenu by remember { mutableStateOf(false) }
+
+                        EditorBreadcrumbs(
+                            stack = navStack,
+                            onLayerClick = { index -> vm.popToLayer(index) },
+                            onMenuClick = { showHeaderMenu = true }
+                        )
+
+                        Box(modifier = Modifier.weight(1f)) {
+                            when (currentLayer.type) {
+                                LayerType.MIXER -> MixerEditorScreen(
+                                    vm = vm, 
+                                    onClose = { /* Root layer usually doesn't close */ },
+                                    onNavigateToSetEditor = { 
+                                        vm.pushLayer(NavLayer("new_set", "New Set", LayerType.SET))
+                                    },
+                                    onNavigateToMandalaEditor = { 
+                                        vm.pushLayer(NavLayer("new_mandala", "New Patch", LayerType.MANDALA))
+                                    },
+                                    onShowCvLab = { showCvLab = true },
+                                    previewContent = previewContent
+                                )
+                                LayerType.SET -> MandalaSetEditorScreen(
+                                    vm = vm, 
+                                    onClose = { vm.popToLayer(navStack.size - 2) },
+                                    onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
+                                    onShowCvLab = { showCvLab = true },
+                                    previewContent = previewContent,
+                                    visualSource = sourceManager!!
+                                )
+                                LayerType.MANDALA -> MandalaEditorScreen(
+                                    vm = vm,
+                                    visualSource = sourceManager!!,
+                                    isDirty = PatchMapper.isDirty(sourceManager!!, currentPatch),
+                                    lastLoadedPatch = currentPatch,
+                                    onPatchLoaded = { vm.setCurrentPatch(it) },
+                                    onInteraction = { /* Generic interaction trigger */ },
+                                    onNavigateToSetEditor = { /* Navigation handled via breadcrumbs */ },
+                                    onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
+                                    onShowCvLab = { showCvLab = true },
+                                    previewContent = previewContent,
+                                    showHeader = false // Hide local header, use breadcrumbs
+                                )
+                            }
                         }
                     }
                 }
@@ -213,7 +229,8 @@ class MainActivity : ComponentActivity() {
         onNavigateToSetEditor: () -> Unit,
         onNavigateToMixerEditor: () -> Unit,
         onShowCvLab: () -> Unit,
-        previewContent: @Composable () -> Unit
+        previewContent: @Composable () -> Unit,
+        showHeader: Boolean = true
     ) {
         val scope = rememberCoroutineScope()
         val context = LocalContext.current
@@ -241,60 +258,62 @@ class MainActivity : ComponentActivity() {
         }
 
         Column(modifier = Modifier.fillMaxSize()) {
-            VisualSourceHeader(
-                title = headerTitle,
-                onMenuClick = { showMenu = true },
-                menuContent = {
-                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }, containerColor = AppBackground) {
-                        DropdownMenuItem(text = { Text("New", color = AppText) }, onClick = { 
-                            val defaultRecipe = MandalaLibrary.MandalaRatios.first()
-                            visualSource.recipe = defaultRecipe
-                            onPatchLoaded(PatchData("New Patch", defaultRecipe.id, emptyList()))
-                            showMenu = false 
-                        })
-                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-                        DropdownMenuItem(text = { Text("CV Lab", color = AppAccent) }, onClick = { onShowCvLab(); showMenu = false }, leadingIcon = { Icon(Icons.Default.Build, contentDescription = null, tint = AppAccent) })
-                        DropdownMenuItem(text = { Text("Mandala Set Editor", color = AppAccent) }, onClick = { onNavigateToSetEditor(); showMenu = false }, leadingIcon = { Icon(Icons.Default.List, contentDescription = null, tint = AppAccent) })
-                        DropdownMenuItem(text = { Text("Mixer Editor", color = AppAccent) }, onClick = { onNavigateToMixerEditor(); showMenu = false }, leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = AppAccent) })
-                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-                        DropdownMenuItem(text = { Text("Open", color = AppText) }, onClick = { showOpenDialog = true; showMenu = false })
-                        DropdownMenuItem(text = { Text("Save", color = AppText) }, onClick = { 
-                            scope.launch { 
+            if (showHeader) {
+                VisualSourceHeader(
+                    title = headerTitle,
+                    onMenuClick = { showMenu = true },
+                    menuContent = {
+                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }, containerColor = AppBackground) {
+                            DropdownMenuItem(text = { Text("New", color = AppText) }, onClick = { 
+                                val defaultRecipe = MandalaLibrary.MandalaRatios.first()
+                                visualSource.recipe = defaultRecipe
+                                onPatchLoaded(PatchData("New Patch", defaultRecipe.id, emptyList()))
+                                showMenu = false 
+                            })
+                            HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                            DropdownMenuItem(text = { Text("CV Lab", color = AppAccent) }, onClick = { onShowCvLab(); showMenu = false }, leadingIcon = { Icon(Icons.Default.Build, contentDescription = null, tint = AppAccent) })
+                            DropdownMenuItem(text = { Text("Mandala Set Editor", color = AppAccent) }, onClick = { onNavigateToSetEditor(); showMenu = false }, leadingIcon = { Icon(Icons.Default.List, contentDescription = null, tint = AppAccent) })
+                            DropdownMenuItem(text = { Text("Mixer Editor", color = AppAccent) }, onClick = { onNavigateToMixerEditor(); showMenu = false }, leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = AppAccent) })
+                            HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                            DropdownMenuItem(text = { Text("Open", color = AppText) }, onClick = { showOpenDialog = true; showMenu = false })
+                            DropdownMenuItem(text = { Text("Save", color = AppText) }, onClick = { 
+                                scope.launch { 
+                                    val data = PatchMapper.fromVisualSource(patchName, visualSource)
+                                    vm.savePatch(data)
+                                    onPatchLoaded(data)
+                                }
+                                showMenu = false 
+                            })
+                            DropdownMenuItem(text = { Text("Rename", color = AppText) }, onClick = { showRenameDialog = true; showMenu = false })
+                            DropdownMenuItem(text = { Text("Clone", color = AppText) }, onClick = { 
+                                scope.launch { 
+                                    val data = PatchMapper.fromVisualSource("$patchName CLONE", visualSource)
+                                    vm.savePatch(data)
+                                    onPatchLoaded(data)
+                                }
+                                showMenu = false 
+                            })
+                            DropdownMenuItem(text = { Text("Copy to Clipboard", color = AppText) }, onClick = { 
                                 val data = PatchMapper.fromVisualSource(patchName, visualSource)
-                                vm.savePatch(data)
-                                onPatchLoaded(data)
-                            }
-                            showMenu = false 
-                        })
-                        DropdownMenuItem(text = { Text("Rename", color = AppText) }, onClick = { showRenameDialog = true; showMenu = false })
-                        DropdownMenuItem(text = { Text("Clone", color = AppText) }, onClick = { 
-                            scope.launch { 
-                                val data = PatchMapper.fromVisualSource("$patchName CLONE", visualSource)
-                                vm.savePatch(data)
-                                onPatchLoaded(data)
-                            }
-                            showMenu = false 
-                        })
-                        DropdownMenuItem(text = { Text("Copy to Clipboard", color = AppText) }, onClick = { 
-                            val data = PatchMapper.fromVisualSource(patchName, visualSource)
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("Mandala Patch", PatchMapper.toJson(data)))
-                            Toast.makeText(context, "Patch copied to clipboard", Toast.LENGTH_SHORT).show()
-                            showMenu = false 
-                        }, leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = AppText) })
-                        DropdownMenuItem(text = { Text("Share", color = AppText) }, onClick = { 
-                            val data = PatchMapper.fromVisualSource(patchName, visualSource)
-                            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) }, "Share Patch"))
-                            showMenu = false 
-                        }, leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = AppText) })
-                        DropdownMenuItem(text = { Text("Delete", color = Color.Red) }, onClick = { 
-                            lastLoadedPatch?.let { vm.deletePatch(it.name) }
-                            onPatchLoaded(PatchData("New Patch", MandalaLibrary.MandalaRatios.first().id, emptyList()))
-                            showMenu = false 
-                        }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) })
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("Mandala Patch", PatchMapper.toJson(data)))
+                                Toast.makeText(context, "Patch copied to clipboard", Toast.LENGTH_SHORT).show()
+                                showMenu = false 
+                            }, leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = AppText) })
+                            DropdownMenuItem(text = { Text("Share", color = AppText) }, onClick = { 
+                                val data = PatchMapper.fromVisualSource(patchName, visualSource)
+                                context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) }, "Share Patch"))
+                                showMenu = false 
+                            }, leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = AppText) })
+                            DropdownMenuItem(text = { Text("Delete", color = Color.Red) }, onClick = { 
+                                lastLoadedPatch?.let { vm.deletePatch(it.name) }
+                                onPatchLoaded(PatchData("New Patch", MandalaLibrary.MandalaRatios.first().id, emptyList()))
+                                showMenu = false 
+                            }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) })
+                        }
                     }
-                }
-            )
+                )
+            }
 
             Column(modifier = Modifier.weight(1f).fillMaxSize()) {
                 Column(modifier = Modifier.wrapContentHeight().fillMaxWidth().padding(horizontal = 8.dp)) {

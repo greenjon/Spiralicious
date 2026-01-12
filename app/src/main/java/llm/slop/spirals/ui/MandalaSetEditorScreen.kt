@@ -257,6 +257,10 @@ fun MandalaSetEditorScreen(
                         orderedMandalaIds = (currentSet?.orderedMandalaIds ?: mutableListOf()).toMutableList().apply { add(patchName) }
                     )
                     focusedMandalaId = patchName
+                },
+                onCreateNew = {
+                    onClose() // Navigate to Mandala Editor
+                    showMandalaPicker = false
                 }
             )
         }

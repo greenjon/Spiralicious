@@ -3,16 +3,21 @@ package llm.slop.spirals
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import llm.slop.spirals.models.MixerPatch
+import java.util.UUID
+
+data class NavLayer(
+    val id: String,
+    val name: String,
+    val type: LayerType,
+    val data: Any? = null 
+)
+
+enum class LayerType { MIXER, SET, MANDALA }
 
 class MandalaViewModel(application: Application) : AndroidViewModel(application) {
     private val db = MandalaDatabase.getDatabase(application)
@@ -24,6 +29,52 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     private val _currentPatch = MutableStateFlow<PatchData?>(null)
     val currentPatch: StateFlow<PatchData?> = _currentPatch.asStateFlow()
 
+    private val _navStack = MutableStateFlow<List<NavLayer>>(listOf(NavLayer("root", "Mixer 1", LayerType.MIXER)))
+    val navStack = _navStack.asStateFlow()
+
+    val allPatches = patchDao.getAllPatches().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val allSets = setDao.getAllSets().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val allMixerPatches = mixerDao.getAllMixerPatches().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    fun generateNextName(type: LayerType): String {
+        val (prefix, list) = when (type) {
+            LayerType.MIXER -> "Mix" to allMixerPatches.value.map { it.name }
+            LayerType.SET -> "Set" to allSets.value.map { it.name }
+            LayerType.MANDALA -> "Man" to allPatches.value.map { it.name }
+        }
+        
+        val regex = Regex("${prefix}(\\d+)")
+        val maxNum = list.mapNotNull { 
+            regex.find(it)?.groupValues?.get(1)?.toIntOrNull() 
+        }.maxOrNull() ?: 0
+        
+        return "$prefix${(maxNum + 1).toString().padStart(3, '0')}"
+    }
+
+    fun pushLayer(layer: NavLayer) {
+        _navStack.value += layer
+    }
+
+    fun createAndPushLayer(type: LayerType, parentData: Any? = null) {
+        val name = generateNextName(type)
+        val id = UUID.randomUUID().toString()
+        pushLayer(NavLayer(id, name, type, parentData))
+    }
+
+    fun popToLayer(index: Int, save: Boolean = true) {
+        if (index < 0 || index >= _navStack.value.size) return
+        val layersToPop = _navStack.value.subList(index + 1, _navStack.value.size).reversed()
+        
+        if (save) {
+            layersToPop.forEach { layer ->
+                // Actual saving logic would go here, triggered by an external save signal or data capture
+                // For now, we assume the UI handles the "dirty" state and we just confirm the final pop
+            }
+        }
+        
+        _navStack.value = _navStack.value.take(index + 1)
+    }
+
     fun setCurrentPatch(patch: PatchData?) {
         _currentPatch.value = patch
     }
@@ -31,10 +82,6 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     val tags: StateFlow<Map<String, List<String>>> = tagDao.getAllTags()
         .map { list -> list.groupBy({ it.id }, { it.tag }) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
-
-    val allPatches = patchDao.getAllPatches()
-    val allSets = setDao.getAllSets()
-    val allMixerPatches = mixerDao.getAllMixerPatches()
 
     fun savePatch(patchData: PatchData) {
         viewModelScope.launch {

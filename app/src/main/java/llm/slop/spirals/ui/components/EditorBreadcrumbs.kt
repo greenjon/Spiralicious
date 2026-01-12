@@ -6,9 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,7 +22,7 @@ import llm.slop.spirals.ui.theme.AppText
 fun EditorBreadcrumbs(
     stack: List<NavLayer>,
     onLayerClick: (Int) -> Unit,
-    onMenuClick: () -> Unit
+    actions: @Composable BoxScope.() -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -37,8 +35,9 @@ fun EditorBreadcrumbs(
         verticalAlignment = Alignment.CenterVertically
     ) {
         stack.forEachIndexed { index, layer ->
+            val displayName = if (layer.isDirty) "${layer.name} *" else layer.name
             Text(
-                text = layer.name,
+                text = displayName,
                 color = if (index == stack.lastIndex) AppAccent else AppText,
                 style = MaterialTheme.typography.labelLarge,
                 modifier = Modifier.clickable { onLayerClick(index) }
@@ -56,8 +55,8 @@ fun EditorBreadcrumbs(
         
         Spacer(modifier = Modifier.weight(1f))
         
-        IconButton(onClick = onMenuClick) {
-            Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
+        Box(contentAlignment = Alignment.Center) {
+            actions()
         }
     }
 }

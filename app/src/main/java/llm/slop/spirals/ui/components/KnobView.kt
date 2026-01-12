@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppText
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Composable
@@ -50,7 +51,7 @@ fun KnobView(
             
             // Background track - Thinner circle
             drawCircle(
-                color = AppText,
+                color = AppText.copy(alpha = 0.2f),
                 radius = radius,
                 center = canvasCenter,
                 style = Stroke(width = 1.dp.toPx())
@@ -61,7 +62,8 @@ fun KnobView(
 
             if (isBipolar) {
                 // Sweep from center (12 o'clock / 270°)
-                val sweep = currentValue * 180f
+                // currentValue is expected to be -1.0 to 1.0
+                val sweep = currentValue * 150f // 150 deg max each side
                 drawArc(
                     color = if (focused) AppAccent else AppText,
                     startAngle = 270f,

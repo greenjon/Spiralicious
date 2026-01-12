@@ -28,6 +28,8 @@ import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.cv.ModulatableParameter
 import llm.slop.spirals.ui.ModulatorRow
 import kotlinx.serialization.json.Json
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun SourceStrip(
@@ -342,9 +344,18 @@ fun MonitorStrip(
                     onPatchChange(updateGroup(patch, group, newGroup))
                 },
                 onInteractionFinished = {},
+                isBipolar = true,
                 knobSize = 44.dp,
                 showValue = true,
-                focused = focusedId == balId
+                focused = focusedId == balId,
+                displayTransform = { 
+                    val v = (it * 100).roundToInt()
+                    when {
+                        v < 0 -> "L${abs(v)}"
+                        v > 0 -> "R$v"
+                        else -> "0"
+                    }
+                }
             )
         }
         
@@ -429,7 +440,7 @@ fun MixerCvEditor(
         }
     }
     
-    var refreshCount by remember { mutableIntStateOf(0) }
+    var refreshCount by remember { mutableStateOf(0) }
 
     Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
         Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {

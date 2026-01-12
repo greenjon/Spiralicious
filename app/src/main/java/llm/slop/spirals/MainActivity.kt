@@ -57,6 +57,9 @@ import llm.slop.spirals.cv.CvModulator
 import llm.slop.spirals.cv.Waveform
 import llm.slop.spirals.cv.ModulationOperator
 import llm.slop.spirals.cv.CvRegistry
+import llm.slop.spirals.models.MixerPatch
+import kotlinx.serialization.json.Json
+import java.util.UUID
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
@@ -88,16 +91,19 @@ class MainActivity : ComponentActivity() {
             SpiralsTheme {
                 val vm: MandalaViewModel = viewModel()
                 val navStack by vm.navStack.collectAsState()
-                val currentLayer = navStack.last()
+                val currentLayer = navStack.lastOrNull() ?: return@SpiralsTheme
                 val currentPatch by vm.currentPatch.collectAsState()
                 val scope = rememberCoroutineScope()
                 
                 var showCvLab by remember { mutableStateOf(false) }
+                var showSettings by remember { mutableStateOf(false) }
                 var hasMicPermission by remember { 
                     mutableStateOf(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) 
                 }
                 
                 var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
+                var showRenameDialog by remember { mutableStateOf(false) }
+                var showOpenMixerDialog by remember { mutableStateOf(false) }
 
                 // 1. Start the CV Sync Registry immediately
                 LaunchedEffect(Unit) {
@@ -151,44 +157,110 @@ class MainActivity : ComponentActivity() {
                         EditorBreadcrumbs(
                             stack = navStack,
                             onLayerClick = { index -> vm.popToLayer(index) },
-                            onMenuClick = { showHeaderMenu = true }
+                            actions = {
+                                IconButton(onClick = { showHeaderMenu = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
+                                }
+                                
+                                if (showHeaderMenu) {
+                                    DropdownMenu(
+                                        expanded = showHeaderMenu, 
+                                        onDismissRequest = { showHeaderMenu = false },
+                                        containerColor = AppBackground
+                                    ) {
+                                        // Standard Options
+                                        DropdownMenuItem(
+                                            text = { Text("Save", color = AppText) }, 
+                                            onClick = { vm.saveLayer(currentLayer); showHeaderMenu = false }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Rename", color = AppText) }, 
+                                            onClick = { showRenameDialog = true; showHeaderMenu = false }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Clone", color = AppText) }, 
+                                            onClick = { vm.cloneLayer(navStack.lastIndex); showHeaderMenu = false }
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Delete", color = Color.Red) }, 
+                                            onClick = { vm.deleteLayerAndPop(navStack.lastIndex); showHeaderMenu = false }
+                                        )
+                                        
+                                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+
+                                        when (currentLayer.type) {
+                                            LayerType.MIXER -> {
+                                                DropdownMenuItem(text = { Text("New Mixer", color = AppAccent) }, onClick = { vm.createAndPushLayer(LayerType.MIXER); showHeaderMenu = false })
+                                                DropdownMenuItem(text = { Text("Open Mixer", color = AppAccent) }, onClick = { showOpenMixerDialog = true; showHeaderMenu = false })
+                                                HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                                                DropdownMenuItem(text = { Text("CV Lab", color = AppAccent) }, onClick = { showCvLab = true; showHeaderMenu = false })
+                                                DropdownMenuItem(text = { Text("Mandala Editor", color = AppAccent) }, onClick = { 
+                                                    vm.createAndPushLayer(LayerType.MANDALA)
+                                                    showHeaderMenu = false 
+                                                })
+                                                DropdownMenuItem(text = { Text("Set Editor", color = AppAccent) }, onClick = { 
+                                                    vm.createAndPushLayer(LayerType.SET)
+                                                    showHeaderMenu = false 
+                                                })
+                                            }
+                                            LayerType.SET, LayerType.MANDALA -> {
+                                                DropdownMenuItem(text = { Text("Discard Changes", color = Color.Red) }, onClick = { 
+                                                    vm.popToLayer(navStack.size - 2, save = false)
+                                                    showHeaderMenu = false 
+                                                })
+                                            }
+                                        }
+                                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                                        DropdownMenuItem(text = { Text("Settings", color = AppText) }, onClick = { 
+                                            showSettings = true
+                                            showHeaderMenu = false 
+                                        })
+                                    }
+                                }
+                            }
                         )
 
                         Box(modifier = Modifier.weight(1f)) {
                             when (currentLayer.type) {
-                                LayerType.MIXER -> MixerEditorScreen(
-                                    vm = vm, 
-                                    onClose = { /* Root layer usually doesn't close */ },
-                                    onNavigateToSetEditor = { 
-                                        vm.pushLayer(NavLayer("new_set", "New Set", LayerType.SET))
-                                    },
-                                    onNavigateToMandalaEditor = { 
-                                        vm.pushLayer(NavLayer("new_mandala", "New Patch", LayerType.MANDALA))
-                                    },
-                                    onShowCvLab = { showCvLab = true },
-                                    previewContent = previewContent
-                                )
-                                LayerType.SET -> MandalaSetEditorScreen(
-                                    vm = vm, 
-                                    onClose = { vm.popToLayer(navStack.size - 2) },
-                                    onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
-                                    onShowCvLab = { showCvLab = true },
-                                    previewContent = previewContent,
-                                    visualSource = sourceManager!!
-                                )
-                                LayerType.MANDALA -> MandalaEditorScreen(
-                                    vm = vm,
-                                    visualSource = sourceManager!!,
-                                    isDirty = PatchMapper.isDirty(sourceManager!!, currentPatch),
-                                    lastLoadedPatch = currentPatch,
-                                    onPatchLoaded = { vm.setCurrentPatch(it) },
-                                    onInteraction = { /* Generic interaction trigger */ },
-                                    onNavigateToSetEditor = { /* Navigation handled via breadcrumbs */ },
-                                    onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
-                                    onShowCvLab = { showCvLab = true },
-                                    previewContent = previewContent,
-                                    showHeader = false // Hide local header, use breadcrumbs
-                                )
+                                LayerType.MIXER -> {
+                                    MixerEditorScreen(
+                                        vm = vm, 
+                                        onClose = { /* Root layer usually doesn't close */ },
+                                        onNavigateToSetEditor = { _ ->
+                                            vm.createAndPushLayer(LayerType.SET)
+                                        },
+                                        onNavigateToMandalaEditor = { _ ->
+                                            vm.createAndPushLayer(LayerType.MANDALA)
+                                        },
+                                        onShowCvLab = { showCvLab = true },
+                                        previewContent = previewContent
+                                    )
+                                }
+                                LayerType.SET -> {
+                                    MandalaSetEditorScreen(
+                                        vm = vm, 
+                                        onClose = { vm.popToLayer(navStack.size - 2) },
+                                        onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
+                                        onShowCvLab = { showCvLab = true },
+                                        previewContent = previewContent,
+                                        visualSource = sourceManager!!
+                                    )
+                                }
+                                LayerType.MANDALA -> {
+                                    MandalaEditorScreen(
+                                        vm = vm,
+                                        visualSource = sourceManager!!,
+                                        isDirty = PatchMapper.isDirty(sourceManager!!, currentPatch),
+                                        lastLoadedPatch = currentPatch,
+                                        onPatchLoaded = { vm.setCurrentPatch(it) },
+                                        onInteraction = { /* Generic interaction trigger */ },
+                                        onNavigateToSetEditor = { /* Navigation handled via breadcrumbs */ },
+                                        onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
+                                        onShowCvLab = { showCvLab = true },
+                                        previewContent = previewContent,
+                                        showHeader = false 
+                                    )
+                                }
                             }
                         }
                     }
@@ -214,6 +286,100 @@ class MainActivity : ComponentActivity() {
                         onClose = { showCvLab = false }
                     )
                 }
+
+                if (showSettings) {
+                    SettingsOverlay(
+                        currentMode = vm.getStartupMode(),
+                        onModeChange = { vm.setStartupMode(it) },
+                        onClose = { showSettings = false }
+                    )
+                }
+                
+                if (showRenameDialog) {
+                    RenamePatchDialog(
+                        initialName = currentLayer.name,
+                        onRename = { newName ->
+                            vm.renameLayer(navStack.lastIndex, currentLayer.name, newName)
+                            showRenameDialog = false
+                        },
+                        onDismiss = { showRenameDialog = false }
+                    )
+                }
+
+                if (showOpenMixerDialog) {
+                    OpenMixerDialog(
+                        vm = vm,
+                        onMixerSelected = { mixer ->
+                            vm.pushLayer(NavLayer(mixer.id, mixer.name, LayerType.MIXER, mixer))
+                            showOpenMixerDialog = false
+                        },
+                        onDismiss = { showOpenMixerDialog = false }
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun SettingsOverlay(
+        currentMode: StartupMode,
+        onModeChange: (StartupMode) -> Unit,
+        onClose: () -> Unit
+    ) {
+        Dialog(onDismissRequest = onClose) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight(),
+                shape = MaterialTheme.shapes.medium,
+                color = AppBackground,
+                border = androidx.compose.foundation.BorderStroke(1.dp, AppText.copy(alpha = 0.1f))
+            ) {
+                Column(modifier = Modifier.padding(24.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Settings", style = MaterialTheme.typography.headlineSmall, color = AppText)
+                        IconButton(onClick = onClose) {
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = AppText)
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    Text("Start app with...", style = MaterialTheme.typography.titleMedium, color = AppText)
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    StartupMode.values().forEach { mode ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onModeChange(mode) }
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = currentMode == mode,
+                                onClick = { onModeChange(mode) },
+                                colors = RadioButtonDefaults.colors(selectedColor = AppAccent, unselectedColor = AppText.copy(alpha = 0.6f))
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = when(mode) {
+                                    StartupMode.LAST_WORKSPACE -> "Last Workspace"
+                                    StartupMode.MIXER -> "Mixer Editor"
+                                    StartupMode.SET -> "Set Editor"
+                                    StartupMode.MANDALA -> "Mandala Editor"
+                                },
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = AppText
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -238,7 +404,6 @@ class MainActivity : ComponentActivity() {
         var recipeExpanded by remember { mutableStateOf(false) }
         var showMenu by remember { mutableStateOf(false) }
         var showOpenDialog by remember { mutableStateOf(false) }
-        var showRenameDialog by remember { mutableStateOf(false) }
         var patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
 
         val renderer = LocalSpiralRenderer.current
@@ -250,71 +415,18 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        val isModified = remember(isDirty, patchName, lastLoadedPatch) {
-            isDirty || patchName != (lastLoadedPatch?.name ?: "New Patch")
-        }
-        val headerTitle = remember(patchName, isModified) {
-            "$patchName${if (isModified) " *" else ""}"
+        // Keep ViewModel updated with current work-in-progress for cascade saving
+        LaunchedEffect(visualSource.recipe, visualSource.parameters.values.map { it.value }) {
+            val patchData = PatchMapper.fromVisualSource(patchName, visualSource)
+            val navStack = vm.navStack.value
+            val index = navStack.indexOfLast { it.type == LayerType.MANDALA }
+            if (index != -1) {
+                val realDirty = PatchMapper.isDirty(visualSource, lastLoadedPatch)
+                vm.updateLayerData(index, patchData, isDirty = realDirty)
+            }
         }
 
         Column(modifier = Modifier.fillMaxSize()) {
-            if (showHeader) {
-                VisualSourceHeader(
-                    title = headerTitle,
-                    onMenuClick = { showMenu = true },
-                    menuContent = {
-                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }, containerColor = AppBackground) {
-                            DropdownMenuItem(text = { Text("New", color = AppText) }, onClick = { 
-                                val defaultRecipe = MandalaLibrary.MandalaRatios.first()
-                                visualSource.recipe = defaultRecipe
-                                onPatchLoaded(PatchData("New Patch", defaultRecipe.id, emptyList()))
-                                showMenu = false 
-                            })
-                            HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-                            DropdownMenuItem(text = { Text("CV Lab", color = AppAccent) }, onClick = { onShowCvLab(); showMenu = false }, leadingIcon = { Icon(Icons.Default.Build, contentDescription = null, tint = AppAccent) })
-                            DropdownMenuItem(text = { Text("Mandala Set Editor", color = AppAccent) }, onClick = { onNavigateToSetEditor(); showMenu = false }, leadingIcon = { Icon(Icons.Default.List, contentDescription = null, tint = AppAccent) })
-                            DropdownMenuItem(text = { Text("Mixer Editor", color = AppAccent) }, onClick = { onNavigateToMixerEditor(); showMenu = false }, leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = AppAccent) })
-                            HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-                            DropdownMenuItem(text = { Text("Open", color = AppText) }, onClick = { showOpenDialog = true; showMenu = false })
-                            DropdownMenuItem(text = { Text("Save", color = AppText) }, onClick = { 
-                                scope.launch { 
-                                    val data = PatchMapper.fromVisualSource(patchName, visualSource)
-                                    vm.savePatch(data)
-                                    onPatchLoaded(data)
-                                }
-                                showMenu = false 
-                            })
-                            DropdownMenuItem(text = { Text("Rename", color = AppText) }, onClick = { showRenameDialog = true; showMenu = false })
-                            DropdownMenuItem(text = { Text("Clone", color = AppText) }, onClick = { 
-                                scope.launch { 
-                                    val data = PatchMapper.fromVisualSource("$patchName CLONE", visualSource)
-                                    vm.savePatch(data)
-                                    onPatchLoaded(data)
-                                }
-                                showMenu = false 
-                            })
-                            DropdownMenuItem(text = { Text("Copy to Clipboard", color = AppText) }, onClick = { 
-                                val data = PatchMapper.fromVisualSource(patchName, visualSource)
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("Mandala Patch", PatchMapper.toJson(data)))
-                                Toast.makeText(context, "Patch copied to clipboard", Toast.LENGTH_SHORT).show()
-                                showMenu = false 
-                            }, leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = AppText) })
-                            DropdownMenuItem(text = { Text("Share", color = AppText) }, onClick = { 
-                                val data = PatchMapper.fromVisualSource(patchName, visualSource)
-                                context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply { type = "text/plain"; putExtra(Intent.EXTRA_TEXT, PatchMapper.toJson(data)) }, "Share Patch"))
-                                showMenu = false 
-                            }, leadingIcon = { Icon(Icons.Default.Share, contentDescription = null, tint = AppText) })
-                            DropdownMenuItem(text = { Text("Delete", color = Color.Red) }, onClick = { 
-                                lastLoadedPatch?.let { vm.deletePatch(it.name) }
-                                onPatchLoaded(PatchData("New Patch", MandalaLibrary.MandalaRatios.first().id, emptyList()))
-                                showMenu = false 
-                            }, leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) })
-                        }
-                    }
-                )
-            }
-
             Column(modifier = Modifier.weight(1f).fillMaxSize()) {
                 Column(modifier = Modifier.wrapContentHeight().fillMaxWidth().padding(horizontal = 8.dp)) {
                     Box(modifier = Modifier.fillMaxWidth().aspectRatio(16 / 9f).background(Color.Black).border(1.dp, AppText.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
@@ -370,18 +482,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        if (showRenameDialog) {
-            RenamePatchDialog(patchName, onRename = { newName ->
-                patchName = newName
-                lastLoadedPatch?.let { 
-                    val updated = it.copy(name = newName)
-                    vm.savePatch(updated)
-                    vm.setCurrentPatch(updated)
-                }
-                showRenameDialog = false
-            }, onDismiss = { showRenameDialog = false })
-        }
-
         if (showOpenDialog) {
             OpenPatchDialog(vm, onPatchSelected = { 
                 PatchMapper.applyToVisualSource(it, visualSource)
@@ -430,7 +530,7 @@ fun RenamePatchDialog(initialName: String, onRename: (String) -> Unit, onDismiss
     var name by remember { mutableStateOf(initialName) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Rename Patch", color = AppText) },
+        title = { Text("Rename", color = AppText) },
         text = {
             OutlinedTextField(
                 value = name,
@@ -481,6 +581,30 @@ fun OpenPatchDialog(vm: MandalaViewModel, onPatchSelected: (PatchData) -> Unit, 
                     }
                 }
                 if (allPatches.isEmpty()) Text("No patches saved yet.", color = AppText.copy(alpha = 0.5f))
+            }
+        }
+    }
+}
+
+@Composable
+fun OpenMixerDialog(vm: MandalaViewModel, onMixerSelected: (MixerPatch) -> Unit, onDismiss: () -> Unit) {
+    val allMixers by vm.allMixerPatches.collectAsState(initial = emptyList())
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = MaterialTheme.shapes.medium, color = AppBackground) {
+            Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
+                Text("Saved Mixers", style = MaterialTheme.typography.titleLarge, color = AppText)
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    allMixers.forEach { entity ->
+                        Row(modifier = Modifier.fillMaxWidth().clickable { 
+                            val mixer = Json.decodeFromString<MixerPatch>(entity.jsonSettings)
+                            onMixerSelected(mixer)
+                        }.padding(12.dp)) {
+                            Text(entity.name, style = MaterialTheme.typography.bodyLarge, color = AppText)
+                        }
+                    }
+                }
+                if (allMixers.isEmpty()) Text("No mixers saved yet.", color = AppText.copy(alpha = 0.5f))
             }
         }
     }

@@ -309,8 +309,13 @@ fun ModulatorRow(
                                     }
                                 }
                             } else if (isLfo) {
+                                val speedLabel = when(lfoSpeedMode) {
+                                    LfoSpeedMode.SLOW -> "Slow"
+                                    LfoSpeedMode.MEDIUM -> "Med"
+                                    LfoSpeedMode.FAST -> "Fast"
+                                }
                                 Text(
-                                    text = lfoSpeedMode.name.substring(0, 1),
+                                    text = speedLabel,
                                     modifier = Modifier
                                         .clickable { 
                                             val nextMode = LfoSpeedMode.values()[(lfoSpeedMode.ordinal + 1) % LfoSpeedMode.values().size]
@@ -318,7 +323,7 @@ fun ModulatorRow(
                                             onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope, nextMode))
                                             onInteractionFinished()
                                         }
-                                        .padding(horizontal = 8.dp),
+                                        .padding(horizontal = 4.dp),
                                     color = AppAccent,
                                     style = MaterialTheme.typography.labelSmall
                                 )
@@ -348,35 +353,34 @@ fun ModulatorRow(
 
                     if (hasAdvancedControls) {
                         // Period/Subdivision Knob
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                            KnobView(
-                                currentValue = subdivision,
-                                onValueChange = { newValue ->
-                                    subdivision = newValue
-                                    onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, newValue, phaseOffset, slope, lfoSpeedMode))
-                                },
-                                onInteractionFinished = onInteractionFinished,
-                                isBipolar = false,
-                                focused = true,
-                                knobSize = 44.dp,
-                                showValue = true,
-                                displayTransform = { 
-                                    if (isLfo) {
-                                        when (lfoSpeedMode) {
-                                            LfoSpeedMode.FAST -> "%.3fs".format(it * 10.0)
-                                            LfoSpeedMode.MEDIUM -> {
-                                                val totalSec = (it * 900.0).toInt()
-                                                "%02dm:%02ds".format(totalSec / 60, totalSec % 60)
-                                            }
-                                            LfoSpeedMode.SLOW -> {
-                                                val totalMin = (it * 1440.0).toInt()
-                                                "%02dh:%02dm".format(totalMin / 60, totalMin % 60)
-                                            }
-                                        }
-                                    } else it.toString()
+                        if (isLfo) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                                KnobView(
+                                    currentValue = subdivision,
+                                    onValueChange = { newValue ->
+                                        subdivision = newValue
+                                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, newValue, phaseOffset, slope, lfoSpeedMode))
+                                    },
+                                    onInteractionFinished = onInteractionFinished,
+                                    isBipolar = false,
+                                    focused = true,
+                                    knobSize = 44.dp,
+                                    showValue = false,
+                                    displayTransform = { it.toString() }
+                                )
+                                val periodLabel = when (lfoSpeedMode) {
+                                    LfoSpeedMode.FAST -> "%.3fs".format(subdivision * 10.0)
+                                    LfoSpeedMode.MEDIUM -> {
+                                        val totalSec = (subdivision * 900.0).toInt()
+                                        "%02dm:%02ds".format(totalSec / 60, totalSec % 60)
+                                    }
+                                    LfoSpeedMode.SLOW -> {
+                                        val totalMin = (subdivision * 1440.0).toInt()
+                                        "%02dh:%02dm".format(totalMin / 60, totalMin % 60)
+                                    }
                                 }
-                            )
-                            Text(if (isLfo) "Period" else "Subdiv", style = MaterialTheme.typography.labelSmall, color = AppText)
+                                Text(text = periodLabel, style = MaterialTheme.typography.labelSmall, color = AppText)
+                            }
                         }
 
                         // Phase Knob

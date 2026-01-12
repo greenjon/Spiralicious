@@ -9,9 +9,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,11 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
-import llm.slop.spirals.MandalaSet
-import llm.slop.spirals.MandalaViewModel
-import llm.slop.spirals.SelectionPolicy
-import llm.slop.spirals.PatchMapper
-import llm.slop.spirals.MandalaVisualSource
+import llm.slop.spirals.*
 import llm.slop.spirals.ui.components.MandalaPicker
 import llm.slop.spirals.ui.components.SetChipList
 import llm.slop.spirals.ui.theme.AppBackground
@@ -49,7 +42,6 @@ fun MandalaSetEditorScreen(
     var focusedMandalaId by remember { mutableStateOf<String?>(null) }
     var showMandalaPicker by remember { mutableStateOf(false) }
     
-    var showMenu by remember { mutableStateOf(false) }
     var showOpenDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
 
@@ -86,91 +78,15 @@ fun MandalaSetEditorScreen(
             .background(AppBackground)
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val breadcrumb = "Mandala Set: ${currentSet?.name ?: "..."}"
-                val focusedName = if(focusedMandalaId != null) " › $focusedMandalaId" else ""
-                Text(
-                    text = breadcrumb + focusedName, 
-                    style = MaterialTheme.typography.titleMedium, 
-                    color = AppText,
-                    modifier = Modifier.padding(4.dp)
-                )
-                
-                Box {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
-                        containerColor = AppBackground
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("New Set", color = AppText) },
-                            onClick = { 
-                                currentSet = MandalaSet(name = "New Set", orderedMandalaIds = mutableListOf())
-                                focusedMandalaId = null
-                                showMenu = false 
-                            }
-                        )
-                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-                        DropdownMenuItem(
-                            text = { Text("CV Lab", color = AppAccent) },
-                            onClick = { onShowCvLab(); showMenu = false },
-                            leadingIcon = { Icon(Icons.Default.Build, contentDescription = null, tint = AppAccent) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Mandala Editor", color = AppAccent) },
-                            onClick = { onClose(); showMenu = false },
-                            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null, tint = AppAccent) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Mixer Editor", color = AppAccent) },
-                            onClick = { onNavigateToMixerEditor(); showMenu = false },
-                            leadingIcon = { Icon(Icons.Default.List, contentDescription = null, tint = AppAccent) }
-                        )
-                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-                        DropdownMenuItem(
-                            text = { Text("Open Set", color = AppText) },
-                            onClick = { showOpenDialog = true; showMenu = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Save Set", color = AppText) },
-                            onClick = { 
-                                currentSet?.let { vm.saveSet(it) }
-                                showMenu = false 
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Rename Set", color = AppText) },
-                            onClick = { showRenameDialog = true; showMenu = false }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Delete Set", color = Color.Red) },
-                            onClick = { 
-                                currentSet?.let { vm.deleteSet(it.id) }
-                                currentSet = null
-                                focusedMandalaId = null
-                                showMenu = false 
-                            }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
+            // Internal Header removed - breadcrumbs handle it
 
             // Always show preview window area
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16 / 9f)
-                    .background(Color.Black)
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
             ) {
                 previewContent()
             }

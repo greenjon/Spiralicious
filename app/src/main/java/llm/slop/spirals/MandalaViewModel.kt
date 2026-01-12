@@ -14,7 +14,8 @@ data class NavLayer(
     val id: String,
     val name: String,
     val type: LayerType,
-    val data: Any? = null 
+    val data: Any? = null,
+    val isDirty: Boolean = false
 )
 
 enum class LayerType { MIXER, SET, MANDALA }
@@ -25,16 +26,42 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     private val patchDao = db.mandalaPatchDao()
     private val setDao = db.mandalaSetDao()
     private val mixerDao = db.mixerPatchDao()
+    private val appConfig = AppConfig(application)
+
+    // 1. Declare Data Flows first
+    val allPatches = patchDao.getAllPatches().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val allSets = setDao.getAllSets().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val allMixerPatches = mixerDao.getAllMixerPatches().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _currentPatch = MutableStateFlow<PatchData?>(null)
     val currentPatch: StateFlow<PatchData?> = _currentPatch.asStateFlow()
 
-    private val _navStack = MutableStateFlow<List<NavLayer>>(listOf(NavLayer("root", "Mixer 1", LayerType.MIXER)))
+    // 2. Initialize navStack with empty first, then fill in init
+    private val _navStack = MutableStateFlow<List<NavLayer>>(emptyList())
     val navStack = _navStack.asStateFlow()
 
-    val allPatches = patchDao.getAllPatches().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val allSets = setDao.getAllSets().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-    val allMixerPatches = mixerDao.getAllMixerPatches().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    init {
+        // 3. Now it is safe to call functions that use the flows
+        _navStack.value = initialStack()
+    }
+
+    private fun initialStack(): List<NavLayer> {
+        val mode = appConfig.startupMode
+        if (mode == StartupMode.LAST_WORKSPACE) {
+            val saved = appConfig.loadNavStack()
+            if (!saved.isNullOrEmpty()) return saved
+        }
+        
+        val type = when (mode) {
+            StartupMode.MIXER -> LayerType.MIXER
+            StartupMode.SET -> LayerType.SET
+            StartupMode.MANDALA -> LayerType.MANDALA
+            else -> LayerType.MIXER
+        }
+        
+        val name = generateNextName(type)
+        return listOf(NavLayer(UUID.randomUUID().toString(), name, type))
+    }
 
     fun generateNextName(type: LayerType): String {
         val (prefix, list) = when (type) {
@@ -53,6 +80,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
 
     fun pushLayer(layer: NavLayer) {
         _navStack.value += layer
+        saveWorkspaceIfEnabled()
     }
 
     fun createAndPushLayer(type: LayerType, parentData: Any? = null) {
@@ -61,18 +89,144 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         pushLayer(NavLayer(id, name, type, parentData))
     }
 
-    fun popToLayer(index: Int, save: Boolean = true) {
+    /**
+     * Updates the data associated with a specific layer in the stack.
+     * Useful for capturing "Work in progress" before a pop or save.
+     */
+    fun updateLayerData(index: Int, data: Any?, isDirty: Boolean? = null) {
         if (index < 0 || index >= _navStack.value.size) return
+        val current = _navStack.value.toMutableList()
+        current[index] = current[index].copy(
+            data = data,
+            isDirty = isDirty ?: current[index].isDirty
+        )
+        _navStack.value = current
+    }
+
+    fun updateLayerName(index: Int, newName: String) {
+        if (index < 0 || index >= _navStack.value.size) return
+        val current = _navStack.value.toMutableList()
+        current[index] = current[index].copy(name = newName)
+        _navStack.value = current
+        saveWorkspaceIfEnabled()
+    }
+
+    fun popToLayer(index: Int, save: Boolean = true) {
+        if (index < -1) return
+        if (index >= _navStack.value.size) return
+        
         val layersToPop = _navStack.value.subList(index + 1, _navStack.value.size).reversed()
         
         if (save) {
             layersToPop.forEach { layer ->
-                // Actual saving logic would go here, triggered by an external save signal or data capture
-                // For now, we assume the UI handles the "dirty" state and we just confirm the final pop
+                if (layer.isDirty) {
+                    saveLayer(layer)
+                }
             }
         }
         
-        _navStack.value = _navStack.value.take(index + 1)
+        _navStack.value = if (index == -1) {
+            emptyList()
+        } else {
+            _navStack.value.take(index + 1)
+        }
+        saveWorkspaceIfEnabled()
+    }
+
+    fun saveLayer(layer: NavLayer) {
+        val data = layer.data ?: return
+        viewModelScope.launch {
+            when (layer.type) {
+                LayerType.MANDALA -> {
+                    val patch = data as? PatchData ?: return@launch
+                    savePatch(patch.copy(name = layer.name))
+                }
+                LayerType.SET -> {
+                    val set = data as? MandalaSet ?: return@launch
+                    saveSet(set.copy(name = layer.name))
+                }
+                LayerType.MIXER -> {
+                    val mixer = data as? MixerPatch ?: return@launch
+                    saveMixerPatch(mixer.copy(name = layer.name))
+                }
+            }
+            // Clear dirty flag for this layer in the stack
+            val index = _navStack.value.indexOfFirst { it.id == layer.id }
+            if (index != -1) {
+                val current = _navStack.value.toMutableList()
+                current[index] = current[index].copy(isDirty = false)
+                _navStack.value = current
+            }
+        }
+    }
+
+    fun renameLayer(index: Int, oldName: String, newName: String) {
+        if (index < 0 || index >= _navStack.value.size) return
+        val layer = _navStack.value[index]
+        
+        viewModelScope.launch {
+            // Delete old entry
+            when (layer.type) {
+                LayerType.MANDALA -> deletePatch(oldName)
+                LayerType.SET -> {
+                    (layer.data as? MandalaSet)?.let { deleteSet(it.id) }
+                }
+                LayerType.MIXER -> {
+                    (layer.data as? MixerPatch)?.let { deleteMixerPatch(it.id) }
+                }
+            }
+            
+            // Update name in stack
+            updateLayerName(index, newName)
+            
+            // Save with new name
+            saveLayer(_navStack.value[index])
+        }
+    }
+
+    fun cloneLayer(index: Int) {
+        if (index < 0 || index >= _navStack.value.size) return
+        val layer = _navStack.value[index]
+        val data = layer.data ?: return
+        
+        val newName = generateNextName(layer.type)
+        val newId = UUID.randomUUID().toString()
+        
+        val newData = when (layer.type) {
+            LayerType.MANDALA -> (data as? PatchData)?.copy(name = newName)
+            LayerType.SET -> (data as? MandalaSet)?.copy(id = newId, name = newName)
+            LayerType.MIXER -> (data as? MixerPatch)?.copy(id = newId, name = newName)
+        } ?: return
+        
+        val newLayer = NavLayer(newId, newName, layer.type, newData, isDirty = true)
+        pushLayer(newLayer)
+        saveLayer(newLayer)
+    }
+
+    fun deleteLayerAndPop(index: Int) {
+        if (index < 0 || index >= _navStack.value.size) return
+        val layer = _navStack.value[index]
+        
+        viewModelScope.launch {
+            when (layer.type) {
+                LayerType.MANDALA -> deletePatch(layer.name)
+                LayerType.SET -> (layer.data as? MandalaSet)?.let { deleteSet(it.id) }
+                LayerType.MIXER -> (layer.data as? MixerPatch)?.let { deleteMixerPatch(it.id) }
+            }
+            popToLayer(index - 1, save = false)
+        }
+    }
+
+    private fun saveWorkspaceIfEnabled() {
+        if (appConfig.startupMode == StartupMode.LAST_WORKSPACE) {
+            appConfig.saveNavStack(_navStack.value)
+        }
+    }
+
+    fun getStartupMode(): StartupMode = appConfig.startupMode
+    fun setStartupMode(mode: StartupMode) {
+        appConfig.startupMode = mode
+        saveWorkspaceIfEnabled()
     }
 
     fun setCurrentPatch(patch: PatchData?) {

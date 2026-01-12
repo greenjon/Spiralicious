@@ -31,8 +31,8 @@ import kotlinx.coroutines.delay
 fun MixerEditorScreen(
     vm: MandalaViewModel = viewModel(),
     onClose: () -> Unit,
-    onNavigateToSetEditor: () -> Unit,
-    onNavigateToMandalaEditor: () -> Unit,
+    onNavigateToSetEditor: (Boolean) -> Unit, // Boolean indicates if it should be nested
+    onNavigateToMandalaEditor: (Boolean) -> Unit,
     onShowCvLab: () -> Unit,
     previewContent: @Composable () -> Unit
 ) {
@@ -97,42 +97,7 @@ fun MixerEditorScreen(
             .fillMaxSize()
             .background(AppBackground)
     ) {
-        // Top Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val breadcrumb = "Mixer: ${currentPatch.name} › ${if (monitorSource in listOf("A", "B", "F")) "Group $monitorSource" else "Slot $monitorSource"}"
-            Text(
-                text = breadcrumb,
-                style = MaterialTheme.typography.titleMedium,
-                color = AppText,
-                modifier = Modifier.padding(4.dp)
-            )
-
-            Box {
-                IconButton(onClick = { showMenu = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
-                }
-                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }, containerColor = AppBackground) {
-                    DropdownMenuItem(text = { Text("New Mixer") }, onClick = { 
-                        currentPatch = MixerPatch(name = "New Mixer", slots = List(4) { MixerSlotData() })
-                        showMenu = false 
-                    })
-                    DropdownMenuItem(text = { Text("Open Mixer") }, onClick = { showOpenDialog = true; showMenu = false })
-                    DropdownMenuItem(text = { Text("Save Mixer") }, onClick = { vm.saveMixerPatch(currentPatch); showMenu = false })
-                    DropdownMenuItem(text = { Text("Rename Mixer") }, onClick = { showRenameDialog = true; showMenu = false })
-                    HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-                    DropdownMenuItem(text = { Text("CV Lab") }, onClick = { onShowCvLab(); showMenu = false })
-                    DropdownMenuItem(text = { Text("Mandala Editor") }, onClick = { onNavigateToMandalaEditor(); showMenu = false })
-                    DropdownMenuItem(text = { Text("Set Editor") }, onClick = { onNavigateToSetEditor(); showMenu = false })
-                    DropdownMenuItem(text = { Text("Close", color = Color.Red) }, onClick = { onClose(); showMenu = false })
-                }
-            }
-        }
+        // Internal Header removed - breadcrumbs now handle it in MainActivity
 
         // Main Preview Window
         Box(
@@ -141,7 +106,8 @@ fun MixerEditorScreen(
                 .padding(horizontal = 8.dp)
                 .aspectRatio(16 / 9f)
                 .background(Color.Black)
-                .border(1.dp, AppText.copy(alpha = 0.1f))
+                .border(1.dp, AppText.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center
         ) {
             previewContent()
 
@@ -232,7 +198,7 @@ fun MixerEditorScreen(
             },
             onDismiss = { showSetPickerForSlot = null },
             onCreateNew = {
-                onNavigateToSetEditor()
+                onNavigateToSetEditor(true) // TRUE = Nested creation
                 showSetPickerForSlot = null
             }
         )
@@ -251,7 +217,7 @@ fun MixerEditorScreen(
             },
             onDismiss = { showMandalaPickerForSlot = null },
             onCreateNew = {
-                onNavigateToMandalaEditor()
+                onNavigateToMandalaEditor(true) // TRUE = Nested creation
                 showMandalaPickerForSlot = null
             }
         )

@@ -22,6 +22,8 @@ object CvRegistry {
         put("bpm", 120f)
     }
 
+    private val startTimeNs = System.nanoTime()
+
     // Anchor State for Precision Clock
     private var anchorBeats = 0.0
     private var anchorBpm = 120f
@@ -40,6 +42,10 @@ object CvRegistry {
         val elapsedSec = (now - anchorTimeNs) / 1_000_000_000.0
         val beatDelta = elapsedSec * (anchorBpm / 60.0)
         return anchorBeats + beatDelta
+    }
+
+    fun getElapsedRealtimeSec(): Double {
+        return (System.nanoTime() - startTimeNs) / 1_000_000_000.0
     }
 
     // Diagnostic History Buffers (Accessible anywhere)

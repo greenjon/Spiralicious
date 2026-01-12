@@ -99,37 +99,41 @@ fun ModulatorRow(
     var weight by remember(mod) { mutableFloatStateOf(mod?.weight ?: 0f) }
     var bypassed by remember(mod) { mutableStateOf(mod?.bypassed ?: false) }
     
-    // Beat fields
+    // Beat/LFO fields
     var waveform by remember(mod) { mutableStateOf(mod?.waveform ?: Waveform.SINE) }
     var subdivision by remember(mod) { mutableFloatStateOf(mod?.subdivision ?: 1.0f) }
     var phaseOffset by remember(mod) { mutableFloatStateOf(mod?.phaseOffset ?: 0.0f) }
     var slope by remember(mod) { mutableFloatStateOf(mod?.slope ?: 0.5f) }
+    var lfoSpeedMode by remember(mod) { mutableStateOf(mod?.lfoSpeedMode ?: LfoSpeedMode.FAST) }
 
     val isBeat = sourceId == "beatPhase"
+    val isLfo = sourceId == "lfo"
+    val hasAdvancedControls = isBeat || isLfo
     var showDeleteConfirm by remember { mutableStateOf(false) }
     
     var pulseValue by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(sourceId, weight, waveform, subdivision, phaseOffset, slope) {
+    LaunchedEffect(sourceId, weight, waveform, subdivision, phaseOffset, slope, lfoSpeedMode) {
         if (sourceId != "none") {
             while(true) {
-                val rawCv = if (sourceId == "beatPhase") {
-                    val beats = CvRegistry.getSynchronizedTotalBeats()
-                    val localPhase = ((beats / subdivision) + phaseOffset) % 1.0
-                    val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
-                    
-                    when(waveform) {
-                        Waveform.SINE -> (sin(positivePhase * 2.0 * Math.PI).toFloat() * 0.5f) + 0.5f
-                        Waveform.TRIANGLE -> {
-                            val s = slope.toDouble()
-                            if (s <= 0.001) (1.0 - positivePhase).toFloat()
-                            else if (s >= 0.999) positivePhase.toFloat()
-                            else if (positivePhase < s) (positivePhase / s).toFloat()
-                            else ((1.0 - positivePhase) / (1.0 - s)).toFloat()
-                        }
-                        Waveform.SQUARE -> if (positivePhase < slope) 1.0f else 0.0f
+                val rawCv = when (sourceId) {
+                    "beatPhase" -> {
+                        val beats = CvRegistry.getSynchronizedTotalBeats()
+                        val localPhase = ((beats / subdivision) + phaseOffset) % 1.0
+                        val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
+                        calculatePreviewWave(waveform, positivePhase, slope)
                     }
-                } else {
-                    CvRegistry.get(sourceId)
+                    "lfo" -> {
+                        val seconds = CvRegistry.getElapsedRealtimeSec()
+                        val period = when (lfoSpeedMode) {
+                            LfoSpeedMode.FAST -> subdivision * 10.0
+                            LfoSpeedMode.MEDIUM -> subdivision * 900.0
+                            LfoSpeedMode.SLOW -> subdivision * 86400.0
+                        }.coerceAtLeast(0.001)
+                        val localPhase = ((seconds / period) + phaseOffset) % 1.0
+                        val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
+                        calculatePreviewWave(waveform, positivePhase, slope)
+                    }
+                    else -> CvRegistry.get(sourceId)
                 }
                 pulseValue = rawCv * weight
                 delay(16)
@@ -186,10 +190,10 @@ fun ModulatorRow(
                                 maxLines = 1
                             )
                             DropdownMenu(expanded = sourceExpanded, onDismissRequest = { sourceExpanded = false }) {
-                                listOf("none", "amp", "bass", "mid", "high", "accent", "beatPhase").forEach { s ->
+                                listOf("none", "amp", "bass", "mid", "high", "accent", "beatPhase", "lfo").forEach { s ->
                                     DropdownMenuItem(text = { Text(if (s == "beatPhase") "BEAT" else s.uppercase()) }, onClick = { 
                                         sourceId = s
-                                        if (s != "none") { onUpdate(CvModulator(s, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope)); onInteractionFinished() }
+                                        if (s != "none") { onUpdate(CvModulator(s, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope, lfoSpeedMode)); onInteractionFinished() }
                                         sourceExpanded = false
                                     })
                                 }
@@ -201,7 +205,7 @@ fun ModulatorRow(
                                 onClick = { 
                                     val newOp = if (operator == ModulationOperator.ADD) ModulationOperator.MUL else ModulationOperator.ADD
                                     operator = newOp
-                                    if (!isNew) { onUpdate(CvModulator(sourceId, newOp, weight, bypassed, waveform, subdivision, phaseOffset, slope)); onInteractionFinished() }
+                                    if (!isNew) { onUpdate(CvModulator(sourceId, newOp, weight, bypassed, waveform, subdivision, phaseOffset, slope, lfoSpeedMode)); onInteractionFinished() }
                                 },
                                 modifier = Modifier.height(32.dp).padding(horizontal = 4.dp),
                                 contentPadding = PaddingValues(0.dp)
@@ -221,7 +225,7 @@ fun ModulatorRow(
                                     .width(32.dp)
                                     .clickable { 
                                         bypassed = !bypassed
-                                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope))
+                                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope, lfoSpeedMode))
                                         onInteractionFinished() 
                                     },
                                 color = AppBackground,
@@ -237,16 +241,18 @@ fun ModulatorRow(
                                 }
                             }
                         } else {
-                            Spacer(modifier = Modifier.width(36.dp))
+                            if (sourceId == "none") {
+                                Spacer(modifier = Modifier.width(36.dp))
+                            }
                         }
 
-                        if (isBeat) {
+                        if (hasAdvancedControls) {
                             Spacer(modifier = Modifier.width(4.dp))
                             
                             IconButton(onClick = {
                                 val nextWave = Waveform.values()[(waveform.ordinal + 1) % Waveform.values().size]
                                 waveform = nextWave
-                                onUpdate(CvModulator(sourceId, operator, weight, bypassed, nextWave, subdivision, phaseOffset, slope))
+                                onUpdate(CvModulator(sourceId, operator, weight, bypassed, nextWave, subdivision, phaseOffset, slope, lfoSpeedMode))
                                 onInteractionFinished()
                             }, modifier = Modifier.size(28.dp)) {
                                 Icon(
@@ -261,45 +267,61 @@ fun ModulatorRow(
                                 )
                             }
 
-                            var subExpanded by remember { mutableStateOf(false) }
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.widthIn(min = 36.dp)) {
-                                val subText = when(subdivision) {
-                                    0.0625f -> "1/16"
-                                    0.125f -> "1/8"
-                                    0.25f -> "1/4"
-                                    0.5f -> "1/2"
-                                    else -> subdivision.toInt().toString()
-                                }
-                                Text(
-                                    text = subText,
-                                    modifier = Modifier
-                                        .clickable { subExpanded = true }
-                                        .padding(horizontal = 4.dp),
-                                    color = AppAccent, 
-                                    style = MaterialTheme.typography.labelSmall, 
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    softWrap = false
-                                )
-                                
-                                DropdownMenu(expanded = subExpanded, onDismissRequest = { subExpanded = false }) {
-                                    listOf(0.0625f, 0.125f, 0.25f, 0.5f, 1f, 2f, 4f, 8f, 16f, 32f, 64f, 128f, 256f).forEach { sub ->
-                                        DropdownMenuItem(text = {
-                                            Text(when(sub) {
-                                                0.0625f -> "1/16"
-                                                0.125f -> "1/8"
-                                                0.25f -> "1/4"
-                                                0.5f -> "1/2"
-                                                else -> sub.toInt().toString()
+                            if (isBeat) {
+                                var subExpanded by remember { mutableStateOf(false) }
+                                Box(contentAlignment = Alignment.Center, modifier = Modifier.widthIn(min = 36.dp)) {
+                                    val subText = when(subdivision) {
+                                        0.0625f -> "1/16"
+                                        0.125f -> "1/8"
+                                        0.25f -> "1/4"
+                                        0.5f -> "1/2"
+                                        else -> subdivision.toInt().toString()
+                                    }
+                                    Text(
+                                        text = subText,
+                                        modifier = Modifier
+                                            .clickable { subExpanded = true }
+                                            .padding(horizontal = 4.dp),
+                                        color = AppAccent, 
+                                        style = MaterialTheme.typography.labelSmall, 
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                    
+                                    DropdownMenu(expanded = subExpanded, onDismissRequest = { subExpanded = false }) {
+                                        listOf(0.0625f, 0.125f, 0.25f, 0.5f, 1f, 2f, 4f, 8f, 16f, 32f, 64f, 128f, 256f).forEach { sub ->
+                                            DropdownMenuItem(text = {
+                                                Text(when(sub) {
+                                                    0.0625f -> "1/16"
+                                                    0.125f -> "1/8"
+                                                    0.25f -> "1/4"
+                                                    0.5f -> "1/2"
+                                                    else -> sub.toInt().toString()
+                                                })
+                                            }, onClick = {
+                                                subdivision = sub
+                                                onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, sub, phaseOffset, slope, lfoSpeedMode))
+                                                onInteractionFinished()
+                                                subExpanded = false
                                             })
-                                        }, onClick = {
-                                            subdivision = sub
-                                            onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, sub, phaseOffset, slope))
-                                            onInteractionFinished()
-                                            subExpanded = false
-                                        })
+                                        }
                                     }
                                 }
+                            } else if (isLfo) {
+                                Text(
+                                    text = lfoSpeedMode.name.substring(0, 1),
+                                    modifier = Modifier
+                                        .clickable { 
+                                            val nextMode = LfoSpeedMode.values()[(lfoSpeedMode.ordinal + 1) % LfoSpeedMode.values().size]
+                                            lfoSpeedMode = nextMode
+                                            onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope, nextMode))
+                                            onInteractionFinished()
+                                        }
+                                        .padding(horizontal = 8.dp),
+                                    color = AppAccent,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
                             }
                         }
                     }
@@ -313,7 +335,7 @@ fun ModulatorRow(
                             currentValue = weight,
                             onValueChange = { newValue ->
                                 weight = newValue
-                                onUpdate(CvModulator(sourceId, operator, newValue, bypassed, waveform, subdivision, phaseOffset, slope))
+                                onUpdate(CvModulator(sourceId, operator, newValue, bypassed, waveform, subdivision, phaseOffset, slope, lfoSpeedMode))
                             },
                             onInteractionFinished = onInteractionFinished,
                             isBipolar = true,
@@ -324,14 +346,46 @@ fun ModulatorRow(
                         Text("Weight", style = MaterialTheme.typography.labelSmall, color = AppText)
                     }
 
-                    if (sourceId == "beatPhase") {
+                    if (hasAdvancedControls) {
+                        // Period/Subdivision Knob
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            KnobView(
+                                currentValue = subdivision,
+                                onValueChange = { newValue ->
+                                    subdivision = newValue
+                                    onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, newValue, phaseOffset, slope, lfoSpeedMode))
+                                },
+                                onInteractionFinished = onInteractionFinished,
+                                isBipolar = false,
+                                focused = true,
+                                knobSize = 44.dp,
+                                showValue = true,
+                                displayTransform = { 
+                                    if (isLfo) {
+                                        when (lfoSpeedMode) {
+                                            LfoSpeedMode.FAST -> "%.3fs".format(it * 10.0)
+                                            LfoSpeedMode.MEDIUM -> {
+                                                val totalSec = (it * 900.0).toInt()
+                                                "%02dm:%02ds".format(totalSec / 60, totalSec % 60)
+                                            }
+                                            LfoSpeedMode.SLOW -> {
+                                                val totalMin = (it * 1440.0).toInt()
+                                                "%02dh:%02dm".format(totalMin / 60, totalMin % 60)
+                                            }
+                                        }
+                                    } else it.toString()
+                                }
+                            )
+                            Text(if (isLfo) "Period" else "Subdiv", style = MaterialTheme.typography.labelSmall, color = AppText)
+                        }
+
                         // Phase Knob
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             KnobView(
                                 currentValue = phaseOffset,
                                 onValueChange = { newValue ->
                                     phaseOffset = newValue
-                                    onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope))
+                                    onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope, lfoSpeedMode))
                                 },
                                 onInteractionFinished = onInteractionFinished,
                                 isBipolar = false,
@@ -350,7 +404,7 @@ fun ModulatorRow(
                                     currentValue = slope,
                                     onValueChange = { newValue ->
                                         slope = newValue
-                                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, newValue))
+                                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, newValue, lfoSpeedMode))
                                     },
                                     onInteractionFinished = onInteractionFinished,
                                     isBipolar = false,
@@ -367,9 +421,6 @@ fun ModulatorRow(
                         } else {
                             Spacer(modifier = Modifier.weight(1f))
                         }
-                        
-                        // Shift knobs to the left by adding a spacer at the end
-                        Spacer(modifier = Modifier.weight(0.9f))
                     } else {
                         Spacer(modifier = Modifier.weight(2.9f))
                     }
@@ -407,5 +458,19 @@ fun ModulatorRow(
                 )
             }
         }
+    }
+}
+
+private fun calculatePreviewWave(waveform: Waveform, phase: Double, slope: Float): Float {
+    return when(waveform) {
+        Waveform.SINE -> (sin(phase * 2.0 * Math.PI).toFloat() * 0.5f) + 0.5f
+        Waveform.TRIANGLE -> {
+            val s = slope.toDouble()
+            if (s <= 0.001) (1.0 - phase).toFloat()
+            else if (s >= 0.999) phase.toFloat()
+            else if (phase < s) (phase / s).toFloat()
+            else ((1.0 - phase) / (1.0 - s)).toFloat()
+        }
+        Waveform.SQUARE -> if (phase < slope) 1.0f else 0.0f
     }
 }

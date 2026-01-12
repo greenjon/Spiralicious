@@ -14,6 +14,10 @@ enum class Waveform {
     SINE, TRIANGLE, SQUARE
 }
 
+enum class LfoSpeedMode {
+    SLOW, MEDIUM, FAST
+}
+
 @Serializable
 data class CvModulator(
     val sourceId: String,
@@ -24,7 +28,9 @@ data class CvModulator(
     val waveform: Waveform = Waveform.SINE,
     val subdivision: Float = 1.0f,
     val phaseOffset: Float = 0.0f,
-    val slope: Float = 0.5f
+    val slope: Float = 0.5f,
+    // LFO expansion fields
+    val lfoSpeedMode: LfoSpeedMode = LfoSpeedMode.FAST
 )
 
 /**
@@ -49,37 +55,26 @@ class ModulatableParameter(
         for (mod in modulators) {
             if (mod.bypassed) continue
             
-            // Advanced BEAT logic - checks for "beatPhase" or "none" (if subdivision is set)
-            // But specifically, we use sourceId "beatPhase" as the trigger for the precision clock.
-            val finalCv = if (mod.sourceId == "beatPhase") {
-                // Use Synchronized precision clock (Predictive Interpolation)
-                val beats = CvRegistry.getSynchronizedTotalBeats()
-                val localPhase = ((beats / mod.subdivision) + mod.phaseOffset) % 1.0
-                
-                // Ensure positive phase for % 1.0
-                val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
-                
-                when(mod.waveform) {
-                    Waveform.SINE -> (sin(positivePhase * 2.0 * Math.PI).toFloat() * 0.5f) + 0.5f
-                    Waveform.TRIANGLE -> {
-                        // Edge-snapping: If slope is effectively 0 or 1, treat as saw
-                        val s = mod.slope.toDouble()
-                        if (s <= 0.001) {
-                            (1.0 - positivePhase).toFloat() // Falling Saw
-                        } else if (s >= 0.999) {
-                            positivePhase.toFloat() // Rising Saw
-                        } else {
-                            if (positivePhase < s) {
-                                (positivePhase / s).toFloat()
-                            } else {
-                                ((1.0 - positivePhase) / (1.0 - s)).toFloat()
-                            }
-                        }
-                    }
-                    Waveform.SQUARE -> if (positivePhase < mod.slope) 1.0f else 0.0f
+            val finalCv = when (mod.sourceId) {
+                "beatPhase" -> {
+                    val beats = CvRegistry.getSynchronizedTotalBeats()
+                    val localPhase = ((beats / mod.subdivision) + mod.phaseOffset) % 1.0
+                    val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
+                    calculateWaveform(mod.waveform, positivePhase, mod.slope)
                 }
-            } else {
-                CvRegistry.get(mod.sourceId)
+                "lfo" -> {
+                    val seconds = CvRegistry.getElapsedRealtimeSec()
+                    val period = when (mod.lfoSpeedMode) {
+                        LfoSpeedMode.FAST -> mod.subdivision * 10.0 // 0 to 10s
+                        LfoSpeedMode.MEDIUM -> mod.subdivision * 900.0 // 0 to 15m
+                        LfoSpeedMode.SLOW -> mod.subdivision * 86400.0 // 0 to 24h
+                    }.coerceAtLeast(0.001)
+                    
+                    val localPhase = ((seconds / period) + mod.phaseOffset) % 1.0
+                    val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
+                    calculateWaveform(mod.waveform, positivePhase, mod.slope)
+                }
+                else -> CvRegistry.get(mod.sourceId)
             }
             
             val modAmount = finalCv * mod.weight
@@ -93,5 +88,19 @@ class ModulatableParameter(
         value = result.coerceIn(0f, 1f)
         history.add(value)
         return value
+    }
+
+    private fun calculateWaveform(waveform: Waveform, phase: Double, slope: Float): Float {
+        return when(waveform) {
+            Waveform.SINE -> (sin(phase * 2.0 * Math.PI).toFloat() * 0.5f) + 0.5f
+            Waveform.TRIANGLE -> {
+                val s = slope.toDouble()
+                if (s <= 0.001) (1.0 - phase).toFloat()
+                else if (s >= 0.999) phase.toFloat()
+                else if (phase < s) (phase / s).toFloat()
+                else ((1.0 - phase) / (1.0 - s)).toFloat()
+            }
+            Waveform.SQUARE -> if (phase < slope) 1.0f else 0.0f
+        }
     }
 }

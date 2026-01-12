@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -219,30 +220,53 @@ fun MixerEditorScreen(
 
     // Picker Dialogs
     if (showSetPickerForSlot != null) {
-        PickerDialog("Select Mandala Set", allSets.map { it.name to it.id }, { id ->
-            val idx = showSetPickerForSlot!!
-            val newSlots = currentPatch.slots.toMutableList()
-            newSlots[idx] = newSlots[idx].copy(mandalaSetId = id, currentIndex = ModulatableParameterData(0f), sourceType = VideoSourceType.MANDALA_SET)
-            currentPatch = currentPatch.copy(slots = newSlots)
-            showSetPickerForSlot = null
-        }, { showSetPickerForSlot = null })
+        PickerDialog(
+            title = "Select Mandala Set",
+            items = allSets.map { it.name to it.id },
+            onSelect = { id ->
+                val idx = showSetPickerForSlot!!
+                val newSlots = currentPatch.slots.toMutableList()
+                newSlots[idx] = newSlots[idx].copy(mandalaSetId = id, currentIndex = ModulatableParameterData(0f), sourceType = VideoSourceType.MANDALA_SET)
+                currentPatch = currentPatch.copy(slots = newSlots)
+                showSetPickerForSlot = null
+            },
+            onDismiss = { showSetPickerForSlot = null },
+            onCreateNew = {
+                onNavigateToSetEditor()
+                showSetPickerForSlot = null
+            }
+        )
     }
 
     if (showMandalaPickerForSlot != null) {
-        PickerDialog("Select Mandala", allPatches.map { it.name to it.name }, { id ->
-            val idx = showMandalaPickerForSlot!!
-            val newSlots = currentPatch.slots.toMutableList()
-            newSlots[idx] = newSlots[idx].copy(selectedMandalaId = id, sourceType = VideoSourceType.MANDALA)
-            currentPatch = currentPatch.copy(slots = newSlots)
-            showMandalaPickerForSlot = null
-        }, { showMandalaPickerForSlot = null })
+        PickerDialog(
+            title = "Select Mandala",
+            items = allPatches.map { it.name to it.name },
+            onSelect = { id ->
+                val idx = showMandalaPickerForSlot!!
+                val newSlots = currentPatch.slots.toMutableList()
+                newSlots[idx] = newSlots[idx].copy(selectedMandalaId = id, sourceType = VideoSourceType.MANDALA)
+                currentPatch = currentPatch.copy(slots = newSlots)
+                showMandalaPickerForSlot = null
+            },
+            onDismiss = { showMandalaPickerForSlot = null },
+            onCreateNew = {
+                onNavigateToMandalaEditor()
+                showMandalaPickerForSlot = null
+            }
+        )
     }
 
     if (showOpenDialog) {
-        PickerDialog("Open Mixer Patch", allMixerPatches.map { it.name to it.jsonSettings }, { json ->
-            currentPatch = Json.decodeFromString(json)
-            showOpenDialog = false
-        }, { showOpenDialog = false })
+        PickerDialog(
+            title = "Open Mixer Patch",
+            items = allMixerPatches.map { it.name to it.jsonSettings },
+            onSelect = { json ->
+                currentPatch = Json.decodeFromString(json)
+                showOpenDialog = false
+            },
+            onDismiss = { showOpenDialog = false }
+        )
     }
 
     if (showRenameDialog) {
@@ -259,17 +283,54 @@ fun MixerEditorScreen(
 }
 
 @Composable
-fun PickerDialog(title: String, items: List<Pair<String, String>>, onSelect: (String) -> Unit, onDismiss: () -> Unit) {
+fun PickerDialog(
+    title: String,
+    items: List<Pair<String, String>>,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onCreateNew: (() -> Unit)? = null
+) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = MaterialTheme.shapes.medium, color = AppBackground, modifier = Modifier.fillMaxHeight(0.7f).fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(title, style = MaterialTheme.typography.titleLarge, color = AppText)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(title, style = MaterialTheme.typography.titleLarge, color = AppText)
+                    if (onCreateNew != null) {
+                        IconButton(onClick = onCreateNew) {
+                            Icon(Icons.Default.Add, contentDescription = "Create New", tint = AppAccent)
+                        }
+                    }
+                }
+                
                 Spacer(modifier = Modifier.height(8.dp))
+                
                 Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    if (onCreateNew != null) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onCreateNew() }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = AppAccent, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text("Create new...", style = MaterialTheme.typography.bodyLarge, color = AppAccent)
+                        }
+                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                    }
+
                     items.forEach { (name, value) ->
                         Row(modifier = Modifier.fillMaxWidth().clickable { onSelect(value) }.padding(12.dp)) {
                             Text(name, style = MaterialTheme.typography.bodyLarge, color = AppText)
                         }
+                    }
+                    if (items.isEmpty() && onCreateNew == null) {
+                        Text("No items found.", color = AppText.copy(alpha = 0.5f), modifier = Modifier.padding(12.dp))
                     }
                 }
             }

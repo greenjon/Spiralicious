@@ -5,19 +5,23 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import llm.slop.spirals.models.MixerPatch
 import java.util.UUID
 
+@Serializable
 data class NavLayer(
     val id: String,
     val name: String,
     val type: LayerType,
-    val data: Any? = null,
+    @Transient val data: Any? = null,
     val isDirty: Boolean = false
 )
 
+@Serializable
 enum class LayerType { MIXER, SET, MANDALA }
 
 class MandalaViewModel(application: Application) : AndroidViewModel(application) {

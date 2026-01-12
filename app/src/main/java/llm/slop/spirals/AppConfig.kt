@@ -2,9 +2,11 @@ package llm.slop.spirals
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
+@Serializable
 enum class StartupMode {
     LAST_WORKSPACE,
     MIXER,
@@ -24,7 +26,11 @@ class AppConfig(context: Context) {
         set(value) = prefs.edit().putString("last_nav_stack", value).apply()
 
     fun saveNavStack(stack: List<NavLayer>) {
-        lastNavStackJson = Json.encodeToString(stack)
+        try {
+            lastNavStackJson = Json.encodeToString(stack)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun loadNavStack(): List<NavLayer>? {
@@ -32,6 +38,7 @@ class AppConfig(context: Context) {
         return try {
             Json.decodeFromString<List<NavLayer>>(json)
         } catch (e: Exception) {
+            e.printStackTrace()
             null
         }
     }

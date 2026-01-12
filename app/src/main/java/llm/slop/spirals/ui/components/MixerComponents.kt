@@ -314,8 +314,9 @@ fun MonitorStrip(
         var modeExpanded by remember { mutableStateOf(false) }
         Box(modifier = Modifier.clickable { onFocusChange(modeId) }) {
             val modeEntries = MixerMode.entries
+            val currentModeIndex = groupData.mode.baseValue.toInt().coerceIn(0, modeEntries.size - 1)
             Text(
-                text = modeEntries[groupData.mode.baseValue.toInt().coerceIn(0, modeEntries.size - 1)].name,
+                text = modeEntries[currentModeIndex].name,
                 style = MaterialTheme.typography.labelSmall,
                 color = if (focusedId == modeId) AppAccent else AppText.copy(alpha = 0.7f),
                 fontSize = 9.sp,

@@ -10,6 +10,7 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import llm.slop.spirals.models.MixerPatch
+import llm.slop.spirals.models.ShowPatch
 import java.util.UUID
 
 @Serializable
@@ -22,7 +23,7 @@ data class NavLayer(
 )
 
 @Serializable
-enum class LayerType { MIXER, SET, MANDALA }
+enum class LayerType { MIXER, SET, MANDALA, SHOW }
 
 class MandalaViewModel(application: Application) : AndroidViewModel(application) {
     private val db = MandalaDatabase.getDatabase(application)
@@ -30,15 +31,21 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     private val patchDao = db.mandalaPatchDao()
     private val setDao = db.mandalaSetDao()
     private val mixerDao = db.mixerPatchDao()
+    private val showDao = db.showPatchDao()
     private val appConfig = AppConfig(application)
 
     // 1. Declare Data Flows first
     val allPatches = patchDao.getAllPatches().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val allSets = setDao.getAllSets().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val allMixerPatches = mixerDao.getAllMixerPatches().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val allShowPatches = showDao.getAllShowPatches().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _currentPatch = MutableStateFlow<PatchData?>(null)
     val currentPatch: StateFlow<PatchData?> = _currentPatch.asStateFlow()
+
+    // Show state
+    private val _currentShowIndex = MutableStateFlow(0)
+    val currentShowIndex = _currentShowIndex.asStateFlow()
 
     // 2. Initialize navStack with empty first, then fill in init
     private val _navStack = MutableStateFlow<List<NavLayer>>(emptyList())
@@ -72,6 +79,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.MIXER -> "Mix" to allMixerPatches.value.map { it.name }
             LayerType.SET -> "Set" to allSets.value.map { it.name }
             LayerType.MANDALA -> "Man" to allPatches.value.map { it.name }
+            LayerType.SHOW -> "Show" to allShowPatches.value.map { it.name }
         }
         
         val regex = Regex("${prefix}(\\d+)")
@@ -168,6 +176,10 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                     val mixer = data as? MixerPatch ?: return@launch
                     saveMixerPatch(mixer.copy(name = layer.name))
                 }
+                LayerType.SHOW -> {
+                    val show = data as? ShowPatch ?: return@launch
+                    saveShowPatch(show.copy(name = layer.name))
+                }
             }
             // Clear dirty flag for this layer in the stack
             val index = _navStack.value.indexOfFirst { it.id == layer.id }
@@ -193,6 +205,9 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 LayerType.MIXER -> {
                     (layer.data as? MixerPatch)?.let { deleteMixerPatch(it.id) }
                 }
+                LayerType.SHOW -> {
+                    (layer.data as? ShowPatch)?.let { deleteShowPatch(it.id) }
+                }
             }
             
             // Update name in stack
@@ -215,6 +230,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.MANDALA -> (data as? PatchData)?.copy(name = newName)
             LayerType.SET -> (data as? MandalaSet)?.copy(id = newId, name = newName)
             LayerType.MIXER -> (data as? MixerPatch)?.copy(id = newId, name = newName)
+            LayerType.SHOW -> (data as? ShowPatch)?.copy(id = newId, name = newName)
         } ?: return
         
         val newLayer = NavLayer(newId, newName, layer.type, newData, isDirty = true)
@@ -227,6 +243,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.MIXER -> allMixerPatches.value.map { it.name }
             LayerType.SET -> allSets.value.map { it.name }
             LayerType.MANDALA -> allPatches.value.map { it.name }
+            LayerType.SHOW -> allShowPatches.value.map { it.name }
         }
     }
 
@@ -239,6 +256,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 LayerType.MANDALA -> deletePatch(layer.name)
                 LayerType.SET -> (layer.data as? MandalaSet)?.let { deleteSet(it.id) }
                 LayerType.MIXER -> (layer.data as? MixerPatch)?.let { deleteMixerPatch(it.id) }
+                LayerType.SHOW -> (layer.data as? ShowPatch)?.let { deleteShowPatch(it.id) }
             }
             popToLayer(index - 1, save = false)
         }
@@ -302,6 +320,17 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { mixerDao.deleteById(id) }
     }
 
+    fun saveShowPatch(showPatch: ShowPatch) {
+        viewModelScope.launch {
+            val json = Json.encodeToString(showPatch)
+            showDao.insertShowPatch(ShowPatchEntity(showPatch.id, showPatch.name, json))
+        }
+    }
+
+    fun deleteShowPatch(id: String) {
+        viewModelScope.launch { showDao.deleteById(id) }
+    }
+
     fun toggleTag(id: String, tag: String) {
         viewModelScope.launch {
             val allForId = tagDao.getAllTagsForId(id)
@@ -348,6 +377,12 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                         mixerDao.insertMixerPatch(entity.copy(name = newName))
                     }
                 }
+                LayerType.SHOW -> {
+                    val entity = allShowPatches.value.find { it.name == oldName }
+                    if (entity != null) {
+                        showDao.insertShowPatch(entity.copy(name = newName))
+                    }
+                }
             }
         }
     }
@@ -378,6 +413,15 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                         mixerDao.insertMixerPatch(MixerPatchEntity(newId, newName, Json.encodeToString(newMixer)))
                     }
                 }
+                LayerType.SHOW -> {
+                    val entity = allShowPatches.value.find { it.name == name }
+                    if (entity != null) {
+                        val newId = UUID.randomUUID().toString()
+                        val show = Json.decodeFromString<ShowPatch>(entity.jsonSettings)
+                        val newShow = show.copy(id = newId, name = newName)
+                        showDao.insertShowPatch(ShowPatchEntity(newId, newName, Json.encodeToString(newShow)))
+                    }
+                }
             }
         }
     }
@@ -394,7 +438,25 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                     val entity = allMixerPatches.value.find { it.name == name }
                     if (entity != null) mixerDao.deleteById(entity.id)
                 }
+                LayerType.SHOW -> {
+                    val entity = allShowPatches.value.find { it.name == name }
+                    if (entity != null) showDao.deleteById(entity.id)
+                }
             }
         }
+    }
+
+    fun jumpToShowIndex(index: Int) {
+        _currentShowIndex.value = index
+    }
+
+    fun triggerNextMixer(size: Int) {
+        if (size == 0) return
+        _currentShowIndex.value = (_currentShowIndex.value + 1) % size
+    }
+
+    fun triggerPrevMixer(size: Int) {
+        if (size == 0) return
+        _currentShowIndex.value = if (_currentShowIndex.value <= 0) size - 1 else _currentShowIndex.value - 1
     }
 }

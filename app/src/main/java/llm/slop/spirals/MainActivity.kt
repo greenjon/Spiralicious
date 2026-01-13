@@ -36,10 +36,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spirals.cv.audio.AudioEngine
 import llm.slop.spirals.cv.audio.AudioSourceType
-import llm.slop.spirals.ui.CvLabScreen
-import llm.slop.spirals.ui.InstrumentEditorScreen
-import llm.slop.spirals.ui.MixerEditorScreen
-import llm.slop.spirals.ui.MandalaSetEditorScreen
+import llm.slop.spirals.ui.*
 import llm.slop.spirals.ui.components.MandalaParameterMatrix
 import llm.slop.spirals.ui.components.OscilloscopeView
 import llm.slop.spirals.ui.components.EditorBreadcrumbs
@@ -52,6 +49,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import llm.slop.spirals.cv.CvRegistry
 import llm.slop.spirals.models.MixerPatch
+import llm.slop.spirals.models.ShowPatch
 import kotlinx.serialization.json.Json
 
 class MainActivity : ComponentActivity() {
@@ -100,6 +98,7 @@ class MainActivity : ComponentActivity() {
                 var showOpenMixerDialog by remember { mutableStateOf(false) }
                 var showOpenPatchDialog by remember { mutableStateOf(false) }
                 var showOpenSetDialog by remember { mutableStateOf(false) }
+                var showOpenShowDialog by remember { mutableStateOf(false) }
 
                 // 1. Start the CV Sync Registry immediately
                 LaunchedEffect(Unit) {
@@ -199,6 +198,7 @@ class MainActivity : ComponentActivity() {
                                             LayerType.MIXER -> "Mixer"
                                             LayerType.SET -> "Set"
                                             LayerType.MANDALA -> "Mandala"
+                                            LayerType.SHOW -> "Show"
                                         }
 
                                         DropdownMenuItem(
@@ -219,6 +219,7 @@ class MainActivity : ComponentActivity() {
                                                         LayerType.MIXER -> showOpenMixerDialog = true
                                                         LayerType.SET -> showOpenSetDialog = true
                                                         LayerType.MANDALA -> showOpenPatchDialog = true
+                                                        LayerType.SHOW -> showOpenShowDialog = true
                                                     }
                                                     showHeaderMenu = false
                                                 }
@@ -229,9 +230,16 @@ class MainActivity : ComponentActivity() {
                                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
 
                                         // Editor Switching
+                                        if (currentLayer.type != LayerType.SHOW) {
+                                            DropdownMenuItem(
+                                                text = { Text("Switch to Show Editor", color = if (canSwitch) AppAccent else disabledColor) },
+                                                onClick = { if (canSwitch) { vm.createAndResetStack(LayerType.SHOW); showHeaderMenu = false } },
+                                                enabled = canSwitch
+                                            )
+                                        }
                                         if (currentLayer.type != LayerType.MIXER) {
                                             DropdownMenuItem(
-                                                text = { Text("Switch to Mixer", color = if (canSwitch) AppAccent else disabledColor) },
+                                                text = { Text("Switch to Mixer Editor", color = if (canSwitch) AppAccent else disabledColor) },
                                                 onClick = { if (canSwitch) { vm.createAndResetStack(LayerType.MIXER); showHeaderMenu = false } },
                                                 enabled = canSwitch
                                             )
@@ -253,7 +261,7 @@ class MainActivity : ComponentActivity() {
 
                                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
 
-                                        if (currentLayer.type == LayerType.MIXER) {
+                                        if (currentLayer.type == LayerType.MIXER || currentLayer.type == LayerType.SHOW) {
                                             DropdownMenuItem(text = { Text("CV Lab", color = AppAccent) }, onClick = { showCvLab = true; showHeaderMenu = false })
                                         } else {
                                             DropdownMenuItem(text = { Text("Discard Changes", color = Color.Red) }, onClick = { 
@@ -274,6 +282,18 @@ class MainActivity : ComponentActivity() {
 
                         Box(modifier = Modifier.weight(1f)) {
                             when (currentLayer.type) {
+                                LayerType.SHOW -> {
+                                    ShowEditorScreen(
+                                        vm = vm,
+                                        onNavigateToMixerEditor = { nested ->
+                                            if (nested) vm.createAndPushLayer(LayerType.MIXER)
+                                            else vm.createAndResetStack(LayerType.MIXER)
+                                        },
+                                        previewContent = previewContent,
+                                        showManager = showManager,
+                                        onHideManager = { showManager = false }
+                                    )
+                                }
                                 LayerType.MIXER -> {
                                     MixerEditorScreen(
                                         vm = vm, 
@@ -409,6 +429,20 @@ class MainActivity : ComponentActivity() {
                             showOpenSetDialog = false
                         },
                         onDismiss = { showOpenSetDialog = false }
+                    )
+                }
+
+                if (showOpenShowDialog) {
+                    OpenShowDialog(
+                        vm = vm,
+                        onShowSelected = { showEntity ->
+                            vm.createAndResetStack(LayerType.SHOW)
+                            val show = Json.decodeFromString<ShowPatch>(showEntity.jsonSettings)
+                            vm.updateLayerData(0, show)
+                            vm.updateLayerName(0, show.name)
+                            showOpenShowDialog = false
+                        },
+                        onDismiss = { showOpenShowDialog = false }
                     )
                 }
             }
@@ -759,6 +793,29 @@ fun OpenSetDialog(vm: MandalaViewModel, onSetSelected: (MandalaSetEntity) -> Uni
                     }
                 }
                 if (allSets.isEmpty()) Text("No sets saved yet.", color = AppText.copy(alpha = 0.5f))
+            }
+        }
+    }
+}
+
+@Composable
+fun OpenShowDialog(vm: MandalaViewModel, onShowSelected: (ShowPatchEntity) -> Unit, onDismiss: () -> Unit) {
+    val allShows by vm.allShowPatches.collectAsState(initial = emptyList())
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = MaterialTheme.shapes.medium, color = AppBackground) {
+            Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
+                Text("Saved Shows", style = MaterialTheme.typography.titleLarge, color = AppText)
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    allShows.forEach { entity ->
+                        Row(modifier = Modifier.fillMaxWidth().clickable { 
+                            onShowSelected(entity)
+                        }.padding(12.dp)) {
+                            Text(entity.name, style = MaterialTheme.typography.bodyLarge, color = AppText)
+                        }
+                    }
+                }
+                if (allShows.isEmpty()) Text("No shows saved yet.", color = AppText.copy(alpha = 0.5f))
             }
         }
     }

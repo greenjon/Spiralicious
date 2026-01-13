@@ -213,7 +213,7 @@ fun MixerEditorScreen(
             PatchManagerOverlay(
                 title = "Manage Mixers",
                 patches = allMixerPatches.map { it.name to it.jsonSettings },
-                selectedId = Json.encodeToString(currentPatch), // Using JSON as ID for simplicity in loading
+                selectedId = Json.encodeToString<MixerPatch>(currentPatch), // Using JSON as ID for simplicity in loading
                 onSelect = { json ->
                     try {
                         val selected = Json.decodeFromString<MixerPatch>(json)

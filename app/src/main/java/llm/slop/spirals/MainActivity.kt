@@ -163,22 +163,29 @@ class MainActivity : ComponentActivity() {
                                         onDismissRequest = { showHeaderMenu = false },
                                         containerColor = AppBackground
                                     ) {
-                                        // Standard Options
+                                        val hasActiveData = currentLayer.data != null
+                                        val disabledColor = AppText.copy(alpha = 0.3f)
+
+                                        // Standard Options - Disabled if no active patch
                                         DropdownMenuItem(
-                                            text = { Text("Save", color = AppText) }, 
-                                            onClick = { vm.saveLayer(currentLayer); showHeaderMenu = false }
+                                            text = { Text("Save", color = if (hasActiveData) AppText else disabledColor) }, 
+                                            onClick = { vm.saveLayer(currentLayer); showHeaderMenu = false },
+                                            enabled = hasActiveData
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("Rename", color = AppText) }, 
-                                            onClick = { showRenameDialog = true; showHeaderMenu = false }
+                                            text = { Text("Rename", color = if (hasActiveData) AppText else disabledColor) }, 
+                                            onClick = { showRenameDialog = true; showHeaderMenu = false },
+                                            enabled = hasActiveData
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("Clone", color = AppText) }, 
-                                            onClick = { vm.cloneLayer(navStack.lastIndex); showHeaderMenu = false }
+                                            text = { Text("Clone", color = if (hasActiveData) AppText else disabledColor) }, 
+                                            onClick = { vm.cloneLayer(navStack.lastIndex); showHeaderMenu = false },
+                                            enabled = hasActiveData
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("Delete", color = Color.Red) }, 
-                                            onClick = { vm.deleteLayerAndPop(navStack.lastIndex); showHeaderMenu = false }
+                                            text = { Text("Delete", color = if (hasActiveData) Color.Red else disabledColor) }, 
+                                            onClick = { vm.deleteLayerAndPop(navStack.lastIndex); showHeaderMenu = false },
+                                            enabled = hasActiveData
                                         )
                                         
                                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
@@ -191,7 +198,6 @@ class MainActivity : ComponentActivity() {
                                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
 
                                         val canSwitch = navStack.size == 1
-                                        val disabledColor = AppText.copy(alpha = 0.3f)
 
                                         // New / Open for current editor
                                         val editorName = when(currentLayer.type) {
@@ -205,7 +211,7 @@ class MainActivity : ComponentActivity() {
                                             text = { Text("New $editorName", color = if (canSwitch) AppAccent else disabledColor) },
                                             onClick = { 
                                                 if (canSwitch) {
-                                                    vm.createAndResetStack(currentLayer.type)
+                                                    vm.startNewPatch(currentLayer.type)
                                                     showHeaderMenu = false
                                                 }
                                             },
@@ -502,6 +508,7 @@ class MainActivity : ComponentActivity() {
                                     StartupMode.MIXER -> "Mixer Editor"
                                     StartupMode.SET -> "Set Editor"
                                     StartupMode.MANDALA -> "Mandala Editor"
+                                    StartupMode.SHOW -> "Show Editor"
                                 },
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = AppText
@@ -551,7 +558,7 @@ class MainActivity : ComponentActivity() {
             val patchData = PatchMapper.fromVisualSource(patchName, visualSource)
             val stack = vm.navStack.value
             val index = stack.indexOfLast { it.type == LayerType.MANDALA }
-            if (index != -1) {
+            if (index != -1 && stack[index].data != null) { // Only update if we have actual data
                 val realDirty = PatchMapper.isDirty(visualSource, lastLoadedPatch)
                 vm.updateLayerData(index, patchData, isDirty = realDirty)
             }
@@ -629,7 +636,10 @@ class MainActivity : ComponentActivity() {
                                 // Update layer name in stack
                                 val stack = vm.navStack.value
                                 val idx = stack.indexOfLast { it.type == LayerType.MANDALA }
-                                if (idx != -1) vm.updateLayerName(idx, data.name)
+                                if (idx != -1) {
+                                    vm.updateLayerData(idx, data)
+                                    vm.updateLayerName(idx, data.name)
+                                }
                             }
                         }
                     },

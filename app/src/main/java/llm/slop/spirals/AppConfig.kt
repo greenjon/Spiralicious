@@ -12,7 +12,8 @@ enum class StartupMode {
     LAST_WORKSPACE,
     MIXER,
     SET,
-    MANDALA
+    MANDALA,
+    SHOW
 }
 
 class AppConfig(context: Context) {

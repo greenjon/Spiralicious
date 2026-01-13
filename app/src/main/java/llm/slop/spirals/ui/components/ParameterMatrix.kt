@@ -24,6 +24,14 @@ fun MandalaParameterMatrix(
     onInteractionFinished: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Frame tick to force recomposition so the live modulated arcs animate
+    var frameTick by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos { frameTick = it }
+        }
+    }
+
     // Row 1: Primary Geometry (Arms + Scale)
     val row1Ids = listOf("L1", "L2", "L3", "L4", "Scale")
     val row1Params = remember(labels, parameters) {
@@ -85,7 +93,8 @@ fun MandalaParameterMatrix(
                     isFocused = id == focusedParameterId,
                     onFocusRequest = onFocusRequest,
                     onInteractionFinished = onInteractionFinished,
-                    labelAbove = true
+                    labelAbove = true,
+                    tick = frameTick
                 )
             }
         }
@@ -105,7 +114,8 @@ fun MandalaParameterMatrix(
                     isFocused = id == focusedParameterId,
                     onFocusRequest = onFocusRequest,
                     onInteractionFinished = onInteractionFinished,
-                    labelAbove = false
+                    labelAbove = false,
+                    tick = frameTick
                 )
             }
         }
@@ -125,7 +135,8 @@ fun MandalaParameterMatrix(
                     isFocused = id == focusedParameterId,
                     onFocusRequest = onFocusRequest,
                     onInteractionFinished = onInteractionFinished,
-                    labelAbove = false
+                    labelAbove = false,
+                    tick = frameTick
                 )
             }
         }
@@ -145,7 +156,8 @@ fun MandalaParameterMatrix(
                     isFocused = id == focusedParameterId,
                     onFocusRequest = onFocusRequest,
                     onInteractionFinished = onInteractionFinished,
-                    labelAbove = false
+                    labelAbove = false,
+                    tick = frameTick
                 )
             }
         }
@@ -164,7 +176,8 @@ fun MandalaParameterMatrix(
                         isFocused = id == focusedParameterId,
                         onFocusRequest = onFocusRequest,
                         onInteractionFinished = onInteractionFinished,
-                        labelAbove = false
+                        labelAbove = false,
+                        tick = frameTick
                     )
                 }
             }
@@ -180,10 +193,20 @@ private fun KnobCell(
     onFocusRequest: (String) -> Unit,
     onInteractionFinished: () -> Unit,
     labelAbove: Boolean,
+    tick: Long,
     modifier: Modifier = Modifier
 ) {
-    var currentValue by remember(param) { mutableFloatStateOf(param.baseValue) }
+    var localBaseValue by remember(param) { mutableFloatStateOf(param.baseValue) }
     val currentOnFocusRequest by rememberUpdatedState(onFocusRequest)
+
+    // Sync if model changes (e.g. preset load)
+    LaunchedEffect(param.baseValue) {
+        localBaseValue = param.baseValue
+    }
+
+    // Capture the live value. Reading param.value here, inside a Composable 
+    // that receives 'tick', ensures this block is sensitive to the frame updates.
+    val liveModulatedValue = param.value
 
     Box(
         modifier = modifier
@@ -205,30 +228,32 @@ private fun KnobCell(
                 )
             }
             KnobView(
-                baseValue = currentValue,
-                modulatedValue = param.value,
+                baseValue = localBaseValue,
+                modulatedValue = liveModulatedValue,
                 onValueChange = { newValue ->
-                    currentValue = newValue
+                    localBaseValue = newValue
                     param.baseValue = newValue
                     currentOnFocusRequest(id)
                 },
                 onInteractionFinished = onInteractionFinished,
                 modifier = Modifier.padding(vertical = 1.dp),
-                isBipolar = false, // Parameters in matrix are typically unipolar 0-1
+                isBipolar = false,
                 focused = isFocused,
                 knobSize = 44.dp,
                 showValue = true,
-                displayTransform = { 
+                tick = tick,
+                displayTransform = { v -> 
+                    // Use the passed baseValue (v) for the text display
                     when (id) {
-                        "Hue Sweep" -> (it * 9.0f).roundToInt().toString()
-                        "Scale" -> "%.2f".format(it * 8.0f)
-                        "Snap Count" -> (it * 14f + 2f).roundToInt().toString()
-                        "Snap Mode" -> if (it < 0.5f) "BHND" else "ABOV"
-                        "Snap Blend" -> if (it < 0.5f) "NORM" else "ADD"
-                        "FB Zoom" -> "%.1f%%".format((it - 0.5f) * 10f)
-                        "FB Rotate" -> "%.1f°".format((it - 0.5f) * 10f)
-                        "FB Shift" -> "%.0f°".format(it * 360f)
-                        else -> (it * 100f).roundToInt().toString()
+                        "Hue Sweep" -> (v * 9.0f).roundToInt().toString()
+                        "Scale" -> "%.2f".format(v * 8.0f)
+                        "Snap Count" -> (v * 14f + 2f).roundToInt().toString()
+                        "Snap Mode" -> if (v < 0.5f) "BHND" else "ABOV"
+                        "Snap Blend" -> if (v < 0.5f) "NORM" else "ADD"
+                        "FB Zoom" -> "%.1f%%".format((v - 0.5f) * 10f)
+                        "FB Rotate" -> "%.1f°".format((v - 0.5f) * 10f)
+                        "FB Shift" -> "%.0f°".format(v * 360f)
+                        else -> (v * 100f).roundToInt().toString()
                     }
                 }
             )

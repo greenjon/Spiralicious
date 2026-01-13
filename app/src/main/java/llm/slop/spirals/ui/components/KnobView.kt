@@ -33,6 +33,7 @@ fun KnobView(
     focused: Boolean = false,
     knobSize: Dp = 32.dp,
     showValue: Boolean = false,
+    tick: Long = 0L, // Added tick to force recomposition/redraw
     displayTransform: (Float) -> String = { (it * 100).roundToInt().toString() }
 ) {
     Box(
@@ -46,7 +47,9 @@ fun KnobView(
             ),
         contentAlignment = Alignment.Center
     ) {
+        // We use the tick here to ensure the Canvas redraws whenever the frame changes
         Canvas(modifier = Modifier.fillMaxSize()) {
+            val _t = tick // Explicit read to satisfy Compose dependency tracking
             val canvasCenter = center 
             val radius = this.size.minDimension / 2f - 4.dp.toPx()
             

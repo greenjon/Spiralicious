@@ -24,7 +24,8 @@ import kotlin.math.roundToInt
 
 @Composable
 fun KnobView(
-    currentValue: Float,
+    baseValue: Float,
+    modulatedValue: Float = baseValue,
     onValueChange: (Float) -> Unit,
     onInteractionFinished: () -> Unit,
     modifier: Modifier = Modifier,
@@ -38,7 +39,7 @@ fun KnobView(
         modifier = modifier
             .size(knobSize)
             .knobInput(
-                value = currentValue,
+                value = baseValue,
                 config = KnobConfig(isBipolar = isBipolar),
                 onValueChange = onValueChange,
                 onInteractionFinished = onInteractionFinished
@@ -62,8 +63,8 @@ fun KnobView(
 
             if (isBipolar) {
                 // Sweep from center (12 o'clock / 270°)
-                // currentValue is expected to be -1.0 to 1.0
-                val sweep = currentValue * 150f // 150 deg max each side
+                // modulatedValue is expected to be -1.0 to 1.0
+                val sweep = modulatedValue * 150f // 150 deg max each side
                 drawArc(
                     color = if (focused) AppAccent else AppText,
                     startAngle = 270f,
@@ -78,7 +79,7 @@ fun KnobView(
                 drawArc(
                     color = if (focused) AppAccent else AppText,
                     startAngle = 120f,
-                    sweepAngle = 300f * currentValue,
+                    sweepAngle = 300f * modulatedValue,
                     useCenter = false,
                     topLeft = arcTopLeft,
                     size = arcSize,
@@ -89,7 +90,7 @@ fun KnobView(
         
         if (showValue) {
             Text(
-                text = displayTransform(currentValue),
+                text = displayTransform(baseValue),
                 style = MaterialTheme.typography.labelSmall.copy(fontSize = (knobSize.value * 0.25f).sp),
                 color = if (focused) AppAccent else AppText
             )

@@ -1,7 +1,6 @@
 package llm.slop.spirals.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -22,14 +21,11 @@ import llm.slop.spirals.MandalaVisualSource
 import llm.slop.spirals.MandalaViewModel
 import llm.slop.spirals.cv.*
 import llm.slop.spirals.R
-import llm.slop.spirals.ui.components.KnobConfig
-import llm.slop.spirals.ui.components.knobInput
 import llm.slop.spirals.ui.components.KnobView
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 import kotlinx.coroutines.delay
-import kotlin.math.roundToInt
 import kotlin.math.sin
 
 @Composable
@@ -337,7 +333,7 @@ fun ModulatorRow(
                     // Weight Knob
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                         KnobView(
-                            currentValue = weight,
+                            baseValue = weight,
                             onValueChange = { newValue ->
                                 weight = newValue
                                 if (!isNew) onUpdate(CvModulator(sourceId, operator, newValue, bypassed, waveform, subdivision, phaseOffset, slope, lfoSpeedMode))
@@ -356,7 +352,7 @@ fun ModulatorRow(
                         if (isLfo) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                                 KnobView(
-                                    currentValue = subdivision,
+                                    baseValue = subdivision,
                                     onValueChange = { newValue ->
                                         subdivision = newValue
                                         if (!isNew) onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, newValue, phaseOffset, slope, lfoSpeedMode))
@@ -386,7 +382,7 @@ fun ModulatorRow(
                         // Phase Knob
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             KnobView(
-                                currentValue = phaseOffset,
+                                baseValue = phaseOffset,
                                 onValueChange = { newValue ->
                                     phaseOffset = newValue
                                     if (!isNew) onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope, lfoSpeedMode))
@@ -405,7 +401,7 @@ fun ModulatorRow(
                         if (hasSecondSlider) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                                 KnobView(
-                                    currentValue = slope,
+                                    baseValue = slope,
                                     onValueChange = { newValue ->
                                         slope = newValue
                                         if (!isNew) onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, newValue, lfoSpeedMode))

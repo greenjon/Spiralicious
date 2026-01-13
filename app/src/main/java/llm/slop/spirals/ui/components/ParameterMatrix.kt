@@ -205,7 +205,8 @@ private fun KnobCell(
                 )
             }
             KnobView(
-                currentValue = currentValue,
+                baseValue = currentValue,
+                modulatedValue = param.value,
                 onValueChange = { newValue ->
                     currentValue = newValue
                     param.baseValue = newValue

@@ -209,8 +209,11 @@ fun SourceStrip(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onFocusChange(hueId) }) {
                         Text("HUE", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = if (focusedId == hueId) AppAccent else AppText)
+                        val mainRenderer = LocalSpiralRenderer.current
+                        val modulatedHue = mainRenderer?.getMixerParam(hueId)?.value ?: slot.hue.baseValue
                         KnobView(
-                            currentValue = slot.hue.baseValue,
+                            baseValue = slot.hue.baseValue,
+                            modulatedValue = modulatedHue,
                             onValueChange = { newValue ->
                                 onFocusChange(hueId)
                                 val newSlots = patch.slots.toMutableList()
@@ -225,8 +228,11 @@ fun SourceStrip(
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onFocusChange(satId) }) {
                         Text("SAT", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = if (focusedId == satId) AppAccent else AppText)
+                        val mainRenderer = LocalSpiralRenderer.current
+                        val modulatedSat = mainRenderer?.getMixerParam(satId)?.value ?: slot.saturation.baseValue
                         KnobView(
-                            currentValue = slot.saturation.baseValue,
+                            baseValue = slot.saturation.baseValue,
+                            modulatedValue = modulatedSat,
                             onValueChange = { newValue ->
                                 onFocusChange(satId)
                                 val newSlots = patch.slots.toMutableList()
@@ -338,8 +344,11 @@ fun MonitorStrip(
         
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onFocusChange(balId) }) {
             Text("BAL", style = MaterialTheme.typography.labelSmall, fontSize = 8.sp, color = if (focusedId == balId) AppAccent else AppText)
+            val mainRenderer = LocalSpiralRenderer.current
+            val modulatedBal = mainRenderer?.getMixerParam(balId)?.value ?: groupData.balance.baseValue
             KnobView(
-                currentValue = groupData.balance.baseValue,
+                baseValue = groupData.balance.baseValue,
+                modulatedValue = modulatedBal,
                 onValueChange = { newValue ->
                     onFocusChange(balId)
                     val newGroup = groupData.copy(balance = groupData.balance.copy(baseValue = newValue))
@@ -364,8 +373,11 @@ fun MonitorStrip(
         if (group == "F") {
             Spacer(modifier = Modifier.height(4.dp))
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { onFocusChange(finalGainId) }) {
+                val mainRenderer = LocalSpiralRenderer.current
+                val modulatedGain = mainRenderer?.getMixerParam(finalGainId)?.value ?: patch.finalGain.baseValue
                 KnobView(
-                    currentValue = patch.finalGain.baseValue,
+                    baseValue = patch.finalGain.baseValue,
+                    modulatedValue = modulatedGain,
                     onValueChange = { newValue ->
                         onFocusChange(finalGainId)
                         onPatchChange(patch.copy(finalGain = patch.finalGain.copy(baseValue = newValue)))

@@ -122,7 +122,7 @@ fun ShowEditorScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("PREV", style = MaterialTheme.typography.labelSmall, color = AppAccent)
                     KnobView(
-                        currentValue = currentShow.prevTrigger.baseValue,
+                        baseValue = currentShow.prevTrigger.baseValue,
                         onValueChange = { currentShow = currentShow.copy(prevTrigger = currentShow.prevTrigger.copy(baseValue = it)) },
                         onInteractionFinished = {
                             if (currentShow.prevTrigger.baseValue > 0.5f) {
@@ -135,7 +135,7 @@ fun ShowEditorScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("NEXT", style = MaterialTheme.typography.labelSmall, color = AppAccent)
                     KnobView(
-                        currentValue = currentShow.nextTrigger.baseValue,
+                        baseValue = currentShow.nextTrigger.baseValue,
                         onValueChange = { currentShow = currentShow.copy(nextTrigger = currentShow.nextTrigger.copy(baseValue = it)) },
                         onInteractionFinished = {
                             if (currentShow.nextTrigger.baseValue > 0.5f) {

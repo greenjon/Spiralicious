@@ -219,7 +219,7 @@ private fun KnobCell(
                 showValue = true,
                 displayTransform = { 
                     when (id) {
-                        "Hue Sweep" -> "%.2f".format(it * 9.0f)
+                        "Hue Sweep" -> (it * 9.0f).roundToInt().toString()
                         "Scale" -> "%.2f".format(it * 8.0f)
                         "Snap Count" -> (it * 14f + 2f).roundToInt().toString()
                         "Snap Mode" -> if (it < 0.5f) "BHND" else "ABOV"

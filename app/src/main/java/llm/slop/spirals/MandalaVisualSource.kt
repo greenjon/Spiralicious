@@ -10,6 +10,7 @@ import kotlin.math.PI
 import kotlin.math.sqrt
 import kotlin.math.max
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Optimized VisualSource that avoids allocations in the render loop.
@@ -106,7 +107,8 @@ class MandalaVisualSource : VisualSource {
         val scale = (parameters["Scale"]?.value ?: 0.125f) * globalScale.value * 8.0f
         val thickness = (parameters["Thickness"]?.value ?: 0.1f) * 20f
         val hueOffset = parameters["Hue Offset"]?.value ?: 0f
-        val hueSweep = (parameters["Hue Sweep"]?.value ?: (1.0f / 9.0f)) * 9.0f 
+        // Quantize sweep to integers for perfect loop seamlessness
+        val hueSweep = ((parameters["Hue Sweep"]?.value ?: (1.0f / 9.0f)) * 9.0f).roundToInt().toFloat()
         val depth = parameters["Depth"]?.value ?: 0.35f
         val rotationDegrees = (parameters["Rotation"]?.value ?: 0f) * 360f
 

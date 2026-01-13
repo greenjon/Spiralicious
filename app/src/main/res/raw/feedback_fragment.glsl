@@ -60,15 +60,17 @@ void main() {
     // 3. Sample Live
     vec4 live = texture(uTextureLive, vTexCoord);
     
-    // 4. The Mix Logic (Prevents White-Out)
-    // We scale the input by Gain.
-    // We add history scaled by Decay, but we use the Live Alpha to "mask" the history.
-    // This prevents recursive brightness buildup where the shapes overlap.
-    float gain = uGain;
-    float decay = uDecay;
+    // 4. The Mix Logic (Prevents White-Out and Dimming)
+    // uGain now strictly multiplies the accumulation (history) 
+    // and does NOT affect the live signal intensity.
+    float feedbackGain = uGain * uDecay;
     
-    vec3 composite = live.rgb * gain + history.rgb * decay * (1.0 - live.a * gain);
-    float alpha = max(live.a * gain, history.a * decay);
+    // We use (1.0 - live.a) to prevent the feedback from overlapping the live shape
+    // and causing additive saturation/white-out.
+    vec3 composite = live.rgb + history.rgb * feedbackGain * (1.0 - live.a);
+    
+    // Ensure alpha decays as well to prevent ghosting artifacts
+    float alpha = max(live.a, history.a * feedbackGain);
     
     fragColor = clamp(vec4(composite, alpha), 0.0, 1.0);
 }

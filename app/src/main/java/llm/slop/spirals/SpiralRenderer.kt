@@ -466,7 +466,9 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, fbTextures[fbIndex])
             GLES30.glUniform1i(uFBTextureHistoryLoc, 1)
 
-            GLES30.glUniform1f(uFBDecayLoc, fbDecay * 0.98f) // Decay capped at 0.98
+            // Apply Warp to FB Decay to make it feel linear 0-100 to the user
+            val warpedDecay = fbDecay.toDouble().pow(0.2).toFloat()
+            GLES30.glUniform1f(uFBDecayLoc, warpedDecay * 0.98f) // Decay capped at 0.98
             GLES30.glUniform1f(uFBGainLoc, fbGain)
             GLES30.glUniform1f(uFBZoomLoc, zoom)
             GLES30.glUniform1f(uFBRotateLoc, rotate)
@@ -663,7 +665,9 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, fbTextures[fbIndex])
             GLES30.glUniform1i(uFBTextureHistoryLoc, 1)
 
-            GLES30.glUniform1f(uFBDecayLoc, fbDecay * 0.98f) // Decay capped at 0.98
+            // Apply Warp to FB Decay to make it feel linear 0-100 to the user
+            val warpedDecay = fbDecay.toDouble().pow(0.2).toFloat()
+            GLES30.glUniform1f(uFBDecayLoc, warpedDecay * 0.98f) // Decay capped at 0.98
             GLES30.glUniform1f(uFBGainLoc, fbGain)
             GLES30.glUniform1f(uFBZoomLoc, zoom)
             GLES30.glUniform1f(uFBRotateLoc, rotate)

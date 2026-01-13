@@ -14,7 +14,7 @@ in vec2 vRawPos;
 
 out vec4 fragColor;
 
-// Branchless HSV to RGB
+// Robust HSV to RGB
 vec3 hsv2rgb(vec3 c) {
     vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
     vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
@@ -22,6 +22,8 @@ vec3 hsv2rgb(vec3 c) {
 }
 
 void main() {
+    // 1. Authoritative normalized hue calculation
+    // Using fract() ensures that integer sweeps wrap perfectly to the starting color.
     float hue = fract(uHueOffset + (vPhase * uHueSweep));
     
     // Perceptual Depth Math

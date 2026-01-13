@@ -749,7 +749,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         val rotation = (source.parameters["Rotation"]?.value ?: 0f) * 2.0f * PI.toFloat()
         
         val hueOffset = source.parameters["Hue Offset"]?.value ?: 0f
-        val hueSweep = source.parameters["Hue Sweep"]?.value ?: 1.0f
+        val hueSweep = (source.parameters["Hue Sweep"]?.value ?: (1.0f / 9.0f)) * 9.0f
         val depth = source.parameters["Depth"]?.value ?: 0.35f
         val alpha = (opacityOverride ?: source.globalAlpha.value) * gain
         val thickness = source.parameters["Thickness"]?.value ?: 0.1f

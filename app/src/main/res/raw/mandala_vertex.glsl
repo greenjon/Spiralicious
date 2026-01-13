@@ -40,9 +40,10 @@ void main() {
     float basePhase = aPhaseSide.x;
     float side = aPhaseSide.y;
     
-    // Authoritative Phase with Layer Offset
-    float phase_i = fract(basePhase + uLayerOffset);
-    vPhase = phase_i;
+    // REMOVED fract() here. 
+    // Allowing vPhase to be continuous (e.g., 0.99 -> 1.0) prevents the "rainbow" interpolation jump.
+    // The fragment shader's fract() will handle the actual color wrapping.
+    vPhase = basePhase + uLayerOffset;
 
     // Line Expansion Logic (Miter)
     vec2 pPrev = getPos(basePhase - dP);

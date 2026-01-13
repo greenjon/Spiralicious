@@ -19,6 +19,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spirals.*
 import llm.slop.spirals.ui.components.MandalaPicker
 import llm.slop.spirals.ui.components.SetChipList
+import llm.slop.spirals.ui.components.PatchManagerOverlay
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.ui.theme.AppAccent
@@ -32,17 +33,33 @@ fun MandalaSetEditorScreen(
     onNavigateToMixerEditor: () -> Unit,
     onShowCvLab: () -> Unit,
     previewContent: @Composable () -> Unit,
-    visualSource: MandalaVisualSource
+    visualSource: MandalaVisualSource,
+    showManager: Boolean = false,
+    onHideManager: () -> Unit = {}
 ) {
     val allSets by vm.allSets.collectAsState(initial = emptyList())
     val allPatches by vm.allPatches.collectAsState(initial = emptyList())
 
-    var currentSet by remember { mutableStateOf<MandalaSet?>(null) }
+    // Initialize from layer data if available
+    val navStack by vm.navStack.collectAsState()
+    val layer = navStack.lastOrNull { it.type == LayerType.SET }
+    
+    var currentSet by remember { mutableStateOf(layer?.data as? MandalaSet) }
     var focusedMandalaId by remember { mutableStateOf<String?>(null) }
     var showMandalaPicker by remember { mutableStateOf(false) }
     
     var showOpenDialog by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
+
+    // Update local state if nav data changes (e.g. from Manage overlay)
+    LaunchedEffect(layer?.data) {
+        (layer?.data as? MandalaSet)?.let {
+            if (it.id != (currentSet?.id ?: "")) {
+                currentSet = it
+                focusedMandalaId = it.orderedMandalaIds.firstOrNull()
+            }
+        }
+    }
 
     // Logic to clear the preview when no set or mandala is selected
     LaunchedEffect(currentSet, focusedMandalaId) {
@@ -62,102 +79,133 @@ fun MandalaSetEditorScreen(
 
     fun selectSet(setId: String) {
         val entity = allSets.find { it.id == setId } ?: return
-        currentSet = MandalaSet(
+        val newSet = MandalaSet(
             id = entity.id,
             name = entity.name,
             orderedMandalaIds = Json.decodeFromString(entity.jsonOrderedMandalaIds),
             selectionPolicy = SelectionPolicy.valueOf(entity.selectionPolicy)
         )
-        focusedMandalaId = currentSet?.orderedMandalaIds?.firstOrNull()
+        currentSet = newSet
+        focusedMandalaId = newSet.orderedMandalaIds.firstOrNull()
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppBackground)
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            // Internal Header removed - breadcrumbs handle it
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(AppBackground)
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                // Internal Header removed - breadcrumbs handle it
 
-            // Always show preview window area
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(16 / 9f)
-                    .background(Color.Black),
-                contentAlignment = Alignment.Center
-            ) {
-                previewContent()
-            }
+                // Always show preview window area
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16 / 9f)
+                        .background(Color.Black),
+                    contentAlignment = Alignment.Center
+                ) {
+                    previewContent()
+                }
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            val activeSet = currentSet
-            if (activeSet == null) {
-                Column {
-                    Text("Existing Sets:", style = MaterialTheme.typography.titleMedium, color = AppText)
-                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                        allSets.forEach { setEntity ->
-                            Text(
-                                text = setEntity.name,
-                                color = AppAccent,
-                                modifier = Modifier.clickable { selectSet(setEntity.id) }.padding(vertical = 8.dp)
-                            )
+                val activeSet = currentSet
+                if (activeSet == null) {
+                    Column {
+                        Text("Existing Sets:", style = MaterialTheme.typography.titleMedium, color = AppText)
+                        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                            allSets.forEach { setEntity ->
+                                Text(
+                                    text = setEntity.name,
+                                    color = AppAccent,
+                                    modifier = Modifier.clickable { selectSet(setEntity.id) }.padding(vertical = 8.dp)
+                                )
+                            }
                         }
                     }
-                }
-            } else {
-                // Set Editor View
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Button(onClick = { showMandalaPicker = true }) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Add Mandala")
-                        }
-                        
-                        Spacer(modifier = Modifier.width(16.dp))
-                        
-                        // Policy Selector Dropdown
-                        var policyExpanded by remember { mutableStateOf(false) }
-                        Box {
-                            OutlinedButton(
-                                onClick = { policyExpanded = true },
-                                shape = MaterialTheme.shapes.extraSmall,
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text(activeSet.selectionPolicy.name, style = MaterialTheme.typography.labelSmall, color = AppText)
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = AppText)
+                } else {
+                    // Set Editor View
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Button(onClick = { showMandalaPicker = true }) {
+                                Icon(Icons.Default.Add, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Add Mandala")
                             }
-                            DropdownMenu(
-                                expanded = policyExpanded,
-                                onDismissRequest = { policyExpanded = false },
-                                containerColor = AppBackground
-                            ) {
-                                SelectionPolicy.entries.forEach { policy ->
-                                    DropdownMenuItem(
-                                        text = { Text(policy.name, style = MaterialTheme.typography.labelSmall) },
-                                        onClick = { 
-                                            currentSet = activeSet.copy(selectionPolicy = policy)
-                                            policyExpanded = false 
-                                        }
-                                    )
+                            
+                            Spacer(modifier = Modifier.width(16.dp))
+                            
+                            // Policy Selector Dropdown
+                            var policyExpanded by remember { mutableStateOf(false) }
+                            Box {
+                                OutlinedButton(
+                                    onClick = { policyExpanded = true },
+                                    shape = MaterialTheme.shapes.extraSmall,
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(activeSet.selectionPolicy.name, style = MaterialTheme.typography.labelSmall, color = AppText)
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = AppText)
+                                }
+                                DropdownMenu(
+                                    expanded = policyExpanded,
+                                    onDismissRequest = { policyExpanded = false },
+                                    containerColor = AppBackground
+                                ) {
+                                    SelectionPolicy.entries.forEach { policy ->
+                                        DropdownMenuItem(
+                                            text = { Text(policy.name, style = MaterialTheme.typography.labelSmall) },
+                                            onClick = { 
+                                                currentSet = activeSet.copy(selectionPolicy = policy)
+                                                policyExpanded = false 
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        SetChipList(
+                            chipIds = activeSet.orderedMandalaIds,
+                            onChipTapped = { focusedMandalaId = it },
+                            onChipReordered = { newOrder -> 
+                                currentSet = activeSet.copy(orderedMandalaIds = newOrder.toMutableList())
+                            }
+                        )
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    SetChipList(
-                        chipIds = activeSet.orderedMandalaIds,
-                        onChipTapped = { focusedMandalaId = it },
-                        onChipReordered = { newOrder -> 
-                            currentSet = activeSet.copy(orderedMandalaIds = newOrder.toMutableList())
-                        }
-                    )
                 }
             }
+        }
+
+        if (showManager) {
+            PatchManagerOverlay(
+                title = "Manage Sets",
+                patches = allSets.map { it.name to it.id },
+                selectedId = currentSet?.id,
+                onSelect = { id ->
+                    selectSet(id)
+                    val set = allSets.find { it.id == id }
+                    if (set != null) {
+                        val idx = navStack.indexOfLast { it.type == LayerType.SET }
+                        if (idx != -1) vm.updateLayerName(idx, set.name)
+                    }
+                },
+                onRename = { newName ->
+                    currentSet?.let { vm.renamePatch(LayerType.SET, it.name, newName) }
+                },
+                onClone = { id ->
+                    val set = allSets.find { it.id == id }
+                    if (set != null) vm.cloneSavedPatch(LayerType.SET, set.name)
+                },
+                onDelete = { id ->
+                    val set = allSets.find { it.id == id }
+                    if (set != null) vm.deleteSavedPatch(LayerType.SET, set.name)
+                },
+                onClose = onHideManager
+            )
         }
     }
 
@@ -237,5 +285,14 @@ fun MandalaSetEditorScreen(
             },
             containerColor = AppBackground
         )
+    }
+
+    // Capture work-in-progress back to VM
+    LaunchedEffect(currentSet) {
+        val stack = vm.navStack.value
+        val index = stack.indexOfLast { it.type == LayerType.SET }
+        if (index != -1 && currentSet != null) {
+            vm.updateLayerData(index, currentSet)
+        }
     }
 }

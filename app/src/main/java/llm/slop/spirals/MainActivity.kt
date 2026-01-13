@@ -43,6 +43,7 @@ import llm.slop.spirals.ui.MandalaSetEditorScreen
 import llm.slop.spirals.ui.components.MandalaParameterMatrix
 import llm.slop.spirals.ui.components.OscilloscopeView
 import llm.slop.spirals.ui.components.EditorBreadcrumbs
+import llm.slop.spirals.ui.components.PatchManagerOverlay
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
@@ -88,6 +89,8 @@ class MainActivity : ComponentActivity() {
                 
                 var showCvLab by remember { mutableStateOf(false) }
                 var showSettings by remember { mutableStateOf(false) }
+                var showManager by remember { mutableStateOf(false) }
+
                 var hasMicPermission by remember { 
                     mutableStateOf(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) 
                 }
@@ -95,6 +98,8 @@ class MainActivity : ComponentActivity() {
                 var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
                 var showRenameDialog by remember { mutableStateOf(false) }
                 var showOpenMixerDialog by remember { mutableStateOf(false) }
+                var showOpenPatchDialog by remember { mutableStateOf(false) }
+                var showOpenSetDialog by remember { mutableStateOf(false) }
 
                 // 1. Start the CV Sync Registry immediately
                 LaunchedEffect(Unit) {
@@ -179,28 +184,84 @@ class MainActivity : ComponentActivity() {
                                         
                                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
 
-                                        when (currentLayer.type) {
-                                            LayerType.MIXER -> {
-                                                DropdownMenuItem(text = { Text("New Mixer", color = AppAccent) }, onClick = { vm.createAndPushLayer(LayerType.MIXER); showHeaderMenu = false })
-                                                DropdownMenuItem(text = { Text("Open Mixer", color = AppAccent) }, onClick = { showOpenMixerDialog = true; showHeaderMenu = false })
-                                                HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-                                                DropdownMenuItem(text = { Text("CV Lab", color = AppAccent) }, onClick = { showCvLab = true; showHeaderMenu = false })
-                                                DropdownMenuItem(text = { Text("Mandala Editor", color = AppAccent) }, onClick = { 
-                                                    vm.createAndPushLayer(LayerType.MANDALA)
-                                                    showHeaderMenu = false 
-                                                })
-                                                DropdownMenuItem(text = { Text("Set Editor", color = AppAccent) }, onClick = { 
-                                                    vm.createAndPushLayer(LayerType.SET)
-                                                    showHeaderMenu = false 
-                                                })
-                                            }
-                                            LayerType.SET, LayerType.MANDALA -> {
-                                                DropdownMenuItem(text = { Text("Discard Changes", color = Color.Red) }, onClick = { 
-                                                    vm.popToLayer(navStack.size - 2, save = false)
-                                                    showHeaderMenu = false 
-                                                })
-                                            }
+                                        DropdownMenuItem(
+                                            text = { Text("Manage", color = AppAccent) },
+                                            onClick = { showManager = true; showHeaderMenu = false }
+                                        )
+
+                                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+
+                                        val canSwitch = navStack.size == 1
+                                        val disabledColor = AppText.copy(alpha = 0.3f)
+
+                                        // New / Open for current editor
+                                        val editorName = when(currentLayer.type) {
+                                            LayerType.MIXER -> "Mixer"
+                                            LayerType.SET -> "Set"
+                                            LayerType.MANDALA -> "Mandala"
                                         }
+
+                                        DropdownMenuItem(
+                                            text = { Text("New $editorName", color = if (canSwitch) AppAccent else disabledColor) },
+                                            onClick = { 
+                                                if (canSwitch) {
+                                                    vm.createAndResetStack(currentLayer.type)
+                                                    showHeaderMenu = false
+                                                }
+                                            },
+                                            enabled = canSwitch
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Open $editorName", color = if (canSwitch) AppAccent else disabledColor) },
+                                            onClick = { 
+                                                if (canSwitch) {
+                                                    when(currentLayer.type) {
+                                                        LayerType.MIXER -> showOpenMixerDialog = true
+                                                        LayerType.SET -> showOpenSetDialog = true
+                                                        LayerType.MANDALA -> showOpenPatchDialog = true
+                                                    }
+                                                    showHeaderMenu = false
+                                                }
+                                            },
+                                            enabled = canSwitch
+                                        )
+
+                                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+
+                                        // Editor Switching
+                                        if (currentLayer.type != LayerType.MIXER) {
+                                            DropdownMenuItem(
+                                                text = { Text("Switch to Mixer", color = if (canSwitch) AppAccent else disabledColor) },
+                                                onClick = { if (canSwitch) { vm.createAndResetStack(LayerType.MIXER); showHeaderMenu = false } },
+                                                enabled = canSwitch
+                                            )
+                                        }
+                                        if (currentLayer.type != LayerType.SET) {
+                                            DropdownMenuItem(
+                                                text = { Text("Switch to Set Editor", color = if (canSwitch) AppAccent else disabledColor) },
+                                                onClick = { if (canSwitch) { vm.createAndResetStack(LayerType.SET); showHeaderMenu = false } },
+                                                enabled = canSwitch
+                                            )
+                                        }
+                                        if (currentLayer.type != LayerType.MANDALA) {
+                                            DropdownMenuItem(
+                                                text = { Text("Switch to Mandala Editor", color = if (canSwitch) AppAccent else disabledColor) },
+                                                onClick = { if (canSwitch) { vm.createAndResetStack(LayerType.MANDALA); showHeaderMenu = false } },
+                                                enabled = canSwitch
+                                            )
+                                        }
+
+                                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+
+                                        if (currentLayer.type == LayerType.MIXER) {
+                                            DropdownMenuItem(text = { Text("CV Lab", color = AppAccent) }, onClick = { showCvLab = true; showHeaderMenu = false })
+                                        } else {
+                                            DropdownMenuItem(text = { Text("Discard Changes", color = Color.Red) }, onClick = { 
+                                                vm.popToLayer(navStack.size - 2, save = false)
+                                                showHeaderMenu = false 
+                                            })
+                                        }
+
                                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
                                         DropdownMenuItem(text = { Text("Settings", color = AppText) }, onClick = { 
                                             showSettings = true
@@ -217,14 +278,18 @@ class MainActivity : ComponentActivity() {
                                     MixerEditorScreen(
                                         vm = vm, 
                                         onClose = { /* Root layer usually doesn't close */ },
-                                        onNavigateToSetEditor = { _ ->
-                                            vm.createAndPushLayer(LayerType.SET)
+                                        onNavigateToSetEditor = { nested ->
+                                            if (nested) vm.createAndPushLayer(LayerType.SET)
+                                            else vm.createAndResetStack(LayerType.SET)
                                         },
-                                        onNavigateToMandalaEditor = { _ ->
-                                            vm.createAndPushLayer(LayerType.MANDALA)
+                                        onNavigateToMandalaEditor = { nested ->
+                                            if (nested) vm.createAndPushLayer(LayerType.MANDALA)
+                                            else vm.createAndResetStack(LayerType.MANDALA)
                                         },
                                         onShowCvLab = { showCvLab = true },
-                                        previewContent = previewContent
+                                        previewContent = previewContent,
+                                        showManager = showManager,
+                                        onHideManager = { showManager = false }
                                     )
                                 }
                                 LayerType.SET -> {
@@ -234,7 +299,9 @@ class MainActivity : ComponentActivity() {
                                         onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
                                         onShowCvLab = { showCvLab = true },
                                         previewContent = previewContent,
-                                        visualSource = manager
+                                        visualSource = manager,
+                                        showManager = showManager,
+                                        onHideManager = { showManager = false }
                                     )
                                 }
                                 LayerType.MANDALA -> {
@@ -249,7 +316,9 @@ class MainActivity : ComponentActivity() {
                                         onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
                                         onShowCvLab = { showCvLab = true },
                                         previewContent = previewContent,
-                                        showHeader = false 
+                                        showHeader = false,
+                                        showManager = showManager,
+                                        onHideManager = { showManager = false }
                                     )
                                 }
                             }
@@ -301,10 +370,45 @@ class MainActivity : ComponentActivity() {
                     OpenMixerDialog(
                         vm = vm,
                         onMixerSelected = { mixer ->
-                            vm.pushLayer(NavLayer(mixer.id, mixer.name, LayerType.MIXER, mixer))
+                            vm.createAndResetStack(LayerType.MIXER)
+                            vm.updateLayerData(0, mixer)
+                            vm.updateLayerName(0, mixer.name)
                             showOpenMixerDialog = false
                         },
                         onDismiss = { showOpenMixerDialog = false }
+                    )
+                }
+
+                if (showOpenPatchDialog) {
+                    OpenPatchDialog(
+                        vm = vm,
+                        onPatchSelected = { patch ->
+                            vm.createAndResetStack(LayerType.MANDALA)
+                            vm.updateLayerData(0, patch)
+                            vm.updateLayerName(0, patch.name)
+                            vm.setCurrentPatch(patch)
+                            showOpenPatchDialog = false
+                        },
+                        onDismiss = { showOpenPatchDialog = false }
+                    )
+                }
+
+                if (showOpenSetDialog) {
+                    OpenSetDialog(
+                        vm = vm,
+                        onSetSelected = { setEntity ->
+                            vm.createAndResetStack(LayerType.SET)
+                            val set = MandalaSet(
+                                id = setEntity.id,
+                                name = setEntity.name,
+                                orderedMandalaIds = Json.decodeFromString(setEntity.jsonOrderedMandalaIds),
+                                selectionPolicy = SelectionPolicy.valueOf(setEntity.selectionPolicy)
+                            )
+                            vm.updateLayerData(0, set)
+                            vm.updateLayerName(0, set.name)
+                            showOpenSetDialog = false
+                        },
+                        onDismiss = { showOpenSetDialog = false }
                     )
                 }
             }
@@ -387,17 +491,22 @@ class MainActivity : ComponentActivity() {
         onNavigateToMixerEditor: () -> Unit,
         onShowCvLab: () -> Unit,
         previewContent: @Composable () -> Unit,
-        showHeader: Boolean = true
+        showHeader: Boolean = true,
+        showManager: Boolean = false,
+        onHideManager: () -> Unit = {}
     ) {
         var focusedParameterId by remember { mutableStateOf("L1") }
         var recipeExpanded by remember { mutableStateOf(false) }
         var showOpenDialog by remember { mutableStateOf(false) }
         val patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
+        val allPatches by vm.allPatches.collectAsState(initial = emptyList())
 
         val renderer = LocalSpiralRenderer.current
         DisposableEffect(renderer) {
             renderer?.visualSource = visualSource
             renderer?.mixerPatch = null
+            // Reset alpha when entering editor
+            visualSource.globalAlpha.baseValue = 1f
             onDispose {
                 renderer?.visualSource = null
             }
@@ -414,59 +523,93 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        Column(modifier = Modifier.fillMaxSize()) {
-            Column(modifier = Modifier.weight(1f).fillMaxSize()) {
-                Column(modifier = Modifier.wrapContentHeight().fillMaxWidth().padding(horizontal = 8.dp)) {
-                    Box(modifier = Modifier.fillMaxWidth().aspectRatio(16 / 9f).background(Color.Black).border(1.dp, AppText.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
-                        previewContent()
-                        
-                        Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-                            Surface(color = AppBackground.copy(alpha = 0.7f), shape = MaterialTheme.shapes.extraSmall, modifier = Modifier.clickable { recipeExpanded = true }) {
-                                Text(text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)", style = MaterialTheme.typography.labelSmall, color = AppAccent, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp) )
-                            }
-                            DropdownMenu(expanded = recipeExpanded, onDismissRequest = { recipeExpanded = false }, containerColor = AppBackground, tonalElevation = 0.dp) {
-                                MandalaLibrary.MandalaRatios.forEach { ratio ->
-                                    DropdownMenuItem(text = { Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)", color = AppText) }, onClick = { 
-                                        visualSource.recipe = ratio
-                                        onInteraction()
-                                        recipeExpanded = false
-                                    })
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.weight(1f).fillMaxSize()) {
+                    Column(modifier = Modifier.wrapContentHeight().fillMaxWidth().padding(horizontal = 8.dp)) {
+                        Box(modifier = Modifier.fillMaxWidth().aspectRatio(16 / 9f).background(Color.Black).border(1.dp, AppText.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
+                            previewContent()
+                            
+                            Box(modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                                Surface(color = AppBackground.copy(alpha = 0.7f), shape = MaterialTheme.shapes.extraSmall, modifier = Modifier.clickable { recipeExpanded = true }) {
+                                    Text(text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)", style = MaterialTheme.typography.labelSmall, color = AppAccent, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp) )
+                                }
+                                DropdownMenu(expanded = recipeExpanded, onDismissRequest = { recipeExpanded = false }, containerColor = AppBackground, tonalElevation = 0.dp) {
+                                    MandalaLibrary.MandalaRatios.forEach { ratio ->
+                                        DropdownMenuItem(text = { Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)", color = AppText) }, onClick = { 
+                                            visualSource.recipe = ratio
+                                            onInteraction()
+                                            recipeExpanded = false
+                                        })
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
 
-                    var monitorTick by remember { mutableIntStateOf(0) }
-                    LaunchedEffect(Unit) {
-                        while (true) {
-                            monitorTick++
-                            delay(16)
+                        var monitorTick by remember { mutableIntStateOf(0) }
+                        LaunchedEffect(Unit) {
+                            while (true) {
+                                monitorTick++
+                                delay(16)
+                            }
                         }
-                    }
 
-                    val focusedParam = remember(focusedParameterId, visualSource) {
-                        visualSource.parameters[focusedParameterId] ?: visualSource.globalAlpha
-                    }
-                    
-                    Box(modifier = Modifier.fillMaxWidth().height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
-                        key(monitorTick) {
-                            OscilloscopeView(history = focusedParam.history, modifier = Modifier.fillMaxSize())
+                        val focusedParam = remember(focusedParameterId, visualSource) {
+                            visualSource.parameters[focusedParameterId] ?: visualSource.globalAlpha
                         }
-                        Surface(color = AppBackground.copy(alpha = 0.8f), modifier = Modifier.align(Alignment.TopStart).padding(4.dp), shape = MaterialTheme.shapes.extraSmall) {
-                            Text(text = focusedParameterId, style = MaterialTheme.typography.labelSmall, color = AppAccent, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                        
+                        Box(modifier = Modifier.fillMaxWidth().height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
+                            key(monitorTick) {
+                                OscilloscopeView(history = focusedParam.history, modifier = Modifier.fillMaxSize())
+                            }
+                            Surface(color = AppBackground.copy(alpha = 0.8f), modifier = Modifier.align(Alignment.TopStart).padding(4.dp), shape = MaterialTheme.shapes.extraSmall) {
+                                Text(text = focusedParameterId, style = MaterialTheme.typography.labelSmall, color = AppAccent, modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+                            }
                         }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        MandalaParameterMatrix(labels = visualSource.parameters.keys.toList(), parameters = visualSource.parameters.values.toList(), focusedParameterId = focusedParameterId, onFocusRequest = { focusedParameterId = it }, onInteractionFinished = onInteraction)
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    MandalaParameterMatrix(labels = visualSource.parameters.keys.toList(), parameters = visualSource.parameters.values.toList(), focusedParameterId = focusedParameterId, onFocusRequest = { focusedParameterId = it }, onInteractionFinished = onInteraction)
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                        InstrumentEditorScreen(source = visualSource, vm = vm, focusedId = focusedParameterId, onFocusChange = { focusedParameterId = it }, onInteractionFinished = onInteraction)
+                    }
                 }
+            }
 
-                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    InstrumentEditorScreen(source = visualSource, vm = vm, focusedId = focusedParameterId, onFocusChange = { focusedParameterId = it }, onInteractionFinished = onInteraction)
-                }
+            if (showManager) {
+                PatchManagerOverlay(
+                    title = "Manage Mandalas",
+                    patches = allPatches.map { it.name to it.name },
+                    selectedId = patchName,
+                    onSelect = { id ->
+                        val entity = allPatches.find { it.name == id }
+                        entity?.let {
+                            val data = PatchMapper.fromJson(it.jsonSettings)
+                            if (data != null) {
+                                PatchMapper.applyToVisualSource(data, visualSource)
+                                vm.setCurrentPatch(data)
+                                // Update layer name in stack
+                                val stack = vm.navStack.value
+                                val idx = stack.indexOfLast { it.type == LayerType.MANDALA }
+                                if (idx != -1) vm.updateLayerName(idx, data.name)
+                            }
+                        }
+                    },
+                    onRename = { newName ->
+                        vm.renamePatch(LayerType.MANDALA, patchName, newName)
+                    },
+                    onClone = { id ->
+                        vm.cloneSavedPatch(LayerType.MANDALA, id)
+                    },
+                    onDelete = { id ->
+                        vm.deleteSavedPatch(LayerType.MANDALA, id)
+                    },
+                    onClose = onHideManager
+                )
             }
         }
 
@@ -593,6 +736,29 @@ fun OpenMixerDialog(vm: MandalaViewModel, onMixerSelected: (MixerPatch) -> Unit,
                     }
                 }
                 if (allMixers.isEmpty()) Text("No mixers saved yet.", color = AppText.copy(alpha = 0.5f))
+            }
+        }
+    }
+}
+
+@Composable
+fun OpenSetDialog(vm: MandalaViewModel, onSetSelected: (MandalaSetEntity) -> Unit, onDismiss: () -> Unit) {
+    val allSets by vm.allSets.collectAsState(initial = emptyList())
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = MaterialTheme.shapes.medium, color = AppBackground) {
+            Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
+                Text("Saved Sets", style = MaterialTheme.typography.titleLarge, color = AppText)
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    allSets.forEach { entity ->
+                        Row(modifier = Modifier.fillMaxWidth().clickable { 
+                            onSetSelected(entity)
+                        }.padding(12.dp)) {
+                            Text(entity.name, style = MaterialTheme.typography.bodyLarge, color = AppText)
+                        }
+                    }
+                }
+                if (allSets.isEmpty()) Text("No sets saved yet.", color = AppText.copy(alpha = 0.5f))
             }
         }
     }

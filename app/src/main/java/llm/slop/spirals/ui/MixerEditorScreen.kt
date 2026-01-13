@@ -23,6 +23,7 @@ import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.ui.theme.AppAccent
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,19 +31,35 @@ import kotlinx.coroutines.delay
 fun MixerEditorScreen(
     vm: MandalaViewModel = viewModel(),
     onClose: () -> Unit,
-    onNavigateToSetEditor: (Boolean) -> Unit, // Boolean indicates if it should be nested
+    onNavigateToSetEditor: (Boolean) -> Unit, 
     onNavigateToMandalaEditor: (Boolean) -> Unit,
     onShowCvLab: () -> Unit,
-    previewContent: @Composable () -> Unit
+    previewContent: @Composable () -> Unit,
+    showManager: Boolean = false,
+    onHideManager: () -> Unit = {}
 ) {
     val allMixerPatches by vm.allMixerPatches.collectAsState(initial = emptyList())
     val allSets by vm.allSets.collectAsState(initial = emptyList())
     val allPatches by vm.allPatches.collectAsState(initial = emptyList())
 
-    var currentPatch by remember { mutableStateOf(MixerPatch(name = "New Mixer", slots = List(4) { MixerSlotData() })) }
-    var monitorSource by remember { mutableStateOf("F") } 
+    // Initialize from layer data if available
+    val navStack by vm.navStack.collectAsState()
+    val layer = navStack.lastOrNull { it.type == LayerType.MIXER }
     
-    // UI state for focusing parameters for CV patching
+    var currentPatch by remember { 
+        mutableStateOf(layer?.data as? MixerPatch ?: MixerPatch(name = "New Mixer", slots = List(4) { MixerSlotData() })) 
+    }
+    
+    // Update local state if nav data changes (e.g. from Manage overlay)
+    LaunchedEffect(layer?.data) {
+        (layer?.data as? MixerPatch)?.let {
+            if (it.id != currentPatch.id) {
+                currentPatch = it
+            }
+        }
+    }
+
+    var monitorSource by remember { mutableStateOf("F") } 
     var focusedParameterId by remember { mutableStateOf("PN1") }
 
     var showOpenDialog by remember { mutableStateOf(false) }
@@ -52,12 +69,19 @@ fun MixerEditorScreen(
 
     val mainRenderer = LocalSpiralRenderer.current
 
-    // A simple tick that forces the UI to recompose at 60Hz so the scopes update
     var frameTick by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
             frameTick++
             delay(16)
+        }
+    }
+
+    // Keep VM updated with work-in-progress
+    LaunchedEffect(currentPatch) {
+        val index = navStack.indexOfLast { it.type == LayerType.MIXER }
+        if (index != -1) {
+            vm.updateLayerData(index, currentPatch)
         }
     }
 
@@ -94,94 +118,127 @@ fun MixerEditorScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppBackground)
-    ) {
-        // Internal Header removed - breadcrumbs now handle it in MainActivity
-
-        // Main Preview Window
-        Box(
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp)
-                .aspectRatio(16 / 9f)
-                .background(Color.Black)
-                .border(1.dp, AppText.copy(alpha = 0.1f)),
-            contentAlignment = Alignment.Center
+                .fillMaxSize()
+                .background(AppBackground)
         ) {
-            previewContent()
-
-            Row(
+            // Main Preview Window
+            Box(
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
+                    .aspectRatio(16 / 9f)
+                    .background(Color.Black)
+                    .border(1.dp, AppText.copy(alpha = 0.1f)),
+                contentAlignment = Alignment.Center
             ) {
-                listOf("1", "2", "3", "4", "A", "B", "F").forEach { src ->
-                    val isSelected = monitorSource == src
-                    Surface(
-                        color = if (isSelected) AppAccent else AppBackground.copy(alpha = 0.7f),
-                        shape = MaterialTheme.shapes.extraSmall,
-                        modifier = Modifier.clickable { monitorSource = src }
-                    ) {
-                        Text(
-                            text = src,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (isSelected) Color.White else AppText,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                previewContent()
+
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf("1", "2", "3", "4", "A", "B", "F").forEach { src ->
+                        val isSelected = monitorSource == src
+                        Surface(
+                            color = if (isSelected) AppAccent else AppBackground.copy(alpha = 0.7f),
+                            shape = MaterialTheme.shapes.extraSmall,
+                            modifier = Modifier.clickable { monitorSource = src }
+                        ) {
+                            Text(
+                                text = src,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isSelected) Color.White else AppText,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-        // Oscilloscope
-        Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
-            key(frameTick) {
-                val targetParam = mainRenderer?.getMixerParam(focusedParameterId)
-                if (targetParam != null) {
-                    OscilloscopeView(history = targetParam.history, modifier = Modifier.fillMaxSize())
+            // Oscilloscope
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
+                key(frameTick) {
+                    val targetParam = mainRenderer?.getMixerParam(focusedParameterId)
+                    if (targetParam != null) {
+                        OscilloscopeView(history = targetParam.history, modifier = Modifier.fillMaxSize())
+                    }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            // Strips Section
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .wrapContentHeight()
+                    .padding(horizontal = 4.dp)
+            ) {
+                Column(modifier = Modifier.weight(3f)) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        SourceStrip(0, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 0 }, { showMandalaPickerForSlot = 0 }, allSets, "1", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                        MonitorStrip("A", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                        SourceStrip(1, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 1 }, { showMandalaPickerForSlot = 1 }, allSets, "2", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        SourceStrip(2, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 2 }, { showMandalaPickerForSlot = 2 }, allSets, "3", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                        MonitorStrip("B", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                        SourceStrip(3, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 3 }, { showMandalaPickerForSlot = 3 }, allSets, "4", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                    }
+                }
+                MonitorStrip("F", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // CV Patching Area
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                MixerCvEditor(
+                    patch = currentPatch,
+                    focusedId = focusedParameterId,
+                    onPatchUpdate = { currentPatch = it }
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(2.dp))
-
-        // Strips Section
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight()
-                .padding(horizontal = 4.dp)
-        ) {
-            Column(modifier = Modifier.weight(3f)) {
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    SourceStrip(0, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 0 }, { showMandalaPickerForSlot = 0 }, allSets, "1", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                    MonitorStrip("A", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                    SourceStrip(1, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 1 }, { showMandalaPickerForSlot = 1 }, allSets, "2", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                }
-                Spacer(modifier = Modifier.height(2.dp))
-                Row(modifier = Modifier.fillMaxWidth()) {
-                    SourceStrip(2, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 2 }, { showMandalaPickerForSlot = 2 }, allSets, "3", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                    MonitorStrip("B", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                    SourceStrip(3, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 3 }, { showMandalaPickerForSlot = 3 }, allSets, "4", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                }
-            }
-            MonitorStrip("F", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // CV Patching Area
-        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-            MixerCvEditor(
-                patch = currentPatch,
-                focusedId = focusedParameterId,
-                onPatchUpdate = { currentPatch = it }
+        if (showManager) {
+            PatchManagerOverlay(
+                title = "Manage Mixers",
+                patches = allMixerPatches.map { it.name to it.jsonSettings },
+                selectedId = Json.encodeToString(currentPatch), // Using JSON as ID for simplicity in loading
+                onSelect = { json ->
+                    try {
+                        val selected = Json.decodeFromString<MixerPatch>(json)
+                        currentPatch = selected
+                        // Update layer name in stack too
+                        val idx = navStack.indexOfLast { it.type == LayerType.MIXER }
+                        if (idx != -1) vm.updateLayerName(idx, selected.name)
+                    } catch (e: Exception) {}
+                },
+                onRename = { newName ->
+                    vm.renamePatch(LayerType.MIXER, currentPatch.name, newName)
+                },
+                onClone = { json ->
+                    try {
+                        val p = Json.decodeFromString<MixerPatch>(json)
+                        vm.cloneSavedPatch(LayerType.MIXER, p.name)
+                    } catch (e: Exception) {}
+                },
+                onDelete = { json ->
+                    try {
+                        val p = Json.decodeFromString<MixerPatch>(json)
+                        vm.deleteSavedPatch(LayerType.MIXER, p.name)
+                    } catch (e: Exception) {}
+                },
+                onClose = onHideManager
             )
         }
     }
@@ -199,7 +256,7 @@ fun MixerEditorScreen(
             },
             onDismiss = { showSetPickerForSlot = null },
             onCreateNew = {
-                onNavigateToSetEditor(true) // TRUE = Nested creation
+                onNavigateToSetEditor(true) 
                 showSetPickerForSlot = null
             }
         )
@@ -217,7 +274,7 @@ fun MixerEditorScreen(
             },
             onDismiss = { showMandalaPickerForSlot = null },
             onCreateNew = {
-                onNavigateToMandalaEditor(true) // TRUE = Nested creation
+                onNavigateToMandalaEditor(true) 
                 showMandalaPickerForSlot = null
             }
         )
@@ -230,9 +287,7 @@ fun MixerEditorScreen(
             onSelect = { json ->
                 try {
                     currentPatch = Json.decodeFromString(json)
-                } catch (e: Exception) {
-                    // Log error
-                }
+                } catch (e: Exception) { }
                 showOpenDialog = false
             },
             onDismiss = { showOpenDialog = false }

@@ -93,6 +93,13 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         pushLayer(NavLayer(id, name, type, parentData))
     }
 
+    fun createAndResetStack(type: LayerType) {
+        val name = generateNextName(type)
+        val id = UUID.randomUUID().toString()
+        _navStack.value = listOf(NavLayer(id, name, type))
+        saveWorkspaceIfEnabled()
+    }
+
     /**
      * Updates the data associated with a specific layer in the stack.
      * Useful for capturing "Work in progress" before a pop or save.
@@ -129,10 +136,18 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         
-        _navStack.value = if (index == -1) {
+        val newStack = if (index == -1) {
             emptyList()
         } else {
             _navStack.value.take(index + 1)
+        }
+        
+        _navStack.value = if (newStack.isEmpty()) {
+            // If the stack is emptied, default back to a Mixer hub
+            val id = UUID.randomUUID().toString()
+            listOf(NavLayer(id, generateNextName(LayerType.MIXER), LayerType.MIXER))
+        } else {
+            newStack
         }
         saveWorkspaceIfEnabled()
     }
@@ -193,7 +208,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         val layer = _navStack.value[index]
         val data = layer.data ?: return
         
-        val newName = generateNextName(layer.type)
+        val newName = NamingUtils.generateCloneName(layer.name, getExistingNames(layer.type))
         val newId = UUID.randomUUID().toString()
         
         val newData = when (layer.type) {
@@ -205,6 +220,14 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         val newLayer = NavLayer(newId, newName, layer.type, newData, isDirty = true)
         pushLayer(newLayer)
         saveLayer(newLayer)
+    }
+
+    private fun getExistingNames(type: LayerType): List<String> {
+        return when (type) {
+            LayerType.MIXER -> allMixerPatches.value.map { it.name }
+            LayerType.SET -> allSets.value.map { it.name }
+            LayerType.MANDALA -> allPatches.value.map { it.name }
+        }
     }
 
     fun deleteLayerAndPop(index: Int) {
@@ -301,5 +324,77 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         val sb = StringBuilder("ID,Tags\n")
         currentTags.forEach { (id, tagsList) -> sb.append("$id,${tagsList.joinToString("|")}\n") }
         return sb.toString()
+    }
+
+    fun renamePatch(type: LayerType, oldName: String, newName: String) {
+        viewModelScope.launch {
+            when (type) {
+                LayerType.MANDALA -> {
+                    val entity = allPatches.value.find { it.name == oldName }
+                    if (entity != null) {
+                        patchDao.deleteByName(oldName)
+                        patchDao.insertPatch(entity.copy(name = newName))
+                    }
+                }
+                LayerType.SET -> {
+                    val entity = allSets.value.find { it.name == oldName }
+                    if (entity != null) {
+                        setDao.insertSet(entity.copy(name = newName))
+                    }
+                }
+                LayerType.MIXER -> {
+                    val entity = allMixerPatches.value.find { it.name == oldName }
+                    if (entity != null) {
+                        mixerDao.insertMixerPatch(entity.copy(name = newName))
+                    }
+                }
+            }
+        }
+    }
+
+    fun cloneSavedPatch(type: LayerType, name: String) {
+        viewModelScope.launch {
+            val newName = NamingUtils.generateCloneName(name, getExistingNames(type))
+            when (type) {
+                LayerType.MANDALA -> {
+                    val entity = allPatches.value.find { it.name == name }
+                    if (entity != null) {
+                        patchDao.insertPatch(entity.copy(name = newName))
+                    }
+                }
+                LayerType.SET -> {
+                    val entity = allSets.value.find { it.name == name }
+                    if (entity != null) {
+                        val newId = UUID.randomUUID().toString()
+                        setDao.insertSet(entity.copy(id = newId, name = newName))
+                    }
+                }
+                LayerType.MIXER -> {
+                    val entity = allMixerPatches.value.find { it.name == name }
+                    if (entity != null) {
+                        val newId = UUID.randomUUID().toString()
+                        val mixer = Json.decodeFromString<MixerPatch>(entity.jsonSettings)
+                        val newMixer = mixer.copy(id = newId, name = newName)
+                        mixerDao.insertMixerPatch(MixerPatchEntity(newId, newName, Json.encodeToString(newMixer)))
+                    }
+                }
+            }
+        }
+    }
+
+    fun deleteSavedPatch(type: LayerType, name: String) {
+        viewModelScope.launch {
+            when (type) {
+                LayerType.MANDALA -> patchDao.deleteByName(name)
+                LayerType.SET -> {
+                    val entity = allSets.value.find { it.name == name }
+                    if (entity != null) setDao.deleteById(entity.id)
+                }
+                LayerType.MIXER -> {
+                    val entity = allMixerPatches.value.find { it.name == name }
+                    if (entity != null) mixerDao.deleteById(entity.id)
+                }
+            }
+        }
     }
 }

@@ -99,6 +99,7 @@ class MainActivity : ComponentActivity() {
                 var showOpenPatchDialog by remember { mutableStateOf(false) }
                 var showOpenSetDialog by remember { mutableStateOf(false) }
                 var showOpenShowDialog by remember { mutableStateOf(false) }
+                var showDeleteConfirm by remember { mutableStateOf(false) }
 
                 // 1. Start the CV Sync Registry immediately
                 LaunchedEffect(Unit) {
@@ -165,41 +166,7 @@ class MainActivity : ComponentActivity() {
                                     ) {
                                         val hasActiveData = currentLayer.data != null
                                         val disabledColor = AppText.copy(alpha = 0.3f)
-
-                                        // Standard Options - Disabled if no active patch
-                                        DropdownMenuItem(
-                                            text = { Text("Save", color = if (hasActiveData) AppText else disabledColor) }, 
-                                            onClick = { vm.saveLayer(currentLayer); showHeaderMenu = false },
-                                            enabled = hasActiveData
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Rename", color = if (hasActiveData) AppText else disabledColor) }, 
-                                            onClick = { showRenameDialog = true; showHeaderMenu = false },
-                                            enabled = hasActiveData
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Clone", color = if (hasActiveData) AppText else disabledColor) }, 
-                                            onClick = { vm.cloneLayer(navStack.lastIndex); showHeaderMenu = false },
-                                            enabled = hasActiveData
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Delete", color = if (hasActiveData) Color.Red else disabledColor) }, 
-                                            onClick = { vm.deleteLayerAndPop(navStack.lastIndex); showHeaderMenu = false },
-                                            enabled = hasActiveData
-                                        )
-                                        
-                                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-
-                                        DropdownMenuItem(
-                                            text = { Text("Manage", color = AppAccent) },
-                                            onClick = { showManager = true; showHeaderMenu = false }
-                                        )
-
-                                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-
                                         val canSwitch = navStack.size == 1
-
-                                        // New / Open for current editor
                                         val editorName = when(currentLayer.type) {
                                             LayerType.MIXER -> "Mixer"
                                             LayerType.SET -> "Set"
@@ -207,6 +174,11 @@ class MainActivity : ComponentActivity() {
                                             LayerType.SHOW -> "Show"
                                         }
 
+                                        // --- TOP GROUP ---
+                                        DropdownMenuItem(
+                                            text = { Text("Manage", color = AppAccent) },
+                                            onClick = { showManager = true; showHeaderMenu = false }
+                                        )
                                         DropdownMenuItem(
                                             text = { Text("New $editorName", color = if (canSwitch) AppAccent else disabledColor) },
                                             onClick = { 
@@ -235,48 +207,74 @@ class MainActivity : ComponentActivity() {
 
                                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
 
-                                        // Editor Switching
-                                        if (currentLayer.type != LayerType.SHOW) {
-                                            DropdownMenuItem(
-                                                text = { Text("Switch to Show Editor", color = if (canSwitch) AppAccent else disabledColor) },
-                                                onClick = { if (canSwitch) { vm.createAndResetStack(LayerType.SHOW); showHeaderMenu = false } },
-                                                enabled = canSwitch
-                                            )
-                                        }
-                                        if (currentLayer.type != LayerType.MIXER) {
-                                            DropdownMenuItem(
-                                                text = { Text("Switch to Mixer Editor", color = if (canSwitch) AppAccent else disabledColor) },
-                                                onClick = { if (canSwitch) { vm.createAndResetStack(LayerType.MIXER); showHeaderMenu = false } },
-                                                enabled = canSwitch
-                                            )
-                                        }
-                                        if (currentLayer.type != LayerType.SET) {
-                                            DropdownMenuItem(
-                                                text = { Text("Switch to Set Editor", color = if (canSwitch) AppAccent else disabledColor) },
-                                                onClick = { if (canSwitch) { vm.createAndResetStack(LayerType.SET); showHeaderMenu = false } },
-                                                enabled = canSwitch
-                                            )
-                                        }
-                                        if (currentLayer.type != LayerType.MANDALA) {
-                                            DropdownMenuItem(
-                                                text = { Text("Switch to Mandala Editor", color = if (canSwitch) AppAccent else disabledColor) },
-                                                onClick = { if (canSwitch) { vm.createAndResetStack(LayerType.MANDALA); showHeaderMenu = false } },
-                                                enabled = canSwitch
-                                            )
-                                        }
+                                        // --- DATA GROUP ---
+                                        DropdownMenuItem(
+                                            text = { Text("Save", color = if (hasActiveData) AppText else disabledColor) }, 
+                                            onClick = { vm.saveLayer(currentLayer); showHeaderMenu = false },
+                                            enabled = hasActiveData
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Rename", color = if (hasActiveData) AppText else disabledColor) }, 
+                                            onClick = { showRenameDialog = true; showHeaderMenu = false },
+                                            enabled = hasActiveData
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Clone", color = if (hasActiveData) AppText else disabledColor) }, 
+                                            onClick = { vm.cloneLayer(navStack.lastIndex); showHeaderMenu = false },
+                                            enabled = hasActiveData
+                                        )
 
                                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
 
-                                        if (currentLayer.type == LayerType.MIXER || currentLayer.type == LayerType.SHOW) {
-                                            DropdownMenuItem(text = { Text("CV Lab", color = AppAccent) }, onClick = { showCvLab = true; showHeaderMenu = false })
-                                        } else {
-                                            DropdownMenuItem(text = { Text("Discard Changes", color = Color.Red) }, onClick = { 
+                                        // --- DELETE GROUP ---
+                                        DropdownMenuItem(
+                                            text = { Text("Delete", color = if (hasActiveData) Color.Red else disabledColor) }, 
+                                            onClick = { showDeleteConfirm = true; showHeaderMenu = false },
+                                            enabled = hasActiveData
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text("Discard Changes", color = Color.Red) }, 
+                                            onClick = { 
                                                 vm.popToLayer(navStack.size - 2, save = false)
                                                 showHeaderMenu = false 
-                                            })
+                                            }
+                                        )
+
+                                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+
+                                        // --- SWITCH GROUP ---
+                                        DropdownMenuItem(
+                                            text = { Text("Switch to...", color = AppText) },
+                                            onClick = { /* Section Header */ },
+                                            enabled = false
+                                        )
+                                        
+                                        LayerType.entries.filter { it != currentLayer.type }.forEach { type ->
+                                            val label = when(type) {
+                                                LayerType.MIXER -> "Mixer Editor"
+                                                LayerType.SET -> "Set Editor"
+                                                LayerType.MANDALA -> "Mandala Editor"
+                                                LayerType.SHOW -> "Show Editor"
+                                            }
+                                            DropdownMenuItem(
+                                                text = { 
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Text("  • ", color = AppAccent)
+                                                        Text(label, color = AppAccent)
+                                                    }
+                                                },
+                                                onClick = { vm.createAndResetStack(type); showHeaderMenu = false },
+                                                enabled = canSwitch
+                                            )
                                         }
 
                                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+
+                                        // --- BOTTOM GROUP ---
+                                        DropdownMenuItem(
+                                            text = { Text("CV Lab", color = AppAccent) }, 
+                                            onClick = { showCvLab = true; showHeaderMenu = false }
+                                        )
                                         DropdownMenuItem(text = { Text("Settings", color = AppText) }, onClick = { 
                                             showSettings = true
                                             showHeaderMenu = false 
@@ -389,6 +387,28 @@ class MainActivity : ComponentActivity() {
                             showRenameDialog = false
                         },
                         onDismiss = { showRenameDialog = false }
+                    )
+                }
+
+                if (showDeleteConfirm) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteConfirm = false },
+                        title = { Text("Delete '${currentLayer.name}'?", color = AppText) },
+                        text = { Text("This action cannot be undone.", color = AppText) },
+                        confirmButton = {
+                            TextButton(onClick = { 
+                                vm.deleteLayerAndPop(navStack.lastIndex)
+                                showDeleteConfirm = false 
+                            }) {
+                                Text("DELETE", color = Color.Red)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteConfirm = false }) {
+                                Text("CANCEL", color = AppText)
+                            }
+                        },
+                        containerColor = AppBackground
                     )
                 }
 

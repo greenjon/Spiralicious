@@ -411,141 +411,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         }
     }
 
-    private fun compositeWithTrails(source: MandalaVisualSource?) {
-        if (source == null) return
-        
-        val currentGate = source.parameters["Snap Trigger"]?.value ?: 0f
-        val trailsParam = source.parameters["Trails"]?.value ?: 0f
-        val snapCount = ((source.parameters["Snap Count"]?.value ?: 0.5f) * 14f + 2f).toInt().coerceIn(2, 16)
-        val snapMode = source.parameters["Snap Mode"]?.value ?: 0f
-        val snapBlend = source.parameters["Snap Blend"]?.value ?: 0f
-
-        val fbDecay = source.parameters["FB Decay"]?.value ?: 0f
-        val fbGain = source.parameters["FB Gain"]?.value ?: 0f
-
-        // --- Ghost Trails Logic ---
-        // Dirty Guard Logic
-        val l1 = source.parameters["L1"]?.value ?: 0f
-        val l2 = source.parameters["L2"]?.value ?: 0f
-        val l3 = source.parameters["L3"]?.value ?: 0f
-        val l4 = source.parameters["L4"]?.value ?: 0f
-        val rot = source.parameters["Rotation"]?.value ?: 0f
-        val isStatic = l1 == lastL1 && l2 == lastL2 && l3 == lastL3 && l4 == lastL4 && rot == lastRotation
-        lastL1 = l1; lastL2 = l2; lastL3 = l3; lastL4 = l4; lastRotation = rot
-
-        // Phase A: Render Current to offscreen FBO
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, currentFrameFBO)
-        GLES30.glClearColor(0f, 0f, 0f, 0f)
-        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-        
-        GLES30.glUseProgram(program)
-        renderSource(source)
-        
-        // --- Feedback Engine Logic ---
-        if (fbDecay > 0.01f || fbGain > 0.01f) {
-            val fbZoomKnob = source.parameters["FB Zoom"]?.value ?: 0.5f
-            val fbRotateKnob = source.parameters["FB Rotate"]?.value ?: 0.5f
-            val fbShift = source.parameters["FB Shift"]?.value ?: 0f
-            val fbBlur = source.parameters["FB Blur"]?.value ?: 0f
-
-            val zoom = (fbZoomKnob - 0.5f) * 0.1f // -5% to +5%
-            val rotate = (fbRotateKnob - 0.5f) * 10f * (PI.toFloat() / 180f) // -5 to +5 deg in radians
-
-            val nextIndex = (fbIndex + 1) % 2
-            GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, fbFramebuffers[nextIndex])
-            GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-
-            GLES30.glUseProgram(feedbackProgram)
-            GLES30.glBindVertexArray(trailVao)
-            
-            GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
-            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, currentFrameTexture)
-            GLES30.glUniform1i(uFBTextureLiveLoc, 0)
-
-            GLES30.glActiveTexture(GLES30.GL_TEXTURE1)
-            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, fbTextures[fbIndex])
-            GLES30.glUniform1i(uFBTextureHistoryLoc, 1)
-
-            // Apply Warp to FB Decay to make it feel linear 0-100 to the user
-            val warpedDecay = fbDecay.toDouble().pow(0.2).toFloat()
-            GLES30.glUniform1f(uFBDecayLoc, warpedDecay * 0.98f) // Decay capped at 0.98
-            GLES30.glUniform1f(uFBGainLoc, fbGain)
-            GLES30.glUniform1f(uFBZoomLoc, zoom)
-            GLES30.glUniform1f(uFBRotateLoc, rotate)
-            GLES30.glUniform1f(uFBShiftLoc, fbShift)
-            GLES30.glUniform1f(uFBBlurLoc, fbBlur)
-
-            GLES30.glDisable(GLES30.GL_BLEND)
-            GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
-            GLES30.glEnable(GLES30.GL_BLEND)
-
-            fbIndex = nextIndex
-        }
-
-        // Phase B: Gated Snapshot Update
-        var shouldCapture = false
-        if (currentGate > 0.5f) {
-            if (isSnapshotArmed && !isStatic) {
-                shouldCapture = true
-                isSnapshotArmed = false
-            }
-        } else {
-            isSnapshotArmed = true
-        }
-
-        if (shouldCapture && trailsParam > 0.01f) {
-            ghostIndex = (ghostIndex + 1) % MAX_GHOSTS
-            GLES30.glBindFramebuffer(GLES30.GL_READ_FRAMEBUFFER, currentFrameFBO)
-            GLES30.glBindFramebuffer(GLES30.GL_DRAW_FRAMEBUFFER, ghostFramebuffers[ghostIndex])
-            GLES30.glBlitFramebuffer(0, 0, screenWidth, screenHeight, 0, 0, screenWidth, screenHeight, GLES30.GL_COLOR_BUFFER_BIT, GLES30.GL_NEAREST)
-        }
-
-        // Phase C & D: Composite to Screen
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
-        
-        GLES30.glUseProgram(trailProgram)
-        GLES30.glBindVertexArray(trailVao)
-        GLES30.glEnable(GLES30.GL_BLEND)
-        
-        if (snapBlend >= 0.5f) {
-            GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE) 
-        } else {
-            GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
-        }
-
-        val drawGhosts = {
-            for (i in (snapCount - 1) downTo 1) {
-                val idx = (ghostIndex - i + MAX_GHOSTS) % MAX_GHOSTS
-                val decayAlpha = trailsParam * exp(-(i.toFloat() * i.toFloat()) / (snapCount.toFloat() * 1.5f))
-                GLES30.glUniform1f(uTrailAlphaLocation, decayAlpha)
-                GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
-                GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, ghostTextures[idx])
-                GLES30.glUniform1i(uTrailTextureLocation, 0)
-                GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
-            }
-        }
-
-        val drawCurrent = {
-            GLES30.glUniform1f(uTrailAlphaLocation, 1.0f)
-            GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
-            if (fbDecay > 0.01f || fbGain > 0.01f) {
-                GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, fbTextures[fbIndex])
-            } else {
-                GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, currentFrameTexture)
-            }
-            GLES30.glUniform1i(uTrailTextureLocation, 0)
-            GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
-        }
-
-        if (snapMode < 0.5f) {
-            drawGhosts()
-            drawCurrent()
-        } else {
-            drawCurrent()
-            drawGhosts()
-        }
-    }
-
     private fun renderHierarchicalGroupTrails(
         prefix: String,
         src1: MandalaVisualSource,
@@ -610,6 +475,9 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glUniform1f(uFillModeLocation, 0.0f)
     }
 
+    /**
+     * Centralized composition logic handling both Ghost Trails and Feedback Engine.
+     */
     private fun compositeWithTrails(source: MandalaVisualSource?, gainOverride: Float? = null) {
         if (source == null) return
         
@@ -620,7 +488,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         val snapBlend = source.parameters["Snap Blend"]?.value ?: 0f
 
         val fbDecay = source.parameters["FB Decay"]?.value ?: 0f
-        val fbGain = (source.parameters["FB Gain"]?.value ?: 0f) * (gainOverride ?: 1.0f)
+        val fbGain = (source.parameters["FB Gain"]?.value ?: 1.0f) * (gainOverride ?: 1.0f)
 
         // --- Ghost Trails Logic ---
         // Dirty Guard Logic
@@ -665,10 +533,12 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, fbTextures[fbIndex])
             GLES30.glUniform1i(uFBTextureHistoryLoc, 1)
 
-            // Apply Warp to FB Decay to make it feel linear 0-100 to the user
-            val warpedDecay = fbDecay.toDouble().pow(0.2).toFloat()
-            GLES30.glUniform1f(uFBDecayLoc, warpedDecay * 0.98f) // Decay capped at 0.98
-            GLES30.glUniform1f(uFBGainLoc, fbGain)
+            // Persistence Tuning: Inverse power curve for long, smooth tails.
+            // 50% knob should now feel like ~5 seconds of persistence.
+            val persistence = 1.0f - (1.0f - fbDecay).pow(6.0f)
+            GLES30.glUniform1f(uFBDecayLoc, persistence) 
+            GLES30.glUniform1f(uFBGainLoc, fbGain * 2.0f) // 2x Headroom
+            
             GLES30.glUniform1f(uFBZoomLoc, zoom)
             GLES30.glUniform1f(uFBRotateLoc, rotate)
             GLES30.glUniform1f(uFBShiftLoc, fbShift)

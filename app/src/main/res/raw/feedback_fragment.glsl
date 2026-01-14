@@ -30,7 +30,7 @@ vec3 rgb2hsv(vec3 c) {
 }
 
 void main() {
-    // 1. Transform History Coordinates (Zoom/Rotate)
+    // 1. Transform History Coordinates
     vec2 uv = vTexCoord - 0.5;
     uv *= (1.0 - uZoom);
     float s = sin(uRotate);
@@ -39,38 +39,35 @@ void main() {
     vec2 historyCoord = uv + 0.5;
     
     vec4 history;
-    if (uBlur > 0.01) {
+    if (uBlur > 0.001) {
         float b = uBlur * 0.004;
         history = texture(uTextureHistory, historyCoord) * 0.4;
-        history += texture(uTextureHistory, historyCoord + vec2(b, b)) * 0.15;
-        history += texture(uTextureHistory, historyCoord + vec2(-b, b)) * 0.15;
-        history += texture(uTextureHistory, historyCoord + vec2(b, -b)) * 0.15;
-        history += texture(uTextureHistory, historyCoord + vec2(-b, -b)) * 0.15;
+        history += texture(uTextureHistory, historyCoord + vec2(b, 0.0)) * 0.15;
+        history += texture(uTextureHistory, historyCoord + vec2(-b, 0.0)) * 0.15;
+        history += texture(uTextureHistory, historyCoord + vec2(0.0, b)) * 0.15;
+        history += texture(uTextureHistory, historyCoord + vec2(0.0, -b)) * 0.15;
     } else {
         history = texture(uTextureHistory, historyCoord);
     }
     
-    // 2. Color Shift the History
+    // 2. Color Shift
     if (uHueShift != 0.0 && history.a > 0.01) {
         vec3 hsv = rgb2hsv(history.rgb);
         hsv.x = fract(hsv.x + uHueShift);
         history.rgb = hsv2rgb(hsv);
     }
     
-    // 3. Sample Live
+    // 3. Sample Live Signal
     vec4 live = texture(uTextureLive, vTexCoord);
     
-    // 4. The Mix Logic (Prevents White-Out and Dimming)
-    // uGain now strictly multiplies the accumulation (history) 
-    // and does NOT affect the live signal intensity.
-    float feedbackGain = uGain * uDecay;
+    // 4. Max Lighten Blend
+    // This preserves hues and prevents additive white-out.
+    // We apply uGain to allow compensating for Blur/Zoom energy loss.
+    vec3 feedbackPart = history.rgb * uDecay * uGain;
+    vec3 composite = max(live.rgb, feedbackPart);
     
-    // We use (1.0 - live.a) to prevent the feedback from overlapping the live shape
-    // and causing additive saturation/white-out.
-    vec3 composite = live.rgb + history.rgb * feedbackGain * (1.0 - live.a);
+    // Persistence: Use max for alpha but multiply by decay to eventually fade.
+    float alpha = max(live.a, history.a * uDecay);
     
-    // Ensure alpha decays as well to prevent ghosting artifacts
-    float alpha = max(live.a, history.a * feedbackGain);
-    
-    fragColor = clamp(vec4(composite, alpha), 0.0, 1.0);
+    fragColor = vec4(composite, alpha);
 }

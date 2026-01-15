@@ -9,7 +9,7 @@ data class PatchData(
     val name: String,
     val recipeId: String,
     val parameters: List<ParameterData>,
-    val version: Int = 2 // Incremented version for new modulator fields
+    val version: Int = 3 // Incremented version for LFO speed mode
 )
 
 @Serializable
@@ -28,5 +28,6 @@ data class ModulatorData(
     val waveform: String = "SINE",
     val subdivision: Float = 1.0f,
     val phaseOffset: Float = 0.0f,
-    val slope: Float = 0.5f
+    val slope: Float = 0.5f,
+    val lfoSpeedMode: String = "FAST"
 )

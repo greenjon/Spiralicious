@@ -61,8 +61,8 @@ fun MandalaSetEditorScreen(
         }
     }
 
-    // Logic to clear the preview when no set or mandala is selected
-    LaunchedEffect(currentSet, focusedMandalaId) {
+    // Logic to update the preview when the selected mandala in the set changes
+    LaunchedEffect(currentSet, focusedMandalaId, allPatches) {
         if (currentSet == null || focusedMandalaId == null) {
             visualSource.globalAlpha.baseValue = 0f
         } else {

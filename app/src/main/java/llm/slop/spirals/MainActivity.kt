@@ -573,6 +573,13 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Apply loaded patch to visual source when it changes
+        LaunchedEffect(lastLoadedPatch) {
+            lastLoadedPatch?.let { 
+                PatchMapper.applyToVisualSource(it, visualSource)
+            }
+        }
+
         // Keep ViewModel updated with current work-in-progress for cascade saving
         LaunchedEffect(visualSource.recipe, visualSource.parameters.values.map { it.value }) {
             val patchData = PatchMapper.fromVisualSource(patchName, visualSource)

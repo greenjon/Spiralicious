@@ -562,6 +562,7 @@ class MainActivity : ComponentActivity() {
         var showOpenDialog by remember { mutableStateOf(false) }
         val patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
         val allPatches by vm.allPatches.collectAsState(initial = emptyList())
+        var recipeSortMode by remember { mutableStateOf(llm.slop.spirals.ui.components.RecipeSortMode.PETALS) }
 
         val renderer = LocalSpiralRenderer.current
         DisposableEffect(renderer) {
@@ -605,13 +606,89 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             
+                            // Navigation arrows (lower right)
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val tagManager = remember { RecipeTagManager(applicationContext) }
+                                val sortedRecipes = remember(recipeSortMode) {
+                                    val favorites = tagManager.getFavorites()
+                                    val trash = tagManager.getTrash()
+                                    when (recipeSortMode) {
+                                        llm.slop.spirals.ui.components.RecipeSortMode.PETALS -> MandalaLibrary.MandalaRatios.sortedBy { it.petals }
+                                        llm.slop.spirals.ui.components.RecipeSortMode.FAVORITES -> {
+                                            val faves = MandalaLibrary.MandalaRatios.filter { favorites.contains(it.id) }
+                                                .sortedWith(compareBy({ it.petals }, { it.id }))
+                                            val rest = MandalaLibrary.MandalaRatios.filter { !favorites.contains(it.id) }
+                                                .sortedWith(compareBy({ it.petals }, { it.id }))
+                                            faves + rest
+                                        }
+                                        llm.slop.spirals.ui.components.RecipeSortMode.TO_DELETE -> {
+                                            val trashItems = MandalaLibrary.MandalaRatios.filter { trash.contains(it.id) }
+                                                .sortedBy { it.id }
+                                            val rest = MandalaLibrary.MandalaRatios.filter { !trash.contains(it.id) }
+                                                .sortedBy { it.id }
+                                            trashItems + rest
+                                        }
+                                        llm.slop.spirals.ui.components.RecipeSortMode.SHAPE_RATIO -> MandalaLibrary.MandalaRatios.sortedBy { it.shapeRatio }
+                                        llm.slop.spirals.ui.components.RecipeSortMode.MULTIPLICITY -> MandalaLibrary.MandalaRatios.sortedBy { it.multiplicityClass }
+                                        llm.slop.spirals.ui.components.RecipeSortMode.FREQ_COUNT -> MandalaLibrary.MandalaRatios.sortedBy { it.independentFreqCount }
+                                        llm.slop.spirals.ui.components.RecipeSortMode.HIERARCHY -> MandalaLibrary.MandalaRatios.sortedBy { it.hierarchyDepth }
+                                        llm.slop.spirals.ui.components.RecipeSortMode.DOMINANCE -> MandalaLibrary.MandalaRatios.sortedBy { it.dominanceRatio }
+                                        llm.slop.spirals.ui.components.RecipeSortMode.RADIAL_VAR -> MandalaLibrary.MandalaRatios.sortedBy { it.radialVariance }
+                                    }
+                                }
+                                val currentIndex = sortedRecipes.indexOfFirst { it.id == visualSource.recipe.id }
+                                
+                                IconButton(
+                                    onClick = {
+                                        if (currentIndex > 0) {
+                                            visualSource.recipe = sortedRecipes[currentIndex - 1]
+                                            onInteraction()
+                                        }
+                                    },
+                                    enabled = currentIndex > 0,
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.KeyboardArrowLeft,
+                                        contentDescription = "Previous Recipe",
+                                        tint = if (currentIndex > 0) AppAccent else AppText.copy(alpha = 0.3f)
+                                    )
+                                }
+                                
+                                IconButton(
+                                    onClick = {
+                                        if (currentIndex < sortedRecipes.size - 1) {
+                                            visualSource.recipe = sortedRecipes[currentIndex + 1]
+                                            onInteraction()
+                                        }
+                                    },
+                                    enabled = currentIndex < sortedRecipes.size - 1,
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.KeyboardArrowRight,
+                                        contentDescription = "Next Recipe",
+                                        tint = if (currentIndex < sortedRecipes.size - 1) AppAccent else AppText.copy(alpha = 0.3f)
+                                    )
+                                }
+                            }
+                            
                             if (recipeExpanded) {
                                 RecipePickerDialog(
                                     currentRecipe = visualSource.recipe,
+                                    initialSortMode = recipeSortMode,
                                     onRecipeSelected = { ratio ->
                                         visualSource.recipe = ratio
                                         onInteraction()
                                         recipeExpanded = false
+                                    },
+                                    onSortModeChanged = { mode ->
+                                        recipeSortMode = mode
                                     },
                                     onDismiss = { recipeExpanded = false }
                                 )

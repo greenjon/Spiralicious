@@ -606,6 +606,56 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             
+                            // Star/Trash buttons on the right side
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .padding(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val tagManager = remember { RecipeTagManager(applicationContext) }
+                                var refreshTrigger by remember { mutableIntStateOf(0) }
+                                val isFavorite = remember(visualSource.recipe.id, refreshTrigger) { 
+                                    tagManager.isFavorite(visualSource.recipe.id) 
+                                }
+                                val isTrash = remember(visualSource.recipe.id, refreshTrigger) { 
+                                    tagManager.isTrash(visualSource.recipe.id) 
+                                }
+                                
+                                IconButton(
+                                    onClick = {
+                                        tagManager.toggleFavorite(visualSource.recipe.id)
+                                        refreshTrigger++
+                                    },
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .background(AppBackground.copy(alpha = 0.7f), MaterialTheme.shapes.small)
+                                ) {
+                                    Icon(
+                                        if (isFavorite) Icons.Filled.Star else Icons.Default.Star,
+                                        contentDescription = "Toggle Favorite",
+                                        tint = if (isFavorite) androidx.compose.ui.graphics.Color(0xFFFFD700) else AppText.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        tagManager.toggleTrash(visualSource.recipe.id)
+                                        refreshTrigger++
+                                    },
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .background(AppBackground.copy(alpha = 0.7f), MaterialTheme.shapes.small)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Toggle Trash",
+                                        tint = if (isTrash) androidx.compose.ui.graphics.Color.Red else AppText.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
+                            }
+                            
                             // Navigation arrows (lower right)
                             Row(
                                 modifier = Modifier

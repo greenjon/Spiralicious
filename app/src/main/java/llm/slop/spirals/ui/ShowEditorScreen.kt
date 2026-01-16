@@ -192,6 +192,9 @@ fun ShowEditorScreen(
         }
 
         if (showManager) {
+            val mixerNames = currentShow.mixerNames
+            val currentMixerIndex = if (mixerNames.isNotEmpty()) currentShowIndex.coerceIn(0, mixerNames.size - 1) else 0
+            
             PatchManagerOverlay(
                 title = "Manage Shows",
                 patches = allShowPatches.map { it.name to it.jsonSettings },
@@ -203,6 +206,8 @@ fun ShowEditorScreen(
                         currentShow = selected
                         val idx = navStack.indexOfLast { it.type == LayerType.SHOW }
                         if (idx != -1) vm.updateLayerName(idx, selected.name)
+                        // Reset to first mixer when switching shows
+                        if (selected.mixerNames.isNotEmpty()) vm.jumpToShowIndex(0)
                     } catch (e: Exception) {}
                 },
                 onOpen = { json ->
@@ -233,7 +238,17 @@ fun ShowEditorScreen(
                         val p = Json.decodeFromString<ShowPatch>(json)
                         vm.deleteSavedPatch(LayerType.SHOW, p.name)
                     } catch (e: Exception) {}
-                }
+                },
+                // Navigation through mixers in the show
+                navigationLabel = if (mixerNames.isNotEmpty()) "Mixer" else null,
+                navigationIndex = if (mixerNames.isNotEmpty()) currentMixerIndex else null,
+                navigationTotal = if (mixerNames.isNotEmpty()) mixerNames.size else null,
+                onNavigatePrev = if (mixerNames.isNotEmpty()) {
+                    { vm.triggerPrevMixer(mixerNames.size) }
+                } else null,
+                onNavigateNext = if (mixerNames.isNotEmpty()) {
+                    { vm.triggerNextMixer(mixerNames.size) }
+                } else null
             )
         }
     }

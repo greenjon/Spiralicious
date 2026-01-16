@@ -181,6 +181,9 @@ fun MandalaSetEditorScreen(
         }
 
         if (showManager) {
+            val mandalaIds = currentSet?.orderedMandalaIds ?: emptyList()
+            val currentMandalaIndex = mandalaIds.indexOf(focusedMandalaId).takeIf { it >= 0 } ?: 0
+            
             PatchManagerOverlay(
                 title = "Manage Sets",
                 patches = allSets.map { it.name to it.id },
@@ -218,7 +221,17 @@ fun MandalaSetEditorScreen(
                 onDelete = { id ->
                     val set = allSets.find { it.id == id }
                     if (set != null) vm.deleteSavedPatch(LayerType.SET, set.name)
-                }
+                },
+                // Navigation through mandalas in the set
+                navigationLabel = if (mandalaIds.isNotEmpty()) "Mandala" else null,
+                navigationIndex = if (mandalaIds.isNotEmpty()) currentMandalaIndex else null,
+                navigationTotal = if (mandalaIds.isNotEmpty()) mandalaIds.size else null,
+                onNavigatePrev = if (mandalaIds.isNotEmpty() && currentMandalaIndex > 0) {
+                    { focusedMandalaId = mandalaIds[currentMandalaIndex - 1] }
+                } else null,
+                onNavigateNext = if (mandalaIds.isNotEmpty() && currentMandalaIndex < mandalaIds.size - 1) {
+                    { focusedMandalaId = mandalaIds[currentMandalaIndex + 1] }
+                } else null
             )
         }
     }

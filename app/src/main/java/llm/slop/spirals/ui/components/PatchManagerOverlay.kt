@@ -31,7 +31,13 @@ fun PatchManagerOverlay(
     onCreateNew: () -> Unit, // Create new item
     onRename: (String) -> Unit,
     onClone: (String) -> Unit,
-    onDelete: (String) -> Unit
+    onDelete: (String) -> Unit,
+    // Navigation for Sets/Shows
+    navigationLabel: String? = null, // e.g., "Mandala" or "Mixer"
+    navigationIndex: Int? = null,
+    navigationTotal: Int? = null,
+    onNavigatePrev: (() -> Unit)? = null,
+    onNavigateNext: (() -> Unit)? = null
 ) {
     var showLongPressMenu by remember { mutableStateOf<String?>(null) }
     var showRenameDialog by remember { mutableStateOf<String?>(null) }
@@ -63,6 +69,42 @@ fun PatchManagerOverlay(
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("Create New")
+                }
+            }
+
+            // Navigation controls (only for Sets/Shows)
+            if (navigationLabel != null && navigationIndex != null && navigationTotal != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = { onNavigatePrev?.invoke() },
+                        enabled = navigationIndex > 0 && onNavigatePrev != null,
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Text("◀ Prev", style = MaterialTheme.typography.labelMedium)
+                    }
+                    
+                    Spacer(modifier = Modifier.width(16.dp))
+                    
+                    Text(
+                        text = "$navigationLabel ${navigationIndex + 1}/$navigationTotal",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AppText
+                    )
+                    
+                    Spacer(modifier = Modifier.width(16.dp))
+                    
+                    OutlinedButton(
+                        onClick = { onNavigateNext?.invoke() },
+                        enabled = navigationIndex < navigationTotal - 1 && onNavigateNext != null,
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Text("Next ▶", style = MaterialTheme.typography.labelMedium)
+                    }
                 }
             }
 

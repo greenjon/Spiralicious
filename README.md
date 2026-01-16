@@ -1,0 +1,63 @@
+# Spirals
+
+An Android app for creating audio-reactive parametric visuals for live VJ performances.
+
+## Quick Overview
+
+Spirals lets you build complex audio-reactive visuals by composing simple building blocks in a 4-level hierarchy:
+
+```
+Show (playlist)
+  └─ Mixer (4-slot video mixer + effects)
+      └─ Set (collection of Mandalas)
+          └─ Mandala (single parametric visual)
+```
+
+**Key Features:**
+- Audio-reactive visuals using frequency analysis
+- CV (Control Voltage) modulation system
+- Real-time parameter control
+- Hierarchical composition for complex visuals
+- Fast workflow optimized for live performance
+
+## Architecture
+
+See **[DESIGN.md](DESIGN.md)** for comprehensive documentation including:
+- System architecture and design decisions
+- Navigation and breadcrumb cascade system
+- Data persistence strategy
+- Recipe tagging workflow
+- Code organization
+
+## Tech Stack
+
+- Kotlin + Jetpack Compose
+- OpenGL ES for rendering
+- Room database for persistence
+- Audio analysis engine
+- Custom CV modulation system
+
+## For Developers (and Future AI)
+
+**Starting point for understanding the codebase:**
+1. Read [DESIGN.md](DESIGN.md) first - it explains the architecture
+2. Key files:
+   - `MandalaViewModel.kt` - Navigation and business logic
+   - `MainActivity.kt` - Main activity with all editor composables
+   - `NavLayer.kt` - Navigation data structures
+   - `models/` - Data models for patches
+
+**Adding Documentation:**
+This project values inline documentation. When you learn something new about the system:
+- Add comments to complex functions
+- Update DESIGN.md with architectural insights
+- Document edge cases and gotchas
+- **Your contributions to documentation are welcome and encouraged!**
+
+## Project Status
+
+Active development. This is a performance tool designed for live use.
+
+---
+
+**Note:** This README provides a quick overview. For detailed architectural documentation, design decisions, and development notes, see [DESIGN.md](DESIGN.md).

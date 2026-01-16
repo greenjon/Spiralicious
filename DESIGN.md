@@ -355,6 +355,53 @@ The overflow menu was streamlined based on the Library overlay's capabilities:
 - Overflow menu handles "current item actions" (editing context)
 - Clear separation of concerns improves UX clarity
 
+**Context-Sensitive Menu Items:**
+
+When editing a child (`navStack.size > 1`), certain menu items are disabled:
+- ❌ **Library** - Not relevant in child editing context
+- ❌ **New [Editor]** - Finish current child first
+- ❌ **Delete** - Dangerous operation, better from root
+- ✅ **Rename** - Always available (current item action)
+- ✅ **Discard Changes** - Always available (escape hatch)
+
+This enforces focused workflow: Create child → Edit → Navigate to parent (via breadcrumb) → Auto-save & link
+
+### Back Button Handling
+
+**Philosophy:** Intelligent context-aware navigation that prevents accidental exits and data loss while maintaining natural Android behavior.
+
+**Priority Order (first match wins):**
+
+1. **Library open + has active data** → Close Library (return to editing)
+2. **Library open + no active data** → Show exit confirmation (prevents limbo state)
+3. **CV Lab open** → Close CV Lab
+4. **Settings open** → Close Settings  
+5. **Any dialog open** → Close dialog (Rename, Delete, Exit confirmations)
+6. **Child editor** (`navStack.size > 1`) → Pop to parent with cascade save+link
+7. **Root editor** (`navStack.size == 1`) → Show "Exit Spirals?" confirmation
+
+**Exit Confirmation Dialog:**
+- Title: "Exit Spirals?"
+- Message: "All changes have been saved."
+- Buttons: [STAY] (accent color) / [EXIT] (normal color)
+- Reassures user that work is preserved via cascade system
+
+**Key Behaviors:**
+
+- **No accidental exits:** Always shows confirmation at root level
+- **No limbo states:** Library without active data triggers exit (can't close to undefined state)
+- **Hierarchical navigation:** Back from child naturally pops to parent
+- **Overlay stack:** Back progressively closes overlays/dialogs before affecting navigation
+- **Data preservation:** Cascade save+link happens automatically when backing from child
+
+**Implementation:** `BackHandler` composable in MainActivity with when-expression covering all states.
+
+**Why no "Save changes?" prompt?**
+- Cascade system auto-saves on navigation
+- Explicit save prompts contradict the auto-save philosophy
+- User already has "Discard Changes" option if needed
+- Simpler UX with fewer decisions
+
 ---
 
 ## Code Organization

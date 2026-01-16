@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.media.AudioFormat
 import android.media.AudioRecord
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -109,6 +110,47 @@ class MainActivity : ComponentActivity() {
                 var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
                 var showRenameDialog by remember { mutableStateOf(false) }
                 var showDeleteConfirm by remember { mutableStateOf(false) }
+                var showExitConfirm by remember { mutableStateOf(false) }
+
+                // Back button handler
+                BackHandler {
+                    when {
+                        // 1. Library open + has active data → Close Library
+                        showManager && currentLayer.data != null -> {
+                            showManager = false
+                        }
+                        // 2. Library open + no active data → Exit with confirmation
+                        showManager && currentLayer.data == null -> {
+                            showExitConfirm = true
+                        }
+                        // 3. CV Lab open → Close CV Lab
+                        showCvLab -> {
+                            showCvLab = false
+                        }
+                        // 4. Settings open → Close Settings
+                        showSettings -> {
+                            showSettings = false
+                        }
+                        // 5. Any dialog open → Close it
+                        showRenameDialog -> {
+                            showRenameDialog = false
+                        }
+                        showDeleteConfirm -> {
+                            showDeleteConfirm = false
+                        }
+                        showExitConfirm -> {
+                            showExitConfirm = false
+                        }
+                        // 6. In child editor → Pop to parent with cascade save+link
+                        navStack.size > 1 -> {
+                            vm.popToLayer(navStack.size - 2, save = true)
+                        }
+                        // 7. At root → Exit with confirmation
+                        else -> {
+                            showExitConfirm = true
+                        }
+                    }
+                }
 
                 // 1. Start the CV Sync Registry immediately
                 LaunchedEffect(Unit) {
@@ -175,7 +217,7 @@ class MainActivity : ComponentActivity() {
                                     ) {
                                         val hasActiveData = currentLayer.data != null
                                         val disabledColor = AppText.copy(alpha = 0.3f)
-                                        val canSwitch = navStack.size == 1
+                                        val isAtRoot = navStack.size == 1
                                         val editorName = when(currentLayer.type) {
                                             LayerType.MIXER -> "Mixer"
                                             LayerType.SET -> "Set"
@@ -185,18 +227,24 @@ class MainActivity : ComponentActivity() {
 
                                         // --- TOP GROUP ---
                                         DropdownMenuItem(
-                                            text = { Text("Library", color = AppAccent) },
-                                            onClick = { showManager = true; showHeaderMenu = false }
+                                            text = { Text("Library", color = if (isAtRoot) AppAccent else disabledColor) },
+                                            onClick = { 
+                                                if (isAtRoot) {
+                                                    showManager = true
+                                                    showHeaderMenu = false
+                                                }
+                                            },
+                                            enabled = isAtRoot
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("New $editorName", color = if (canSwitch) AppAccent else disabledColor) },
+                                            text = { Text("New $editorName", color = if (isAtRoot) AppAccent else disabledColor) },
                                             onClick = { 
-                                                if (canSwitch) {
+                                                if (isAtRoot) {
                                                     vm.startNewPatch(currentLayer.type)
                                                     showHeaderMenu = false
                                                 }
                                             },
-                                            enabled = canSwitch
+                                            enabled = isAtRoot
                                         )
 
                                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
@@ -208,9 +256,14 @@ class MainActivity : ComponentActivity() {
                                             enabled = hasActiveData
                                         )
                                         DropdownMenuItem(
-                                            text = { Text("Delete", color = if (hasActiveData) Color.Red else disabledColor) }, 
-                                            onClick = { showDeleteConfirm = true; showHeaderMenu = false },
-                                            enabled = hasActiveData
+                                            text = { Text("Delete", color = if (hasActiveData && isAtRoot) Color.Red else disabledColor) }, 
+                                            onClick = { 
+                                                if (isAtRoot) {
+                                                    showDeleteConfirm = true
+                                                    showHeaderMenu = false
+                                                }
+                                            },
+                                            enabled = hasActiveData && isAtRoot
                                         )
                                         DropdownMenuItem(
                                             text = { Text("Discard Changes", color = Color.Red) }, 
@@ -239,12 +292,17 @@ class MainActivity : ComponentActivity() {
                                             DropdownMenuItem(
                                                 text = { 
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Text("  • ", color = AppAccent)
-                                                        Text(label, color = AppAccent)
+                                                        Text("  • ", color = if (isAtRoot) AppAccent else disabledColor)
+                                                        Text(label, color = if (isAtRoot) AppAccent else disabledColor)
                                                     }
                                                 },
-                                                onClick = { vm.createAndResetStack(type, openedFromMenu = true); showHeaderMenu = false },
-                                                enabled = canSwitch
+                                                onClick = { 
+                                                    if (isAtRoot) {
+                                                        vm.createAndResetStack(type, openedFromMenu = true)
+                                                        showHeaderMenu = false
+                                                    }
+                                                },
+                                                enabled = isAtRoot
                                             )
                                         }
 
@@ -392,7 +450,26 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-
+                if (showExitConfirm) {
+                    AlertDialog(
+                        onDismissRequest = { showExitConfirm = false },
+                        title = { Text("Exit Spirals?", color = AppText) },
+                        text = { Text("All changes have been saved.", color = AppText) },
+                        confirmButton = {
+                            TextButton(onClick = { 
+                                finish()
+                            }) {
+                                Text("EXIT", color = AppText)
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showExitConfirm = false }) {
+                                Text("STAY", color = AppAccent)
+                            }
+                        },
+                        containerColor = AppBackground
+                    )
+                }
             }
         }
     }

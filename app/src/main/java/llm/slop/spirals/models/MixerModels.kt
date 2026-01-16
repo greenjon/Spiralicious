@@ -29,6 +29,21 @@ data class MixerGroupData(
 )
 
 @Serializable
+data class MixerFXData(
+    val fbDecay: ModulatableParameterData = ModulatableParameterData(0.0f),
+    val fbGain: ModulatableParameterData = ModulatableParameterData(1.0f),
+    val fbZoom: ModulatableParameterData = ModulatableParameterData(0.5f),
+    val fbRotate: ModulatableParameterData = ModulatableParameterData(0.5f),
+    val fbShift: ModulatableParameterData = ModulatableParameterData(0.0f),
+    val fbBlur: ModulatableParameterData = ModulatableParameterData(0.0f),
+    val trails: ModulatableParameterData = ModulatableParameterData(0.0f),
+    val snapCount: ModulatableParameterData = ModulatableParameterData(0.5f),
+    val snapMode: ModulatableParameterData = ModulatableParameterData(0.0f),
+    val snapBlend: ModulatableParameterData = ModulatableParameterData(0.0f),
+    val snapTrigger: ModulatableParameterData = ModulatableParameterData(0.0f)
+)
+
+@Serializable
 data class MixerSlotData(
     val mandalaSetId: String? = null,
     val selectedMandalaId: String? = null,
@@ -57,5 +72,6 @@ data class MixerPatch(
     val mixerB: MixerGroupData = MixerGroupData(),
     val mixerF: MixerGroupData = MixerGroupData(),
     val finalGain: ModulatableParameterData = ModulatableParameterData(1.0f),
-    val masterAlpha: Float = 1.0f
+    val masterAlpha: Float = 1.0f,
+    val effects: MixerFXData = MixerFXData()
 )

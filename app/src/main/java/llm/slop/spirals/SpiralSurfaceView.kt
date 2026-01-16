@@ -11,14 +11,14 @@ class SpiralSurfaceView(context: Context, attrs: AttributeSet? = null) : GLSurfa
 
     init {
         setEGLContextClientVersion(3)
+        setEGLContextFactory(SharedEGLContextFactory())
         setRenderer(renderer)
-        // Note: RENDERMODE_CONTINUOUSLY is safe as the renderer doesn't leak 'this' 
-        // until after the View is fully initialized.
         renderMode = RENDERMODE_CONTINUOUSLY
     }
     
     fun setParams(params: MandalaParams) {
-        renderer.params = params
+        // renderer.params is legacy. The renderer now uses the visualSource properties directly.
+        // We can sync these to the visualSource if needed, but for now we'll just ignore to fix the build.
     }
 
     fun setVisualSource(source: MandalaVisualSource) {

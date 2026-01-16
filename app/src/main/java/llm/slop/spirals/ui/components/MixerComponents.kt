@@ -1,5 +1,6 @@
 package llm.slop.spirals.ui.components
 
+import android.opengl.GLSurfaceView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,8 +29,90 @@ import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.cv.ModulatableParameter
 import llm.slop.spirals.ui.ModulatorRow
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.delay
+import javax.microedition.khronos.egl.EGLConfig
+import javax.microedition.khronos.opengles.GL10
 import kotlin.math.abs
 import kotlin.math.roundToInt
+
+@Composable
+fun SpiralPreview(sourceId: String, mainRenderer: SpiralRenderer?, modifier: Modifier = Modifier) {
+    if (mainRenderer == null) return
+
+    val view = remember { mutableStateOf<GLSurfaceView?>(null) }
+
+    AndroidView(
+        factory = { ctx ->
+            GLSurfaceView(ctx).apply {
+                setEGLContextClientVersion(3)
+                // Bridge Context
+                setEGLContextFactory(SharedEGLContextFactory())
+                setRenderer(object : GLSurfaceView.Renderer {
+                    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {}
+                    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {}
+                    override fun onDrawFrame(gl: GL10?) {
+                        // Sample from main renderer's master pool
+                        val textureId = mainRenderer.getTextureForSource(sourceId)
+                        if (textureId != 0) {
+                            mainRenderer.drawTextureToCurrentBuffer(textureId)
+                        }
+                    }
+                })
+                renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
+                view.value = this
+            }
+        },
+        modifier = modifier,
+        update = { _ -> }
+    )
+
+    LaunchedEffect(sourceId) {
+        while (true) {
+            delay(33) // Throttled sample
+            view.value?.requestRender()
+        }
+    }
+}
+
+/**
+ * Updated StripPreview using the throttled architecture with Shared Context.
+ */
+@Composable
+fun StripPreview(monitorSource: String, patch: MixerPatch, mainRenderer: SpiralRenderer?) {
+    val view = remember { mutableStateOf<GLSurfaceView?>(null) }
+    
+    AndroidView(
+        factory = { ctx ->
+            GLSurfaceView(ctx).apply {
+                setEGLContextClientVersion(3)
+                // Bridge Context
+                setEGLContextFactory(SharedEGLContextFactory())
+                setRenderer(object : GLSurfaceView.Renderer {
+                    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {}
+                    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {}
+                    override fun onDrawFrame(gl: GL10?) {
+                        // Sample from main renderer's master pool
+                        val textureId = mainRenderer?.getTextureForSource(monitorSource) ?: 0
+                        if (textureId != 0) {
+                            mainRenderer?.drawTextureToCurrentBuffer(textureId)
+                        }
+                    }
+                })
+                renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
+                view.value = this
+            }
+        },
+        modifier = Modifier.fillMaxSize(),
+        update = { _ -> }
+    )
+
+    LaunchedEffect(monitorSource) {
+        while (true) {
+            delay(33) // Throttled sample (30 FPS)
+            view.value?.requestRender()
+        }
+    }
+}
 
 @Composable
 fun SourceStrip(
@@ -430,10 +513,22 @@ fun MixerCvEditor(
                 }
             }
             focusedId.startsWith("MF_") -> {
-                when(focusedId.removePrefix("MF_")) {
-                    "MODE" -> patch.mixerF.mode
-                    "BAL" -> patch.mixerF.balance
-                    "GAIN" -> patch.finalGain
+                val sub = focusedId.removePrefix("MF_")
+                when {
+                    sub == "MODE" -> patch.mixerF.mode
+                    sub == "BAL" -> patch.mixerF.balance
+                    sub == "GAIN" -> patch.finalGain
+                    sub == "FB_DECAY" -> patch.effects.fbDecay
+                    sub == "FB_GAIN" -> patch.effects.fbGain
+                    sub == "FB_ZOOM" -> patch.effects.fbZoom
+                    sub == "FB_ROTATE" -> patch.effects.fbRotate
+                    sub == "FB_SHIFT" -> patch.effects.fbShift
+                    sub == "FB_BLUR" -> patch.effects.fbBlur
+                    sub == "TRAILS" -> patch.effects.trails
+                    sub == "SNAP_COUNT" -> patch.effects.snapCount
+                    sub == "SNAP_MODE" -> patch.effects.snapMode
+                    sub == "SNAP_BLEND" -> patch.effects.snapBlend
+                    sub == "SNAP_TRIG" -> patch.effects.snapTrigger
                     else -> null
                 }
             }
@@ -533,43 +628,28 @@ private fun syncMixerParam(patch: MixerPatch, id: String, param: ModulatablePara
             patch.copy(mixerB = newGroup)
         }
         id.startsWith("MF_") -> {
-            val group = patch.mixerF
-            val (newGroup, finalGain) = when(id.removePrefix("MF_")) {
-                "MODE" -> group.copy(mode = data) to patch.finalGain
-                "BAL" -> group.copy(balance = data) to patch.finalGain
-                "GAIN" -> group to data
-                else -> group to patch.finalGain
+            val sub = id.removePrefix("MF_")
+            when {
+                sub == "MODE" -> patch.copy(mixerF = patch.mixerF.copy(mode = data))
+                sub == "BAL" -> patch.copy(mixerF = patch.mixerF.copy(balance = data))
+                sub == "GAIN" -> patch.copy(finalGain = data)
+                sub == "FB_DECAY" -> patch.copy(effects = patch.effects.copy(fbDecay = data))
+                sub == "FB_GAIN" -> patch.copy(effects = patch.effects.copy(fbGain = data))
+                sub == "FB_ZOOM" -> patch.copy(effects = patch.effects.copy(fbZoom = data))
+                sub == "FB_ROTATE" -> patch.copy(effects = patch.effects.copy(fbRotate = data))
+                sub == "FB_SHIFT" -> patch.copy(effects = patch.effects.copy(fbShift = data))
+                sub == "FB_BLUR" -> patch.copy(effects = patch.effects.copy(fbBlur = data))
+                sub == "TRAILS" -> patch.copy(effects = patch.effects.copy(trails = data))
+                sub == "SNAP_COUNT" -> patch.copy(effects = patch.effects.copy(snapCount = data))
+                sub == "SNAP_MODE" -> patch.copy(effects = patch.effects.copy(snapMode = data))
+                sub == "SNAP_BLEND" -> patch.copy(effects = patch.effects.copy(snapBlend = data))
+                sub == "SNAP_TRIG" -> patch.copy(effects = patch.effects.copy(snapTrigger = data))
+                else -> patch
             }
-            patch.copy(mixerF = newGroup, finalGain = finalGain)
         }
         else -> patch
     }
     onUpdate(newPatch)
-}
-
-@Composable
-fun StripPreview(monitorSource: String, patch: MixerPatch, mainRenderer: SpiralRenderer?) {
-    AndroidView(
-        factory = { ctx ->
-            SpiralSurfaceView(ctx).apply {
-                mainRenderer?.let { mr ->
-                    (0..3).forEach { i ->
-                        renderer.setSlotSource(i, mr.getSlotSource(i))
-                    }
-                }
-                setMixerState(patch, monitorSource)
-            }
-        },
-        modifier = Modifier.fillMaxSize(),
-        update = { view ->
-            mainRenderer?.let { mr ->
-                (0..3).forEach { i ->
-                    view.renderer.setSlotSource(i, mr.getSlotSource(i))
-                }
-            }
-            view.setMixerState(patch, monitorSource)
-        }
-    )
 }
 
 private fun updateGroup(patch: MixerPatch, group: String, data: MixerGroupData): MixerPatch {

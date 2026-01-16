@@ -5,26 +5,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import llm.slop.spirals.models.MixerPatch
 import llm.slop.spirals.models.ShowPatch
 import llm.slop.spirals.models.MixerSlotData
 import java.util.UUID
-
-@Serializable
-data class NavLayer(
-    val id: String,
-    val name: String,
-    val type: LayerType,
-    @Transient val data: Any? = null,
-    val isDirty: Boolean = false
-)
-
-@Serializable
-enum class LayerType { MIXER, SET, MANDALA, SHOW }
 
 class MandalaViewModel(application: Application) : AndroidViewModel(application) {
     private val db = MandalaDatabase.getDatabase(application)
@@ -72,7 +58,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             else -> LayerType.MIXER
         }
         
-        return listOf(NavLayer(UUID.randomUUID().toString(), getGenericName(type), type, data = null))
+        return listOf(NavLayer(UUID.randomUUID().toString(), getGenericName(type), type, isDirty = false))
     }
 
     fun getGenericName(type: LayerType): String = when(type) {
@@ -106,13 +92,15 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     fun createAndPushLayer(type: LayerType, parentData: Any? = null) {
         val name = generateNextName(type)
         val id = UUID.randomUUID().toString()
-        pushLayer(NavLayer(id, name, type, parentData))
+        val newLayer = NavLayer(id, name, type, isDirty = false)
+        newLayer.data = parentData
+        pushLayer(newLayer)
     }
 
     fun createAndResetStack(type: LayerType) {
         val name = getGenericName(type)
         val id = UUID.randomUUID().toString()
-        _navStack.value = listOf(NavLayer(id, name, type, data = null))
+        _navStack.value = listOf(NavLayer(id, name, type, isDirty = false))
         saveWorkspaceIfEnabled()
     }
 
@@ -126,7 +114,8 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.MANDALA -> PatchData(name = name, recipeId = MandalaLibrary.MandalaRatios.first().id, parameters = emptyList())
         }
         
-        val newLayer = NavLayer(id, name, type, data, isDirty = true)
+        val newLayer = NavLayer(id, name, type, isDirty = true)
+        newLayer.data = data
         
         // If we are at root and it is generic, replace it
         if (_navStack.value.size == 1 && _navStack.value[0].type == type && _navStack.value[0].data == null) {
@@ -147,17 +136,21 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     fun updateLayerData(index: Int, data: Any?, isDirty: Boolean? = null) {
         if (index < 0 || index >= _navStack.value.size) return
         val current = _navStack.value.toMutableList()
-        current[index] = current[index].copy(
-            data = data,
+        val updatedLayer = current[index].copy(
             isDirty = isDirty ?: current[index].isDirty
         )
+        updatedLayer.data = data
+        current[index] = updatedLayer
         _navStack.value = current
     }
 
     fun updateLayerName(index: Int, newName: String) {
         if (index < 0 || index >= _navStack.value.size) return
         val current = _navStack.value.toMutableList()
-        current[index] = current[index].copy(name = newName)
+        val oldData = current[index].data
+        val updatedLayer = current[index].copy(name = newName)
+        updatedLayer.data = oldData
+        current[index] = updatedLayer
         _navStack.value = current
         saveWorkspaceIfEnabled()
     }
@@ -185,7 +178,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         _navStack.value = if (newStack.isEmpty()) {
             // If the stack is emptied, default back to a Mixer hub
             val id = UUID.randomUUID().toString()
-            listOf(NavLayer(id, getGenericName(LayerType.MIXER), LayerType.MIXER, data = null))
+            listOf(NavLayer(id, getGenericName(LayerType.MIXER), LayerType.MIXER, isDirty = false))
         } else {
             newStack
         }
@@ -217,7 +210,10 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             val index = _navStack.value.indexOfFirst { it.id == layer.id }
             if (index != -1) {
                 val current = _navStack.value.toMutableList()
-                current[index] = current[index].copy(isDirty = false)
+                val oldData = current[index].data
+                val updatedLayer = current[index].copy(isDirty = false)
+                updatedLayer.data = oldData
+                current[index] = updatedLayer
                 _navStack.value = current
             }
         }
@@ -265,7 +261,8 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.SHOW -> (data as? ShowPatch)?.copy(id = newId, name = newName)
         } ?: return
         
-        val newLayer = NavLayer(newId, newName, layer.type, newData, isDirty = true)
+        val newLayer = NavLayer(newId, newName, layer.type, isDirty = true)
+        newLayer.data = newData
         pushLayer(newLayer)
         saveLayer(newLayer)
     }

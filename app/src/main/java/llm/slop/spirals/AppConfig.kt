@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -35,7 +36,7 @@ class AppConfig(context: Context) {
 
     fun saveNavStack(stack: List<NavLayer>) {
         try {
-            lastNavStackJson = Json.encodeToString(stack)
+            lastNavStackJson = Json.encodeToString(ListSerializer(NavLayer.serializer()), stack)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -44,7 +45,7 @@ class AppConfig(context: Context) {
     fun loadNavStack(): List<NavLayer>? {
         val json = lastNavStackJson ?: return null
         return try {
-            Json.decodeFromString<List<NavLayer>>(json)
+            Json.decodeFromString(ListSerializer(NavLayer.serializer()), json)
         } catch (e: Exception) {
             e.printStackTrace()
             null

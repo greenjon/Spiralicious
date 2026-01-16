@@ -42,7 +42,6 @@ fun MixerEditorScreen(
     val allSets by vm.allSets.collectAsState(initial = emptyList())
     val allPatches by vm.allPatches.collectAsState(initial = emptyList())
 
-    // Initialize from layer data if available
     val navStack by vm.navStack.collectAsState()
     val layer = navStack.lastOrNull { it.type == LayerType.MIXER }
     
@@ -50,7 +49,6 @@ fun MixerEditorScreen(
         mutableStateOf(layer?.data as? MixerPatch ?: MixerPatch(name = "New Mixer", slots = List(4) { MixerSlotData() })) 
     }
     
-    // Update local state if nav data changes (e.g. from Manage overlay)
     LaunchedEffect(layer?.data) {
         (layer?.data as? MixerPatch)?.let {
             if (it.id != currentPatch.id) {
@@ -77,7 +75,6 @@ fun MixerEditorScreen(
         }
     }
 
-    // Keep VM updated with work-in-progress
     LaunchedEffect(currentPatch) {
         val index = navStack.indexOfLast { it.type == LayerType.MIXER }
         if (index != -1) {
@@ -109,8 +106,8 @@ fun MixerEditorScreen(
             } else null
 
             val source = mainRenderer.getSlotSource(index)
-            patchEntity?.let { pe ->
-                val patchData = PatchMapper.fromJson(pe.jsonSettings)
+            if (patchEntity != null) {
+                val patchData = PatchMapper.fromJson(patchEntity.jsonSettings)
                 patchData?.let { pd ->
                     PatchMapper.applyToVisualSource(pd, source)
                 }
@@ -124,7 +121,6 @@ fun MixerEditorScreen(
                 .fillMaxSize()
                 .background(AppBackground)
         ) {
-            // Main Preview Window
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -162,7 +158,6 @@ fun MixerEditorScreen(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Oscilloscope
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
                 key(frameTick) {
                     val targetParam = mainRenderer?.getMixerParam(focusedParameterId)
@@ -174,7 +169,6 @@ fun MixerEditorScreen(
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            // Strips Section
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -199,7 +193,6 @@ fun MixerEditorScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // CV Patching Area
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 MixerCvEditor(
                     patch = currentPatch,
@@ -213,12 +206,11 @@ fun MixerEditorScreen(
             PatchManagerOverlay(
                 title = "Manage Mixers",
                 patches = allMixerPatches.map { it.name to it.jsonSettings },
-                selectedId = Json.encodeToString<MixerPatch>(currentPatch), // Using JSON as ID for simplicity in loading
+                selectedId = Json.encodeToString<MixerPatch>(currentPatch), 
                 onSelect = { json ->
                     try {
                         val selected = Json.decodeFromString<MixerPatch>(json)
                         currentPatch = selected
-                        // Update layer name in stack too
                         val idx = navStack.indexOfLast { it.type == LayerType.MIXER }
                         if (idx != -1) vm.updateLayerName(idx, selected.name)
                     } catch (e: Exception) {}
@@ -243,12 +235,11 @@ fun MixerEditorScreen(
         }
     }
 
-    // Picker Dialogs
-    showSetPickerForSlot?.let { idx ->
+    showSetPickerForSlot?.let { idx: Int ->
         PickerDialog(
             title = "Select Mandala Set",
             items = allSets.map { it.name to it.id },
-            onSelect = { id ->
+            onSelect = { id: String ->
                 val newSlots = currentPatch.slots.toMutableList()
                 newSlots[idx] = newSlots[idx].copy(mandalaSetId = id, currentIndex = ModulatableParameterData(0f), sourceType = VideoSourceType.MANDALA_SET)
                 currentPatch = currentPatch.copy(slots = newSlots)
@@ -262,11 +253,11 @@ fun MixerEditorScreen(
         )
     }
 
-    showMandalaPickerForSlot?.let { idx ->
+    showMandalaPickerForSlot?.let { idx: Int ->
         PickerDialog(
             title = "Select Mandala",
             items = allPatches.map { it.name to it.name },
-            onSelect = { id ->
+            onSelect = { id: String ->
                 val newSlots = currentPatch.slots.toMutableList()
                 newSlots[idx] = newSlots[idx].copy(selectedMandalaId = id, sourceType = VideoSourceType.MANDALA)
                 currentPatch = currentPatch.copy(slots = newSlots)
@@ -284,7 +275,7 @@ fun MixerEditorScreen(
         PickerDialog(
             title = "Open Mixer Patch",
             items = allMixerPatches.map { it.name to it.jsonSettings },
-            onSelect = { json ->
+            onSelect = { json: String ->
                 try {
                     currentPatch = Json.decodeFromString(json)
                 } catch (e: Exception) { }

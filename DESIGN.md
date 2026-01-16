@@ -282,8 +282,78 @@ All editors (Show, Mixer, Set, Mandala) follow same patterns:
 - Preview area at top
 - Controls below
 - Breadcrumb header with overflow menu
-- "Manage" overlay for browsing saved patches
+- Library overlay for browsing saved patches
 - "Create new..." in picker dialogs
+
+### Library Overlay System
+
+**Purpose:** Unified interface for browsing, previewing, and managing saved patches across all editor types.
+
+**Access:** Via "Library" menu item in overflow menu (or automatically shown when opening from "Switch to..." menu)
+
+**Key Features:**
+
+1. **Instant Preview on Tap**
+   - Tapping any chip immediately loads and previews that item
+   - Allows rapid browsing without committing
+   - Updates stay in memory until explicitly saved or navigating away
+
+2. **Overflow Menu per Chip**
+   - Each chip has a visible overflow icon (⋮) on the right
+   - Opens context menu with: Open, Rename, Clone, Delete
+   - "Open" loads the item and closes the overlay (commits to selection)
+   - Long-press on chip also opens menu (backup gesture for discoverability)
+
+3. **Create New Button**
+   - Prominent button in top-right corner
+   - Creates new item and closes overlay
+   - Provides direct path from "browsing" to "creating"
+
+4. **No Close Button**
+   - Intentional design decision: prevents returning to "undefined state"
+   - User must tap a chip (preview) or navigate away (breadcrumb)
+   - Forces explicit selection rather than passive dismissal
+
+5. **Navigation for Collections (Sets/Shows)**
+   - Sets: Shows "◀ Prev   Mandala 2/5   Next ▶" controls
+   - Shows: Shows "◀ Prev   Mixer 1/3   Next ▶" controls
+   - Allows previewing contents of collections before opening
+   - Only appears when collection has items
+   - Buttons disabled at start/end of list
+
+**Implementation:**
+- `PatchManagerOverlay` component (`ui/components/PatchManagerOverlay.kt`)
+- Takes callbacks: `onSelect` (preview), `onOpen` (commit), `onCreateNew`, `onRename`, `onClone`, `onDelete`
+- Optional navigation params for Sets/Shows: `navigationLabel`, `navigationIndex`, `navigationTotal`, `onNavigatePrev`, `onNavigateNext`
+
+**Auto-Show Behavior:**
+- `NavLayer` has `openedFromMenu` flag
+- Set to `true` when using "Switch to..." or "Open..." from menu
+- Triggers automatic Library overlay display on first render
+- Flag cleared after showing once to prevent repeated popups
+
+**Menu Simplification:**
+
+The overflow menu was streamlined based on the Library overlay's capabilities:
+
+**Removed:**
+- ❌ "Open [Editor]" - Replaced by Library (better with instant preview)
+- ❌ "Save" - Unnecessary (cascade save system handles it)
+- ❌ "Clone" - Available via Library overlay (less common action)
+
+**Kept:**
+- ✅ "Library" - Opens the overlay
+- ✅ "New [Editor]" - Quick creation
+- ✅ "Rename" - Common action on current item
+- ✅ "Delete" - Common cleanup action
+- ✅ "Discard Changes" - Escape hatch
+- ✅ "Switch to..." - Navigate between editor types
+- ✅ "CV Lab" & "Settings" - System-level features
+
+**Design Rationale:**
+- Library handles "browsing all items" (collection management)
+- Overflow menu handles "current item actions" (editing context)
+- Clear separation of concerns improves UX clarity
 
 ---
 
@@ -297,6 +367,7 @@ All editors (Show, Mixer, Set, Mandala) follow same patterns:
 - `SpiralRenderer.kt` - OpenGL rendering engine, feedback system, texture management
 - `SharedEGLContextFactory.kt` - Creates child GL contexts that share textures
 - `EditorBreadcrumbs.kt` - Breadcrumb UI component
+- `PatchManagerOverlay.kt` - Library overlay for browsing/managing saved items
 - `RecipeTagManager.kt` - Recipe favorites/trash persistence
 - `ui/components/MixerComponents.kt` - Mixer editor UI, includes `SimpleBlitHelper` for mini-monitors
 - `ui/components/RecipePickerDialog.kt` - Lazy-loaded recipe picker with search/sort/tagging
@@ -518,3 +589,6 @@ sealed interface LayerContent
 - **Serialization:** Always wrap patch data in appropriate `*LayerContent` class before setting `layer.data`
 - **Compose Performance:** Use `LazyColumn` for any list over 50 items, never eager `Column` or `DropdownMenu`
 - **State Updates:** When toggling SharedPreferences data (like tags), increment a trigger state to force recomposition
+- **Library Overlay:** No close button by design - prevents "undefined state" where user views controls for nothing in particular
+- **Library Navigation:** Sets/Shows need `navigationLabel`, `navigationIndex`, `navigationTotal` params for Prev/Next controls
+- **Chip Gestures:** Both tap overflow icon AND long-press open context menu (dual affordance for discoverability)

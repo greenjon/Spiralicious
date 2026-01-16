@@ -745,6 +745,10 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     },
+                    onCreateNew = {
+                        vm.startNewPatch(LayerType.MANDALA)
+                        onHideManager()
+                    },
                     onRename = { newName ->
                         vm.renamePatch(LayerType.MANDALA, patchName, newName)
                     },
@@ -753,8 +757,7 @@ class MainActivity : ComponentActivity() {
                     },
                     onDelete = { id ->
                         vm.deleteSavedPatch(LayerType.MANDALA, id)
-                    },
-                    onClose = onHideManager
+                    }
                 )
             }
         }

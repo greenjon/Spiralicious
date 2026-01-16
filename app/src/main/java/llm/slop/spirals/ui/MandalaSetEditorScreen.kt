@@ -204,6 +204,10 @@ fun MandalaSetEditorScreen(
                         onHideManager()
                     }
                 },
+                onCreateNew = {
+                    vm.startNewPatch(LayerType.SET)
+                    onHideManager()
+                },
                 onRename = { newName ->
                     currentSet?.let { vm.renamePatch(LayerType.SET, it.name, newName) }
                 },
@@ -214,8 +218,7 @@ fun MandalaSetEditorScreen(
                 onDelete = { id ->
                     val set = allSets.find { it.id == id }
                     if (set != null) vm.deleteSavedPatch(LayerType.SET, set.name)
-                },
-                onClose = onHideManager
+                }
             )
         }
     }

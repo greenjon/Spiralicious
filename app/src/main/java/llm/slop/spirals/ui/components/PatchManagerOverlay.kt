@@ -7,7 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,10 +28,10 @@ fun PatchManagerOverlay(
     selectedId: String?,
     onSelect: (String) -> Unit, // Preview instantly
     onOpen: ((String) -> Unit)? = null, // Open and close overlay
+    onCreateNew: () -> Unit, // Create new item
     onRename: (String) -> Unit,
     onClone: (String) -> Unit,
-    onDelete: (String) -> Unit,
-    onClose: () -> Unit
+    onDelete: (String) -> Unit
 ) {
     var showLongPressMenu by remember { mutableStateOf<String?>(null) }
     var showRenameDialog by remember { mutableStateOf<String?>(null) }
@@ -40,9 +41,6 @@ fun PatchManagerOverlay(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.6f))
-            .pointerInput(Unit) {
-                detectTapGestures(onTap = { onClose() })
-            }
     ) {
         Column(
             modifier = Modifier
@@ -50,7 +48,6 @@ fun PatchManagerOverlay(
                 .fillMaxWidth()
                 .fillMaxHeight(0.7f)
                 .background(AppBackground)
-                .clickable(enabled = false) {} // Prevent taps from reaching the dim background
                 .padding(16.dp)
         ) {
             Row(
@@ -59,8 +56,13 @@ fun PatchManagerOverlay(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(title, style = MaterialTheme.typography.headlineSmall, color = AppText)
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = AppText)
+                Button(
+                    onClick = onCreateNew,
+                    colors = ButtonDefaults.buttonColors(containerColor = AppAccent)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Create New")
                 }
             }
 
@@ -96,12 +98,28 @@ fun PatchManagerOverlay(
                                     )
                                 }
                         ) {
-                            Text(
-                                text = name,
-                                color = if (isSelected) AppAccent else AppText,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                style = MaterialTheme.typography.labelLarge
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(start = 16.dp, top = 4.dp, bottom = 4.dp, end = 4.dp)
+                            ) {
+                                Text(
+                                    text = name,
+                                    color = if (isSelected) AppAccent else AppText,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    onClick = { showLongPressMenu = id },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.MoreVert,
+                                        contentDescription = "Options",
+                                        tint = AppText.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
                         }
                     }
                 }

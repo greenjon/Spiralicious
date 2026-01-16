@@ -215,6 +215,10 @@ fun ShowEditorScreen(
                         onHideManager()
                     } catch (e: Exception) {}
                 },
+                onCreateNew = {
+                    vm.startNewPatch(LayerType.SHOW)
+                    onHideManager()
+                },
                 onRename = { newName ->
                     vm.renamePatch(LayerType.SHOW, currentShow.name, newName)
                 },
@@ -229,8 +233,7 @@ fun ShowEditorScreen(
                         val p = Json.decodeFromString<ShowPatch>(json)
                         vm.deleteSavedPatch(LayerType.SHOW, p.name)
                     } catch (e: Exception) {}
-                },
-                onClose = onHideManager
+                }
             )
         }
     }

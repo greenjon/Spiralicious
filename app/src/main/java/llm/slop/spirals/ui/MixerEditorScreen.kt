@@ -226,6 +226,10 @@ fun MixerEditorScreen(
                         onHideManager()
                     } catch (e: Exception) {}
                 },
+                onCreateNew = {
+                    vm.startNewPatch(LayerType.MIXER)
+                    onHideManager()
+                },
                 onRename = { newName ->
                     vm.renamePatch(LayerType.MIXER, currentPatch.name, newName)
                 },
@@ -240,8 +244,7 @@ fun MixerEditorScreen(
                         val p = Json.decodeFromString<MixerPatch>(json)
                         vm.deleteSavedPatch(LayerType.MIXER, p.name)
                     } catch (e: Exception) {}
-                },
-                onClose = onHideManager
+                }
             )
         }
     }

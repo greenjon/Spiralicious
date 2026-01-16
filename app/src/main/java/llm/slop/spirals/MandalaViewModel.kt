@@ -92,9 +92,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     fun createAndPushLayer(type: LayerType, parentData: Any? = null) {
         val name = generateNextName(type)
         val id = UUID.randomUUID().toString()
-        val newLayer = NavLayer(id, name, type, isDirty = false)
-        newLayer.data = parentData
-        pushLayer(newLayer)
+        pushLayer(NavLayer(id, name, type, isDirty = false).apply { this.data = parentData })
     }
 
     fun createAndResetStack(type: LayerType) {
@@ -114,8 +112,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.MANDALA -> PatchData(name = name, recipeId = MandalaLibrary.MandalaRatios.first().id, parameters = emptyList())
         }
         
-        val newLayer = NavLayer(id, name, type, isDirty = true)
-        newLayer.data = data
+        val newLayer = NavLayer(id, name, type, isDirty = true).apply { this.data = data }
         
         // If we are at root and it is generic, replace it
         if (_navStack.value.size == 1 && _navStack.value[0].type == type && _navStack.value[0].data == null) {
@@ -136,11 +133,11 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     fun updateLayerData(index: Int, data: Any?, isDirty: Boolean? = null) {
         if (index < 0 || index >= _navStack.value.size) return
         val current = _navStack.value.toMutableList()
-        val updatedLayer = current[index].copy(
-            isDirty = isDirty ?: current[index].isDirty
-        )
-        updatedLayer.data = data
-        current[index] = updatedLayer
+        val updatedLayer = current[index]
+        val newLayer = updatedLayer.copy(
+            isDirty = isDirty ?: updatedLayer.isDirty
+        ).apply { this.data = data }
+        current[index] = newLayer
         _navStack.value = current
     }
 
@@ -148,9 +145,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         if (index < 0 || index >= _navStack.value.size) return
         val current = _navStack.value.toMutableList()
         val oldData = current[index].data
-        val updatedLayer = current[index].copy(name = newName)
-        updatedLayer.data = oldData
-        current[index] = updatedLayer
+        current[index] = current[index].copy(name = newName).apply { this.data = oldData }
         _navStack.value = current
         saveWorkspaceIfEnabled()
     }
@@ -211,9 +206,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             if (index != -1) {
                 val current = _navStack.value.toMutableList()
                 val oldData = current[index].data
-                val updatedLayer = current[index].copy(isDirty = false)
-                updatedLayer.data = oldData
-                current[index] = updatedLayer
+                current[index] = current[index].copy(isDirty = false).apply { this.data = oldData }
                 _navStack.value = current
             }
         }
@@ -261,8 +254,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.SHOW -> (data as? ShowPatch)?.copy(id = newId, name = newName)
         } ?: return
         
-        val newLayer = NavLayer(newId, newName, layer.type, isDirty = true)
-        newLayer.data = newData
+        val newLayer = NavLayer(newId, newName, layer.type, isDirty = true).apply { this.data = newData }
         pushLayer(newLayer)
         saveLayer(newLayer)
     }

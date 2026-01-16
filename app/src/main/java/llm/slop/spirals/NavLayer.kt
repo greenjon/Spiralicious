@@ -8,5 +8,7 @@ data class NavLayer(
     val name: String,
     val type: LayerType,
     val isDirty: Boolean = false,
-    val data: LayerContent? = null
+    val data: LayerContent? = null,
+    val parentSlotIndex: Int? = null,  // For Mixer slots - which slot to insert into
+    val createdFromParent: Boolean = false  // Track if should link back to parent on breadcrumb navigation
 )

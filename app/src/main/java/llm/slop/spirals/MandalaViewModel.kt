@@ -10,6 +10,7 @@ import kotlinx.serialization.json.Json
 import llm.slop.spirals.models.MixerPatch
 import llm.slop.spirals.models.ShowPatch
 import llm.slop.spirals.models.MixerSlotData
+import llm.slop.spirals.models.VideoSourceType
 import java.util.UUID
 
 class MandalaViewModel(application: Application) : AndroidViewModel(application) {
@@ -89,10 +90,37 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         saveWorkspaceIfEnabled()
     }
 
-    fun createAndPushLayer(type: LayerType, parentData: LayerContent? = null) {
+    fun createAndPushLayer(type: LayerType, parentSlotIndex: Int? = null) {
         val name = generateNextName(type)
         val id = UUID.randomUUID().toString()
-        pushLayer(NavLayer(id, name, type, isDirty = false, data = parentData))
+        
+        // Create initial data with auto-save
+        val data: LayerContent = when(type) {
+            LayerType.MIXER -> MixerLayerContent(MixerPatch(id = id, name = name, slots = List(4) { MixerSlotData() }))
+            LayerType.SET -> SetLayerContent(MandalaSet(id = id, name = name, orderedMandalaIds = mutableListOf()))
+            LayerType.MANDALA -> MandalaLayerContent(PatchData(name = name, recipeId = MandalaLibrary.MandalaRatios.first().id, parameters = emptyList()))
+            LayerType.SHOW -> ShowLayerContent(ShowPatch(id = id, name = name))
+        }
+        
+        val newLayer = NavLayer(
+            id = id, 
+            name = name, 
+            type = type, 
+            isDirty = true, 
+            data = data,
+            parentSlotIndex = parentSlotIndex,
+            createdFromParent = true  // Mark as created from parent for auto-linking
+        )
+        
+        pushLayer(newLayer)
+        
+        // Auto-save immediately
+        saveLayer(newLayer)
+        
+        // Set current patch if it's a Mandala
+        if (type == LayerType.MANDALA) {
+            _currentPatch.value = (data as MandalaLayerContent).patch
+        }
     }
 
     fun createAndResetStack(type: LayerType) {
@@ -154,12 +182,20 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         if (index < -1) return
         if (index >= _navStack.value.size) return
         
-        val layersToPop = _navStack.value.subList(index + 1, _navStack.value.size).reversed()
-        
         if (save) {
-            layersToPop.forEach { layer ->
-                if (layer.isDirty) {
-                    saveLayer(layer)
+            // Process layers from current down to target+1, saving and linking
+            for (i in _navStack.value.lastIndex downTo index + 1) {
+                val child = _navStack.value[i]
+                
+                // Save the child layer
+                if (child.isDirty || child.data != null) {
+                    saveLayer(child)
+                }
+                
+                // If created from parent, link it back
+                if (child.createdFromParent && i > 0) {
+                    val parentIndex = i - 1
+                    linkChildToParent(child, parentIndex)
                 }
             }
         }
@@ -178,6 +214,78 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             newStack
         }
         saveWorkspaceIfEnabled()
+    }
+    
+    private fun linkChildToParent(child: NavLayer, parentIndex: Int) {
+        if (parentIndex < 0 || parentIndex >= _navStack.value.size) return
+        val parent = _navStack.value[parentIndex]
+        val parentData = parent.data ?: return
+        
+        when (parent.type) {
+            LayerType.SHOW -> {
+                val show = (parentData as? ShowLayerContent)?.show ?: return
+                val mixer = (child.data as? MixerLayerContent)?.mixer ?: return
+                
+                // Add mixer to show if not already present
+                if (!show.mixerNames.contains(mixer.name)) {
+                    val updatedShow = show.copy(mixerNames = show.mixerNames + mixer.name)
+                    updateLayerData(parentIndex, ShowLayerContent(updatedShow), isDirty = true)
+                    saveLayer(_navStack.value[parentIndex])
+                }
+            }
+            LayerType.MIXER -> {
+                val mixer = (parentData as? MixerLayerContent)?.mixer ?: return
+                val slotIndex = child.parentSlotIndex ?: return
+                
+                when (child.type) {
+                    LayerType.SET -> {
+                        val set = (child.data as? SetLayerContent)?.set ?: return
+                        val newSlots = mixer.slots.toMutableList()
+                        
+                        // Only update if not already set to this Set
+                        if (newSlots[slotIndex].mandalaSetId != set.id) {
+                            newSlots[slotIndex] = newSlots[slotIndex].copy(
+                                mandalaSetId = set.id,
+                                sourceType = VideoSourceType.MANDALA_SET
+                            )
+                            val updatedMixer = mixer.copy(slots = newSlots)
+                            updateLayerData(parentIndex, MixerLayerContent(updatedMixer), isDirty = true)
+                            saveLayer(_navStack.value[parentIndex])
+                        }
+                    }
+                    LayerType.MANDALA -> {
+                        val mandala = (child.data as? MandalaLayerContent)?.patch ?: return
+                        val newSlots = mixer.slots.toMutableList()
+                        
+                        // Only update if not already set to this Mandala
+                        if (newSlots[slotIndex].selectedMandalaId != mandala.name) {
+                            newSlots[slotIndex] = newSlots[slotIndex].copy(
+                                selectedMandalaId = mandala.name,
+                                sourceType = VideoSourceType.MANDALA
+                            )
+                            val updatedMixer = mixer.copy(slots = newSlots)
+                            updateLayerData(parentIndex, MixerLayerContent(updatedMixer), isDirty = true)
+                            saveLayer(_navStack.value[parentIndex])
+                        }
+                    }
+                    else -> { /* Show can't be child of Mixer */ }
+                }
+            }
+            LayerType.SET -> {
+                val set = (parentData as? SetLayerContent)?.set ?: return
+                val mandala = (child.data as? MandalaLayerContent)?.patch ?: return
+                
+                // Add mandala to set if not already present
+                if (!set.orderedMandalaIds.contains(mandala.name)) {
+                    val updatedSet = set.copy(orderedMandalaIds = (set.orderedMandalaIds + mandala.name).toMutableList())
+                    updateLayerData(parentIndex, SetLayerContent(updatedSet), isDirty = true)
+                    saveLayer(_navStack.value[parentIndex])
+                }
+            }
+            LayerType.MANDALA -> {
+                // Mandala can't have children
+            }
+        }
     }
 
     fun saveLayer(layer: NavLayer) {

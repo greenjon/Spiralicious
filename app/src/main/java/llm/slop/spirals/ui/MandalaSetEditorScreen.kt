@@ -223,7 +223,7 @@ fun MandalaSetEditorScreen(
                     focusedMandalaId = patchName
                 },
                 onCreateNew = {
-                    onClose() // Navigate to Mandala Editor
+                    vm.createAndPushLayer(LayerType.MANDALA)
                     showMandalaPicker = false
                 }
             )

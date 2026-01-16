@@ -169,7 +169,7 @@ fun ShowEditorScreen(
                             },
                             onDismiss = { showMixerPicker = false },
                             onCreateNew = {
-                                onNavigateToMixerEditor(true)
+                                vm.createAndPushLayer(LayerType.MIXER)
                                 showMixerPicker = false
                             }
                         )

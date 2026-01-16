@@ -247,7 +247,7 @@ fun MixerEditorScreen(
             },
             onDismiss = { showSetPickerForSlot = null },
             onCreateNew = {
-                onNavigateToSetEditor(true) 
+                vm.createAndPushLayer(LayerType.SET, parentSlotIndex = idx)
                 showSetPickerForSlot = null
             }
         )
@@ -265,7 +265,7 @@ fun MixerEditorScreen(
             },
             onDismiss = { showMandalaPickerForSlot = null },
             onCreateNew = {
-                onNavigateToMandalaEditor(true) 
+                vm.createAndPushLayer(LayerType.MANDALA, parentSlotIndex = idx)
                 showMandalaPickerForSlot = null
             }
         )

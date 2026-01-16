@@ -45,6 +45,7 @@ import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.ui.theme.SpiralsTheme
+import llm.slop.spirals.ui.components.RecipePickerDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import llm.slop.spirals.cv.CvRegistry
@@ -602,15 +603,18 @@ class MainActivity : ComponentActivity() {
                                 Surface(color = AppBackground.copy(alpha = 0.7f), shape = MaterialTheme.shapes.extraSmall, modifier = Modifier.clickable { recipeExpanded = true }) {
                                     Text(text = "${visualSource.recipe.a}, ${visualSource.recipe.b}, ${visualSource.recipe.c}, ${visualSource.recipe.d} (${visualSource.recipe.petals}P)", style = MaterialTheme.typography.labelSmall, color = AppAccent, modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp) )
                                 }
-                                DropdownMenu(expanded = recipeExpanded, onDismissRequest = { recipeExpanded = false }, containerColor = AppBackground, tonalElevation = 0.dp) {
-                                    MandalaLibrary.MandalaRatios.forEach { ratio ->
-                                        DropdownMenuItem(text = { Text("${ratio.a}, ${ratio.b}, ${ratio.c}, ${ratio.d} (${ratio.petals}P)", color = AppText) }, onClick = { 
-                                            visualSource.recipe = ratio
-                                            onInteraction()
-                                            recipeExpanded = false
-                                        })
-                                    }
-                                }
+                            }
+                            
+                            if (recipeExpanded) {
+                                RecipePickerDialog(
+                                    currentRecipe = visualSource.recipe,
+                                    onRecipeSelected = { ratio ->
+                                        visualSource.recipe = ratio
+                                        onInteraction()
+                                        recipeExpanded = false
+                                    },
+                                    onDismiss = { recipeExpanded = false }
+                                )
                             }
                         }
 

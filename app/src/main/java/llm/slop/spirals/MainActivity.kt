@@ -185,7 +185,7 @@ class MainActivity : ComponentActivity() {
 
                                         // --- TOP GROUP ---
                                         DropdownMenuItem(
-                                            text = { Text("Manage", color = AppAccent) },
+                                            text = { Text("Library", color = AppAccent) },
                                             onClick = { showManager = true; showHeaderMenu = false }
                                         )
                                         DropdownMenuItem(

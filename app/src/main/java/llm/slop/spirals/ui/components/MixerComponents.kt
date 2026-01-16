@@ -37,9 +37,27 @@ import kotlin.math.roundToInt
 
 @Composable
 fun SpiralPreview(sourceId: String, mainRenderer: SpiralRenderer?, modifier: Modifier = Modifier) {
-    if (mainRenderer == null) return
+    if (mainRenderer == null) {
+        Box(modifier = modifier.background(Color.Black))
+        return
+    }
 
     val view = remember { mutableStateOf<GLSurfaceView?>(null) }
+    var viewportWidth by remember { mutableIntStateOf(0) }
+    var viewportHeight by remember { mutableIntStateOf(0) }
+    var blitHelper: SimpleBlitHelper? by remember { mutableStateOf(null) }
+    
+    // Wait a bit for main context to be established
+    var isReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(100) // Give main renderer time to initialize
+        isReady = true
+    }
+    
+    if (!isReady) {
+        Box(modifier = modifier.background(Color.Black))
+        return
+    }
 
     AndroidView(
         factory = { ctx ->
@@ -48,13 +66,24 @@ fun SpiralPreview(sourceId: String, mainRenderer: SpiralRenderer?, modifier: Mod
                 // Bridge Context
                 setEGLContextFactory(SharedEGLContextFactory())
                 setRenderer(object : GLSurfaceView.Renderer {
-                    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {}
-                    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {}
+                    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+                        // Create blit resources for this context
+                        blitHelper = SimpleBlitHelper()
+                    }
+                    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+                        viewportWidth = width
+                        viewportHeight = height
+                    }
                     override fun onDrawFrame(gl: GL10?) {
+                        // Set viewport for this view
+                        android.opengl.GLES30.glViewport(0, 0, viewportWidth, viewportHeight)
+                        android.opengl.GLES30.glClearColor(0f, 0f, 0f, 1f)
+                        android.opengl.GLES30.glClear(android.opengl.GLES30.GL_COLOR_BUFFER_BIT)
+                        
                         // Sample from main renderer's master pool
                         val textureId = mainRenderer.getTextureForSource(sourceId)
-                        if (textureId != 0) {
-                            mainRenderer.drawTextureToCurrentBuffer(textureId)
+                        if (textureId != 0 && blitHelper != null) {
+                            blitHelper?.drawTexture(textureId)
                         }
                     }
                 })
@@ -79,7 +108,27 @@ fun SpiralPreview(sourceId: String, mainRenderer: SpiralRenderer?, modifier: Mod
  */
 @Composable
 fun StripPreview(monitorSource: String, patch: MixerPatch, mainRenderer: SpiralRenderer?) {
+    if (mainRenderer == null) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+        return
+    }
+    
     val view = remember { mutableStateOf<GLSurfaceView?>(null) }
+    var viewportWidth by remember { mutableIntStateOf(0) }
+    var viewportHeight by remember { mutableIntStateOf(0) }
+    var blitHelper: SimpleBlitHelper? by remember { mutableStateOf(null) }
+    
+    // Wait a bit for main context to be established
+    var isReady by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        delay(100) // Give main renderer time to initialize
+        isReady = true
+    }
+    
+    if (!isReady) {
+        Box(modifier = Modifier.fillMaxSize().background(Color.Black))
+        return
+    }
     
     AndroidView(
         factory = { ctx ->
@@ -88,13 +137,24 @@ fun StripPreview(monitorSource: String, patch: MixerPatch, mainRenderer: SpiralR
                 // Bridge Context
                 setEGLContextFactory(SharedEGLContextFactory())
                 setRenderer(object : GLSurfaceView.Renderer {
-                    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {}
-                    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {}
+                    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+                        // Create blit resources for this context
+                        blitHelper = SimpleBlitHelper()
+                    }
+                    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+                        viewportWidth = width
+                        viewportHeight = height
+                    }
                     override fun onDrawFrame(gl: GL10?) {
+                        // Set viewport for this view
+                        android.opengl.GLES30.glViewport(0, 0, viewportWidth, viewportHeight)
+                        android.opengl.GLES30.glClearColor(0f, 0f, 0f, 1f)
+                        android.opengl.GLES30.glClear(android.opengl.GLES30.GL_COLOR_BUFFER_BIT)
+                        
                         // Sample from main renderer's master pool
-                        val textureId = mainRenderer?.getTextureForSource(monitorSource) ?: 0
-                        if (textureId != 0) {
-                            mainRenderer?.drawTextureToCurrentBuffer(textureId)
+                        val textureId = mainRenderer.getTextureForSource(monitorSource)
+                        if (textureId != 0 && blitHelper != null) {
+                            blitHelper?.drawTexture(textureId)
                         }
                     }
                 })
@@ -657,5 +717,96 @@ private fun updateGroup(patch: MixerPatch, group: String, data: MixerGroupData):
         "A" -> patch.copy(mixerA = data)
         "B" -> patch.copy(mixerB = data)
         else -> patch.copy(mixerF = data)
+    }
+}
+
+/**
+ * Helper class to blit textures in secondary GL contexts.
+ * Each context needs its own shader program and VAO since these aren't shared.
+ */
+class SimpleBlitHelper {
+    private val program: Int
+    private val vao: Int
+    private val vbo: Int
+    private val uTextureLocation: Int
+
+    init {
+        // Simple passthrough vertex shader
+        val vertexShader = """
+            #version 300 es
+            in vec2 aPosition;
+            out vec2 vTexCoord;
+            void main() {
+                vTexCoord = (aPosition + 1.0) * 0.5;
+                gl_Position = vec4(aPosition, 0.0, 1.0);
+            }
+        """.trimIndent()
+
+        // Simple texture fragment shader
+        val fragmentShader = """
+            #version 300 es
+            precision mediump float;
+            in vec2 vTexCoord;
+            out vec4 fragColor;
+            uniform sampler2D uTexture;
+            void main() {
+                fragColor = texture(uTexture, vTexCoord);
+            }
+        """.trimIndent()
+
+        // Compile shaders
+        val vShader = android.opengl.GLES30.glCreateShader(android.opengl.GLES30.GL_VERTEX_SHADER)
+        android.opengl.GLES30.glShaderSource(vShader, vertexShader)
+        android.opengl.GLES30.glCompileShader(vShader)
+
+        val fShader = android.opengl.GLES30.glCreateShader(android.opengl.GLES30.GL_FRAGMENT_SHADER)
+        android.opengl.GLES30.glShaderSource(fShader, fragmentShader)
+        android.opengl.GLES30.glCompileShader(fShader)
+
+        // Link program
+        program = android.opengl.GLES30.glCreateProgram()
+        android.opengl.GLES30.glAttachShader(program, vShader)
+        android.opengl.GLES30.glAttachShader(program, fShader)
+        android.opengl.GLES30.glLinkProgram(program)
+        android.opengl.GLES30.glDeleteShader(vShader)
+        android.opengl.GLES30.glDeleteShader(fShader)
+
+        uTextureLocation = android.opengl.GLES30.glGetUniformLocation(program, "uTexture")
+
+        // Create fullscreen quad
+        val quad = floatArrayOf(-1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f)
+        val quadBuffer = java.nio.ByteBuffer.allocateDirect(quad.size * 4)
+            .order(java.nio.ByteOrder.nativeOrder())
+            .asFloatBuffer()
+        quadBuffer.put(quad)
+        quadBuffer.position(0)
+
+        val vaoArr = IntArray(1)
+        android.opengl.GLES30.glGenVertexArrays(1, vaoArr, 0)
+        vao = vaoArr[0]
+
+        val vboArr = IntArray(1)
+        android.opengl.GLES30.glGenBuffers(1, vboArr, 0)
+        vbo = vboArr[0]
+
+        android.opengl.GLES30.glBindVertexArray(vao)
+        android.opengl.GLES30.glBindBuffer(android.opengl.GLES30.GL_ARRAY_BUFFER, vbo)
+        android.opengl.GLES30.glBufferData(
+            android.opengl.GLES30.GL_ARRAY_BUFFER,
+            quad.size * 4,
+            quadBuffer,
+            android.opengl.GLES30.GL_STATIC_DRAW
+        )
+        android.opengl.GLES30.glEnableVertexAttribArray(0)
+        android.opengl.GLES30.glVertexAttribPointer(0, 2, android.opengl.GLES30.GL_FLOAT, false, 0, 0)
+    }
+
+    fun drawTexture(textureId: Int) {
+        android.opengl.GLES30.glUseProgram(program)
+        android.opengl.GLES30.glBindVertexArray(vao)
+        android.opengl.GLES30.glActiveTexture(android.opengl.GLES30.GL_TEXTURE0)
+        android.opengl.GLES30.glBindTexture(android.opengl.GLES30.GL_TEXTURE_2D, textureId)
+        android.opengl.GLES30.glUniform1i(uTextureLocation, 0)
+        android.opengl.GLES30.glDrawArrays(android.opengl.GLES30.GL_TRIANGLE_STRIP, 0, 4)
     }
 }

@@ -57,24 +57,25 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     private val resolution = 2048
     
-    private val MAX_GHOSTS = 16
-    private val ghostTextures = IntArray(MAX_GHOSTS)
-    private val ghostFramebuffers = IntArray(MAX_GHOSTS)
+    // Per-slot feedback: 2 textures per slot (ping-pong) + 2 for final output
+    private val slotFBTextures = Array(4) { IntArray(2) }
+    private val slotFBFramebuffers = Array(4) { IntArray(2) }
+    private val slotFBIndex = IntArray(4) { 0 }
+    
+    // Final output feedback
+    private val finalFBTextures = IntArray(2)
+    private val finalFBFramebuffers = IntArray(2)
+    private var finalFBIndex = 0
+    
+    // Temp rendering target
     private var currentFrameFBO: Int = 0
     private var currentFrameTexture: Int = 0
-    private var ghostIndex = 0
-
-    private val fbTextures = IntArray(2)
-    private val fbFramebuffers = IntArray(2)
-    private var fbIndex = 0
 
     private val masterTextures = IntArray(7)
     private val masterFramebuffers = IntArray(7)
 
     private var screenWidth = 0
     private var screenHeight = 0
-    
-    private var isSnapshotArmed: Boolean = true
     
     private var lastL1 = -1f; private var lastL2 = -1f; private var lastL3 = -1f; private var lastL4 = -1f; private var lastRotation = -1f
 
@@ -190,8 +191,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         trailVbo = -1
         currentFrameFBO = 0
         currentFrameTexture = 0
-        fbIndex = 0
-        ghostIndex = 0
+        finalFBIndex = 0
+        for (i in 0..3) slotFBIndex[i] = 0
         
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f); GLES30.glEnable(GLES30.GL_BLEND); GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
         program = ShaderHelper.buildProgram(context, R.raw.mandala_vertex, R.raw.mandala_fragment)
@@ -247,10 +248,27 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             val a = IntArray(1); GLES30.glGenFramebuffers(1, a, 0); GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, a[0])
             GLES30.glFramebufferTexture2D(GLES30.GL_FRAMEBUFFER, GLES30.GL_COLOR_ATTACHMENT0, GLES30.GL_TEXTURE_2D, t, 0); return a[0]
         }
+        // Master output textures (one per source + mixer stages)
         for (i in 0..6) { masterTextures[i] = cT(TARGET_WIDTH, TARGET_HEIGHT); masterFramebuffers[i] = cF(masterTextures[i]) }
-        for (i in 0 until MAX_GHOSTS) { ghostTextures[i] = cT(TARGET_WIDTH, TARGET_HEIGHT); ghostFramebuffers[i] = cF(ghostTextures[i]) }
-        currentFrameTexture = cT(TARGET_WIDTH, TARGET_HEIGHT); currentFrameFBO = cF(currentFrameTexture)
-        for (i in 0..1) { fbTextures[i] = cT(TARGET_WIDTH, TARGET_HEIGHT); fbFramebuffers[i] = cF(fbTextures[i]) }
+        
+        // Per-slot feedback textures (2 per slot for ping-pong)
+        for (slot in 0..3) {
+            for (i in 0..1) {
+                slotFBTextures[slot][i] = cT(TARGET_WIDTH, TARGET_HEIGHT)
+                slotFBFramebuffers[slot][i] = cF(slotFBTextures[slot][i])
+            }
+        }
+        
+        // Final output feedback textures
+        for (i in 0..1) { 
+            finalFBTextures[i] = cT(TARGET_WIDTH, TARGET_HEIGHT)
+            finalFBFramebuffers[i] = cF(finalFBTextures[i])
+        }
+        
+        // Temp rendering target
+        currentFrameTexture = cT(TARGET_WIDTH, TARGET_HEIGHT)
+        currentFrameFBO = cF(currentFrameTexture)
+        
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
     }
 
@@ -259,8 +277,20 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         if (program == 0 || screenWidth == 0) return
         
         if (clearFeedbackNextFrame) {
-            for (i in 0..1) { GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, fbFramebuffers[i]); GLES30.glClearColor(0f,0f,0f,0f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT) }
-            for (i in 0 until MAX_GHOSTS) { GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, ghostFramebuffers[i]); GLES30.glClearColor(0f,0f,0f,0f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT) }
+            // Clear per-slot feedback buffers
+            for (slot in 0..3) {
+                for (i in 0..1) {
+                    GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, slotFBFramebuffers[slot][i])
+                    GLES30.glClearColor(0f,0f,0f,0f)
+                    GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+                }
+            }
+            // Clear final feedback buffers
+            for (i in 0..1) {
+                GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, finalFBFramebuffers[i])
+                GLES30.glClearColor(0f,0f,0f,0f)
+                GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+            }
             clearFeedbackNextFrame = false
         }
         
@@ -272,15 +302,41 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         val p = mixerPatch
         GLES30.glViewport(0, 0, TARGET_WIDTH, TARGET_HEIGHT)
         if (p != null) {
+            // Render each slot with its own persistent feedback
             for (i in 0..3) {
-                GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, masterFramebuffers[i]); GLES30.glClearColor(0f,0f,0f,0f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-                if (p.slots[i].enabled && p.slots[i].isPopulated()) { GLES30.glUseProgram(program); renderSource(slotSources[i]) }
+                if (p.slots[i].enabled && p.slots[i].isPopulated()) {
+                    val source = slotSources[i]
+                    val fx = source.parameters
+                    val fxMap = if (fx != null) mapOf(
+                        "FB_DECAY" to (fx["FB Decay"]?.value ?: 0f),
+                        "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f),
+                        "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f),
+                        "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f),
+                        "FB_SHIFT" to (fx["FB Shift"]?.value ?: 0f),
+                        "FB_BLUR" to (fx["FB Blur"]?.value ?: 0f)
+                    ) else emptyMap()
+                    
+                    compositeWithFeedback(
+                        render = { GLES30.glUseProgram(program); renderSource(source) },
+                        fx = fxMap,
+                        fbTextures = slotFBTextures[i],
+                        fbFramebuffers = slotFBFramebuffers[i],
+                        fbIndexRef = { slotFBIndex[i] },
+                        fbIndexSet = { slotFBIndex[i] = it },
+                        targetFboIdx = i
+                    )
+                } else {
+                    // Clear empty slots
+                    GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, masterFramebuffers[i])
+                    GLES30.glClearColor(0f, 0f, 0f, 0f)
+                    GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+                }
             }
             renderMixerGroup(4, masterTextures[0], masterTextures[1], "A")
             renderMixerGroup(5, masterTextures[2], masterTextures[3], "B")
             compositeFinalMixer(masterTextures[4], masterTextures[5])
         } else {
-            // Null-safety guard: only render if visualSource exists
+            // Single mandala mode - use final feedback buffers
             val currentSource = visualSource
             if (currentSource != null) {
                 val fx = currentSource.parameters
@@ -290,17 +346,24 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                     "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f), 
                     "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f), 
                     "FB_SHIFT" to (fx["FB Shift"]?.value ?: 0f), 
-                    "FB_BLUR" to (fx["FB Blur"]?.value ?: 0f), 
-                    "TRAILS" to (fx["Trails"]?.value ?: 0f), 
-                    "SNAP_COUNT" to (fx["Snap Count"]?.value ?: 0.5f), 
-                    "SNAP_MODE" to (fx["Snap Mode"]?.value ?: 0f), 
-                    "SNAP_BLEND" to (fx["Snap Blend"]?.value ?: 0f), 
-                    "SNAP_TRIG" to (fx["Snap Trigger"]?.value ?: 0f)
+                    "FB_BLUR" to (fx["FB Blur"]?.value ?: 0f)
                 ) else emptyMap()
-                compositeWithFX({ GLES30.glUseProgram(program); renderSource(currentSource) }, fxMap, isSourceStatic(currentSource), 6)
+                
+                compositeWithFeedback(
+                    render = { GLES30.glUseProgram(program); renderSource(currentSource) },
+                    fx = fxMap,
+                    fbTextures = finalFBTextures,
+                    fbFramebuffers = finalFBFramebuffers,
+                    fbIndexRef = { finalFBIndex },
+                    fbIndexSet = { finalFBIndex = it },
+                    targetFboIdx = 6
+                )
             }
         }
 
+        // Ensure all rendering is complete before other contexts can read the textures
+        GLES30.glFlush()
+        
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0); GLES30.glViewport(0, 0, screenWidth, screenHeight); GLES30.glClearColor(0f,0f,0f,1f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
         val dTex = getTextureForSource(monitorSource); if (dTex != 0) drawTextureToCurrentBuffer(dTex)
     }
@@ -328,40 +391,83 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             "FB_ZOOM" to (mixerParams["MF_FB_ZOOM"]?.value ?: 0.5f), 
             "FB_ROTATE" to (mixerParams["MF_FB_ROTATE"]?.value ?: 0.5f), 
             "FB_SHIFT" to (mixerParams["MF_FB_SHIFT"]?.value ?: 0f), 
-            "FB_BLUR" to (mixerParams["MF_FB_BLUR"]?.value ?: 0f), 
-            "TRAILS" to (mixerParams["MF_TRAILS"]?.value ?: 0f), 
-            "SNAP_COUNT" to (mixerParams["MF_SNAP_COUNT"]?.value ?: 0.5f), 
-            "SNAP_MODE" to (mixerParams["MF_SNAP_MODE"]?.value ?: 0f), 
-            "SNAP_BLEND" to (mixerParams["MF_SNAP_BLEND"]?.value ?: 0f), 
-            "SNAP_TRIG" to (mixerParams["MF_SNAP_TRIG"]?.value ?: 0f)
+            "FB_BLUR" to (mixerParams["MF_FB_BLUR"]?.value ?: 0f)
         )
-        compositeWithFX({ GLES30.glUseProgram(mixerProgram); GLES30.glActiveTexture(GLES30.GL_TEXTURE0); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, tA); GLES30.glUniform1i(uMixTex1Loc, 0); GLES30.glActiveTexture(GLES30.GL_TEXTURE1); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, tB); GLES30.glUniform1i(uMixTex2Loc, 1); GLES30.glUniform1i(uMixModeLoc, ((mixerParams["MF_MODE"]?.value ?: 0f) * (MixerMode.entries.size - 1)).roundToInt()); GLES30.glUniform1f(uMixBalLoc, mixerParams["MF_BAL"]?.value ?: 0.5f); GLES30.glUniform1f(uMixAlphaLoc, mixerParams["MF_GAIN"]?.value ?: 1f); GLES30.glDisable(GLES30.GL_BLEND); GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4); GLES30.glEnable(GLES30.GL_BLEND) }, fx, false, 6)
+        compositeWithFeedback(
+            render = { GLES30.glUseProgram(mixerProgram); GLES30.glActiveTexture(GLES30.GL_TEXTURE0); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, tA); GLES30.glUniform1i(uMixTex1Loc, 0); GLES30.glActiveTexture(GLES30.GL_TEXTURE1); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, tB); GLES30.glUniform1i(uMixTex2Loc, 1); GLES30.glUniform1i(uMixModeLoc, ((mixerParams["MF_MODE"]?.value ?: 0f) * (MixerMode.entries.size - 1)).roundToInt()); GLES30.glUniform1f(uMixBalLoc, mixerParams["MF_BAL"]?.value ?: 0.5f); GLES30.glUniform1f(uMixAlphaLoc, mixerParams["MF_GAIN"]?.value ?: 1f); GLES30.glDisable(GLES30.GL_BLEND); GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4); GLES30.glEnable(GLES30.GL_BLEND) },
+            fx = fx,
+            fbTextures = finalFBTextures,
+            fbFramebuffers = finalFBFramebuffers,
+            fbIndexRef = { finalFBIndex },
+            fbIndexSet = { finalFBIndex = it },
+            targetFboIdx = 6
+        )
     }
 
-    private fun compositeWithFX(ren: () -> Unit, fx: Map<String, Float>, s: Boolean, targetFboIdx: Int) {
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, currentFrameFBO); GLES30.glClearColor(0f, 0f, 0f, 0f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT); ren()
-        val dec = fx["FB_DECAY"] ?: 0f; val gain = fx["FB_GAIN"] ?: 1f
+    /**
+     * Composite with persistent feedback (no ghost/trails).
+     * Supports per-slot feedback via separate texture arrays.
+     */
+    private fun compositeWithFeedback(
+        render: () -> Unit,
+        fx: Map<String, Float>,
+        fbTextures: IntArray,
+        fbFramebuffers: IntArray,
+        fbIndexRef: () -> Int,
+        fbIndexSet: (Int) -> Unit,
+        targetFboIdx: Int
+    ) {
+        // Render to temp buffer
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, currentFrameFBO)
+        GLES30.glClearColor(0f, 0f, 0f, 0f)
+        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+        render()
+        
+        // Apply feedback if enabled
+        val dec = fx["FB_DECAY"] ?: 0f
+        val gain = fx["FB_GAIN"] ?: 1f
+        val fbIdx = fbIndexRef()
+        
         if (dec > 0.01f || gain > 0.01f) {
-            val n = (fbIndex + 1) % 2; GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, fbFramebuffers[n]); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-            GLES30.glUseProgram(feedbackProgram); GLES30.glBindVertexArray(trailVao)
-            GLES30.glActiveTexture(GLES30.GL_TEXTURE0); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, currentFrameTexture); GLES30.glUniform1i(uFBTextureLiveLoc, 0)
-            GLES30.glActiveTexture(GLES30.GL_TEXTURE1); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, fbTextures[fbIndex]); GLES30.glUniform1i(uFBTextureHistoryLoc, 1)
-            GLES30.glUniform1f(uFBDecayLoc, 1.0f - (1.0f - dec).pow(6.0f)); GLES30.glUniform1f(uFBGainLoc, gain * 1.5f)
-            GLES30.glUniform1f(uFBZoomLoc, ((fx["FB_ZOOM"] ?: 0.5f) - 0.5f) * 0.1f); GLES30.glUniform1f(uFBRotateLoc, ((fx["FB_ROTATE"] ?: 0.5f) - 0.5f) * 10f * (PI.toFloat() / 180f))
-            GLES30.glUniform1f(uFBShiftLoc, fx["FB_SHIFT"] ?: 0f); GLES30.glUniform1f(uFBBlurLoc, fx["FB_BLUR"] ?: 0f)
-            GLES30.glDisable(GLES30.GL_BLEND); GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4); GLES30.glEnable(GLES30.GL_BLEND); fbIndex = n
+            val nextIdx = (fbIdx + 1) % 2
+            GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, fbFramebuffers[nextIdx])
+            GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+            GLES30.glUseProgram(feedbackProgram)
+            GLES30.glBindVertexArray(trailVao)
+            
+            // Bind current frame (live) and feedback history
+            GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, currentFrameTexture)
+            GLES30.glUniform1i(uFBTextureLiveLoc, 0)
+            GLES30.glActiveTexture(GLES30.GL_TEXTURE1)
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, fbTextures[fbIdx])
+            GLES30.glUniform1i(uFBTextureHistoryLoc, 1)
+            
+            // Apply feedback parameters
+            GLES30.glUniform1f(uFBDecayLoc, 1.0f - (1.0f - dec).pow(6.0f))
+            GLES30.glUniform1f(uFBGainLoc, gain * 1.5f)
+            GLES30.glUniform1f(uFBZoomLoc, ((fx["FB_ZOOM"] ?: 0.5f) - 0.5f) * 0.1f)
+            GLES30.glUniform1f(uFBRotateLoc, ((fx["FB_ROTATE"] ?: 0.5f) - 0.5f) * 10f * (PI.toFloat() / 180f))
+            GLES30.glUniform1f(uFBShiftLoc, fx["FB_SHIFT"] ?: 0f)
+            GLES30.glUniform1f(uFBBlurLoc, fx["FB_BLUR"] ?: 0f)
+            
+            GLES30.glDisable(GLES30.GL_BLEND)
+            GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
+            GLES30.glEnable(GLES30.GL_BLEND)
+            fbIndexSet(nextIdx)
         }
-        val t = fx["SNAP_TRIG"] ?: 0f; val trs = fx["TRAILS"] ?: 0f
-        if (t > 0.5f && isSnapshotArmed && !s && trs > 0.01f) {
-            ghostIndex = (ghostIndex + 1) % MAX_GHOSTS; GLES30.glBindFramebuffer(GLES30.GL_READ_FRAMEBUFFER, currentFrameFBO); GLES30.glBindFramebuffer(GLES30.GL_DRAW_FRAMEBUFFER, ghostFramebuffers[ghostIndex]); GLES30.glBlitFramebuffer(0,0,TARGET_WIDTH,TARGET_HEIGHT,0,0,TARGET_WIDTH,TARGET_HEIGHT,GLES30.GL_COLOR_BUFFER_BIT,GLES30.GL_NEAREST); isSnapshotArmed = false
-        } else if (t <= 0.5f) isSnapshotArmed = true
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, masterFramebuffers[targetFboIdx]); GLES30.glClearColor(0f, 0f, 0f, 0f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT); GLES30.glUseProgram(trailProgram); GLES30.glBindVertexArray(trailVao)
-        if ((fx["SNAP_BLEND"] ?: 0f) >= 0.5f) GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE) else GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
-        val cnt = ((fx["SNAP_COUNT"] ?: 0.5f) * 14f + 2f).toInt().coerceIn(2, MAX_GHOSTS); val mde = fx["SNAP_MODE"] ?: 0f
-        val dG = { for (i in (cnt - 1) downTo 1) { val idx = (ghostIndex - i + MAX_GHOSTS) % MAX_GHOSTS; GLES30.glUniform1f(uTrailAlphaLocation, trs * exp(-(i.toFloat() * i.toFloat()) / (cnt.toFloat() * 1.5f))); GLES30.glActiveTexture(GLES30.GL_TEXTURE0); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, ghostTextures[idx]); GLES30.glUniform1i(uTrailTextureLocation, 0); GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4) } }
-        val dC = { GLES30.glUniform1f(uTrailAlphaLocation, 1.0f); GLES30.glActiveTexture(GLES30.GL_TEXTURE0); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, if (dec > 0.01f || gain > 0.01f) fbTextures[fbIndex] else currentFrameTexture)
-            GLES30.glUniform1i(uTrailTextureLocation, 0); GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4) }
-        if (mde < 0.5f) { dG(); dC() } else { dC(); dG() }
+        
+        // Copy result to target
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, masterFramebuffers[targetFboIdx])
+        GLES30.glClearColor(0f, 0f, 0f, 0f)
+        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+        GLES30.glUseProgram(trailProgram)
+        GLES30.glBindVertexArray(trailVao)
+        GLES30.glUniform1f(uTrailAlphaLocation, 1.0f)
+        GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, if (dec > 0.01f || gain > 0.01f) fbTextures[fbIndexRef()] else currentFrameTexture)
+        GLES30.glUniform1i(uTrailTextureLocation, 0)
+        GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
     }
 
     private fun renderSource(s: MandalaVisualSource) {

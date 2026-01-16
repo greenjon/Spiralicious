@@ -560,7 +560,12 @@ class MainActivity : ComponentActivity() {
         var focusedParameterId by remember { mutableStateOf("L1") }
         var recipeExpanded by remember { mutableStateOf(false) }
         var showOpenDialog by remember { mutableStateOf(false) }
-        val patchName by remember(lastLoadedPatch) { mutableStateOf(lastLoadedPatch?.name ?: "New Patch") }
+        
+        // Get the current layer name from the nav stack (handles renames)
+        val navStack by vm.navStack.collectAsState()
+        val currentLayer = navStack.lastOrNull { it.type == LayerType.MANDALA }
+        val patchName = currentLayer?.name ?: lastLoadedPatch?.name ?: "New Patch"
+        
         val allPatches by vm.allPatches.collectAsState(initial = emptyList())
         var recipeSortMode by remember { mutableStateOf(llm.slop.spirals.ui.components.RecipeSortMode.PETALS) }
 
@@ -583,7 +588,7 @@ class MainActivity : ComponentActivity() {
         }
 
         // Keep ViewModel updated with current work-in-progress for cascade saving
-        LaunchedEffect(visualSource.recipe, visualSource.parameters.values.map { it.value }) {
+        LaunchedEffect(patchName, visualSource.recipe, visualSource.parameters.values.map { it.value }) {
             val patchData = PatchMapper.fromVisualSource(patchName, visualSource)
             val stack = vm.navStack.value
             val index = stack.indexOfLast { it.type == LayerType.MANDALA }

@@ -331,11 +331,28 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 null -> { /* no data to delete */ }
             }
             
-            // Update name in stack
-            updateLayerName(index, newName)
+            // Update the data to use the new name
+            val updatedData: LayerContent? = when (val data = layer.data) {
+                is MandalaLayerContent -> MandalaLayerContent(data.patch.copy(name = newName))
+                is SetLayerContent -> SetLayerContent(data.set.copy(name = newName))
+                is MixerLayerContent -> MixerLayerContent(data.mixer.copy(name = newName))
+                is ShowLayerContent -> ShowLayerContent(data.show.copy(name = newName))
+                null -> null
+            }
+            
+            // Update both name and data in stack
+            val current = _navStack.value.toMutableList()
+            current[index] = current[index].copy(name = newName, data = updatedData)
+            _navStack.value = current
+            
+            // Update currentPatch if this is a Mandala being renamed
+            if (layer.type == LayerType.MANDALA && updatedData is MandalaLayerContent) {
+                _currentPatch.value = updatedData.patch
+            }
             
             // Save with new name
             saveLayer(_navStack.value[index])
+            saveWorkspaceIfEnabled()
         }
     }
 

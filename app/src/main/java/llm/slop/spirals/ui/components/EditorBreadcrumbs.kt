@@ -49,7 +49,16 @@ fun EditorBreadcrumbs(
                 val showName = layer.data != null
                 
                 if (showName) {
-                    val displayName = if (layer.isDirty) "${layer.name} *" else layer.name
+                    // Get the actual name from the data if available, otherwise use layer.name
+                    val actualName = when (val data = layer.data) {
+                        is llm.slop.spirals.MandalaLayerContent -> data.patch.name
+                        is llm.slop.spirals.SetLayerContent -> data.set.name
+                        is llm.slop.spirals.MixerLayerContent -> data.mixer.name
+                        is llm.slop.spirals.ShowLayerContent -> data.show.name
+                        null -> layer.name
+                    }
+                    
+                    val displayName = if (layer.isDirty) "$actualName *" else actualName
                     val isCurrent = index == stack.lastIndex
                     
                     // Wrap each breadcrumb + arrow as a single unit so they don't break mid-item

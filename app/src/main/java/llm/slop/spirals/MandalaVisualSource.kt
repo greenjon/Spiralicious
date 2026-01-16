@@ -28,11 +28,6 @@ class MandalaVisualSource : VisualSource {
         "Hue Offset" to ModulatableParameter(0.0f),
         "Hue Sweep" to ModulatableParameter(1.0f / 9.0f), 
         "Depth" to ModulatableParameter(0.35f),
-        "Trails" to ModulatableParameter(0.0f),
-        "Snap Count" to ModulatableParameter(0.5f), 
-        "Snap Mode" to ModulatableParameter(0.0f),  
-        "Snap Blend" to ModulatableParameter(0.0f), 
-        "Snap Trigger" to ModulatableParameter(0.0f),
         // Feedback Engine Parameters
         "FB Decay" to ModulatableParameter(0.0f),
         "FB Gain" to ModulatableParameter(1.0f),

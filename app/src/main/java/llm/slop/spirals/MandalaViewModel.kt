@@ -89,10 +89,10 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         saveWorkspaceIfEnabled()
     }
 
-    fun createAndPushLayer(type: LayerType, parentData: Any? = null) {
+    fun createAndPushLayer(type: LayerType, parentData: LayerContent? = null) {
         val name = generateNextName(type)
         val id = UUID.randomUUID().toString()
-        pushLayer(NavLayer(id, name, type, isDirty = false).apply { this.data = parentData })
+        pushLayer(NavLayer(id, name, type, isDirty = false, data = parentData))
     }
 
     fun createAndResetStack(type: LayerType) {
@@ -105,14 +105,14 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     fun startNewPatch(type: LayerType) {
         val name = generateNextName(type)
         val id = UUID.randomUUID().toString()
-        val data: Any? = when(type) {
-            LayerType.MIXER -> MixerPatch(id = id, name = name, slots = List(4) { MixerSlotData() })
-            LayerType.SET -> MandalaSet(id = id, name = name, orderedMandalaIds = mutableListOf())
-            LayerType.SHOW -> ShowPatch(id = id, name = name)
-            LayerType.MANDALA -> PatchData(name = name, recipeId = MandalaLibrary.MandalaRatios.first().id, parameters = emptyList())
+        val data: LayerContent? = when(type) {
+            LayerType.MIXER -> MixerLayerContent(MixerPatch(id = id, name = name, slots = List(4) { MixerSlotData() }))
+            LayerType.SET -> SetLayerContent(MandalaSet(id = id, name = name, orderedMandalaIds = mutableListOf()))
+            LayerType.SHOW -> ShowLayerContent(ShowPatch(id = id, name = name))
+            LayerType.MANDALA -> MandalaLayerContent(PatchData(name = name, recipeId = MandalaLibrary.MandalaRatios.first().id, parameters = emptyList()))
         }
         
-        val newLayer = NavLayer(id, name, type, isDirty = true).apply { this.data = data }
+        val newLayer = NavLayer(id, name, type, isDirty = true, data = data)
         
         // If we are at root and it is generic, replace it
         if (_navStack.value.size == 1 && _navStack.value[0].type == type && _navStack.value[0].data == null) {
@@ -122,7 +122,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         }
         
         if (type == LayerType.MANDALA) {
-            _currentPatch.value = data as? PatchData
+            _currentPatch.value = (data as? MandalaLayerContent)?.patch
         }
     }
 
@@ -130,13 +130,14 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
      * Updates the data associated with a specific layer in the stack.
      * Useful for capturing "Work in progress" before a pop or save.
      */
-    fun updateLayerData(index: Int, data: Any?, isDirty: Boolean? = null) {
+    fun updateLayerData(index: Int, data: LayerContent?, isDirty: Boolean? = null) {
         if (index < 0 || index >= _navStack.value.size) return
         val current = _navStack.value.toMutableList()
         val updatedLayer = current[index]
         val newLayer = updatedLayer.copy(
+            data = data,
             isDirty = isDirty ?: updatedLayer.isDirty
-        ).apply { this.data = data }
+        )
         current[index] = newLayer
         _navStack.value = current
     }
@@ -144,8 +145,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     fun updateLayerName(index: Int, newName: String) {
         if (index < 0 || index >= _navStack.value.size) return
         val current = _navStack.value.toMutableList()
-        val oldData = current[index].data
-        current[index] = current[index].copy(name = newName).apply { this.data = oldData }
+        current[index] = current[index].copy(name = newName)
         _navStack.value = current
         saveWorkspaceIfEnabled()
     }
@@ -183,31 +183,28 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     fun saveLayer(layer: NavLayer) {
         val data = layer.data ?: return
         viewModelScope.launch {
-            when (layer.type) {
-                LayerType.MANDALA -> {
-                    val patch = data as? PatchData ?: return@launch
-                    savePatch(patch.copy(name = layer.name))
+            when (data) {
+                is MandalaLayerContent -> {
+                    savePatch(data.patch.copy(name = layer.name))
                 }
-                LayerType.SET -> {
-                    val set = data as? MandalaSet ?: return@launch
-                    saveSet(set.copy(name = layer.name))
+                is SetLayerContent -> {
+                    saveSet(data.set.copy(name = layer.name))
                 }
-                LayerType.MIXER -> {
-                    val mixer = data as? MixerPatch ?: return@launch
-                    saveMixerPatch(mixer.copy(name = layer.name))
+                is MixerLayerContent -> {
+                    saveMixerPatch(data.mixer.copy(name = layer.name))
                 }
-                LayerType.SHOW -> {
-                    val show = data as? ShowPatch ?: return@launch
-                    saveShowPatch(show.copy(name = layer.name))
+                is ShowLayerContent -> {
+                    saveShowPatch(data.show.copy(name = layer.name))
                 }
             }
             // Clear dirty flag for this layer in the stack
             val index = _navStack.value.indexOfFirst { it.id == layer.id }
             if (index != -1) {
-                val current = _navStack.value.toMutableList()
-                val oldData = current[index].data
-                current[index] = current[index].copy(isDirty = false).apply { this.data = oldData }
-                _navStack.value = current
+                _navStack.update { stack ->
+                    stack.toMutableList().apply {
+                        this[index] = this[index].copy(isDirty = false)
+                    }
+                }
             }
         }
     }
@@ -218,17 +215,12 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         
         viewModelScope.launch {
             // Delete old entry
-            when (layer.type) {
-                LayerType.MANDALA -> deletePatch(oldName)
-                LayerType.SET -> {
-                    (layer.data as? MandalaSet)?.let { deleteSet(it.id) }
-                }
-                LayerType.MIXER -> {
-                    (layer.data as? MixerPatch)?.let { deleteMixerPatch(it.id) }
-                }
-                LayerType.SHOW -> {
-                    (layer.data as? ShowPatch)?.let { deleteShowPatch(it.id) }
-                }
+            when (val data = layer.data) {
+                is MandalaLayerContent -> deletePatch(oldName)
+                is SetLayerContent -> deleteSet(data.set.id)
+                is MixerLayerContent -> deleteMixerPatch(data.mixer.id)
+                is ShowLayerContent -> deleteShowPatch(data.show.id)
+                null -> { /* no data to delete */ }
             }
             
             // Update name in stack
@@ -247,14 +239,14 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         val newName = NamingUtils.generateCloneName(layer.name, getExistingNames(layer.type))
         val newId = UUID.randomUUID().toString()
         
-        val newData = when (layer.type) {
-            LayerType.MANDALA -> (data as? PatchData)?.copy(name = newName)
-            LayerType.SET -> (data as? MandalaSet)?.copy(id = newId, name = newName)
-            LayerType.MIXER -> (data as? MixerPatch)?.copy(id = newId, name = newName)
-            LayerType.SHOW -> (data as? ShowPatch)?.copy(id = newId, name = newName)
-        } ?: return
+        val newData: LayerContent = when (data) {
+            is MandalaLayerContent -> MandalaLayerContent(data.patch.copy(name = newName))
+            is SetLayerContent -> SetLayerContent(data.set.copy(id = newId, name = newName))
+            is MixerLayerContent -> MixerLayerContent(data.mixer.copy(id = newId, name = newName))
+            is ShowLayerContent -> ShowLayerContent(data.show.copy(id = newId, name = newName))
+        }
         
-        val newLayer = NavLayer(newId, newName, layer.type, isDirty = true).apply { this.data = newData }
+        val newLayer = NavLayer(newId, newName, layer.type, isDirty = true, data = newData)
         pushLayer(newLayer)
         saveLayer(newLayer)
     }
@@ -273,11 +265,12 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         val layer = _navStack.value[index]
         
         viewModelScope.launch {
-            when (layer.type) {
-                LayerType.MANDALA -> deletePatch(layer.name)
-                LayerType.SET -> (layer.data as? MandalaSet)?.let { deleteSet(it.id) }
-                LayerType.MIXER -> (layer.data as? MixerPatch)?.let { deleteMixerPatch(it.id) }
-                LayerType.SHOW -> (layer.data as? ShowPatch)?.let { deleteShowPatch(it.id) }
+            when (val data = layer.data) {
+                is MandalaLayerContent -> deletePatch(layer.name)
+                is SetLayerContent -> deleteSet(data.set.id)
+                is MixerLayerContent -> deleteMixerPatch(data.mixer.id)
+                is ShowLayerContent -> deleteShowPatch(data.show.id)
+                null -> { /* no data to delete */ }
             }
             popToLayer(index - 1, save = false)
         }

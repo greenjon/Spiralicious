@@ -39,14 +39,14 @@ fun ShowEditorScreen(
     val layer = navStack.lastOrNull { it.type == LayerType.SHOW }
     
     var currentShow by remember { 
-        mutableStateOf(layer?.data as? ShowPatch ?: ShowPatch(name = "New Show")) 
+        mutableStateOf((layer?.data as? ShowLayerContent)?.show ?: ShowPatch(name = "New Show")) 
     }
 
     val mainRenderer = LocalSpiralRenderer.current
 
     // Update local state if nav data changes
     LaunchedEffect(layer?.data) {
-        (layer?.data as? ShowPatch)?.let {
+        (layer?.data as? ShowLayerContent)?.show?.let {
             if (it.id != currentShow.id) {
                 currentShow = it
             }
@@ -72,7 +72,7 @@ fun ShowEditorScreen(
     LaunchedEffect(currentShow) {
         val index = navStack.indexOfLast { it.type == LayerType.SHOW }
         if (index != -1) {
-            vm.updateLayerData(index, currentShow)
+            vm.updateLayerData(index, ShowLayerContent(currentShow))
         }
     }
 

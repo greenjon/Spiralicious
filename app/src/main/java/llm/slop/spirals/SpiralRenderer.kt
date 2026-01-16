@@ -178,6 +178,21 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var uBLoc: Int = -1; private var uCLoc: Int = -1; private var uDLoc: Int = -1
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        // Reset all GL resource handles to handle context loss
+        program = 0
+        trailProgram = 0
+        feedbackProgram = 0
+        mixerProgram = 0
+        blitProgram = 0
+        vao = 0
+        vbo = 0
+        trailVao = 0
+        trailVbo = -1
+        currentFrameFBO = 0
+        currentFrameTexture = 0
+        fbIndex = 0
+        ghostIndex = 0
+        
         GLES30.glClearColor(0.0f, 0.0f, 0.0f, 1.0f); GLES30.glEnable(GLES30.GL_BLEND); GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
         program = ShaderHelper.buildProgram(context, R.raw.mandala_vertex, R.raw.mandala_fragment)
         trailProgram = ShaderHelper.buildProgram(context, R.raw.trail_vertex, R.raw.trail_fragment)
@@ -240,13 +255,19 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     override fun onDrawFrame(gl: GL10?) {
+        // Null-safety guard: verify GL resources are initialized
         if (program == 0 || screenWidth == 0) return
+        
         if (clearFeedbackNextFrame) {
             for (i in 0..1) { GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, fbFramebuffers[i]); GLES30.glClearColor(0f,0f,0f,0f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT) }
             for (i in 0 until MAX_GHOSTS) { GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, ghostFramebuffers[i]); GLES30.glClearColor(0f,0f,0f,0f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT) }
             clearFeedbackNextFrame = false
         }
-        visualSource?.update(); for (i in 0..3) slotSources[i].update(); mixerParams.values.forEach { it.evaluate() }
+        
+        // Null-safety guard: check visualSource before updating
+        visualSource?.update()
+        for (i in 0..3) slotSources[i].update()
+        mixerParams.values.forEach { it.evaluate() }
         
         val p = mixerPatch
         GLES30.glViewport(0, 0, TARGET_WIDTH, TARGET_HEIGHT)
@@ -259,8 +280,25 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             renderMixerGroup(5, masterTextures[2], masterTextures[3], "B")
             compositeFinalMixer(masterTextures[4], masterTextures[5])
         } else {
-            val fx = visualSource?.parameters; val fxMap = if (fx != null) mapOf("FB_DECAY" to (fx["FB Decay"]?.value ?: 0f), "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f), "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f), "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f), "FB_SHIFT" to (fx["FB Shift"]?.value ?: 0f), "FB_BLUR" to (fx["FB Blur"]?.value ?: 0f), "TRAILS" to (fx["Trails"]?.value ?: 0f), "SNAP_COUNT" to (fx["Snap Count"]?.value ?: 0.5f), "SNAP_MODE" to (fx["Snap Mode"]?.value ?: 0f), "SNAP_BLEND" to (fx["Snap Blend"]?.value ?: 0f), "SNAP_TRIG" to (fx["Snap Trigger"]?.value ?: 0f)) else emptyMap()
-            compositeWithFX({ GLES30.glUseProgram(program); renderSource(visualSource!!) }, fxMap, isSourceStatic(visualSource), 6)
+            // Null-safety guard: only render if visualSource exists
+            val currentSource = visualSource
+            if (currentSource != null) {
+                val fx = currentSource.parameters
+                val fxMap = if (fx != null) mapOf(
+                    "FB_DECAY" to (fx["FB Decay"]?.value ?: 0f), 
+                    "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f), 
+                    "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f), 
+                    "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f), 
+                    "FB_SHIFT" to (fx["FB Shift"]?.value ?: 0f), 
+                    "FB_BLUR" to (fx["FB Blur"]?.value ?: 0f), 
+                    "TRAILS" to (fx["Trails"]?.value ?: 0f), 
+                    "SNAP_COUNT" to (fx["Snap Count"]?.value ?: 0.5f), 
+                    "SNAP_MODE" to (fx["Snap Mode"]?.value ?: 0f), 
+                    "SNAP_BLEND" to (fx["Snap Blend"]?.value ?: 0f), 
+                    "SNAP_TRIG" to (fx["Snap Trigger"]?.value ?: 0f)
+                ) else emptyMap()
+                compositeWithFX({ GLES30.glUseProgram(program); renderSource(currentSource) }, fxMap, isSourceStatic(currentSource), 6)
+            }
         }
 
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0); GLES30.glViewport(0, 0, screenWidth, screenHeight); GLES30.glClearColor(0f,0f,0f,1f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
@@ -283,7 +321,20 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     private fun compositeFinalMixer(tA: Int, tB: Int) {
-        val fx = mapOf("FB_DECAY" to mixerParams["MF_FB_DECAY"]!!.value, "FB_GAIN" to mixerParams["MF_FB_GAIN"]!!.value, "FB_ZOOM" to mixerParams["MF_FB_ZOOM"]!!.value, "FB_ROTATE" to mixerParams["MF_FB_ROTATE"]!!.value, "FB_SHIFT" to mixerParams["MF_FB_SHIFT"]!!.value, "FB_BLUR" to mixerParams["MF_FB_BLUR"]!!.value, "TRAILS" to mixerParams["MF_TRAILS"]!!.value, "SNAP_COUNT" to mixerParams["MF_SNAP_COUNT"]!!.value, "SNAP_MODE" to mixerParams["MF_SNAP_MODE"]!!.value, "SNAP_BLEND" to mixerParams["MF_SNAP_BLEND"]!!.value, "SNAP_TRIG" to mixerParams["MF_SNAP_TRIG"]!!.value)
+        // Null-safety guard: use safe access for mixer parameters
+        val fx = mapOf(
+            "FB_DECAY" to (mixerParams["MF_FB_DECAY"]?.value ?: 0f), 
+            "FB_GAIN" to (mixerParams["MF_FB_GAIN"]?.value ?: 1f), 
+            "FB_ZOOM" to (mixerParams["MF_FB_ZOOM"]?.value ?: 0.5f), 
+            "FB_ROTATE" to (mixerParams["MF_FB_ROTATE"]?.value ?: 0.5f), 
+            "FB_SHIFT" to (mixerParams["MF_FB_SHIFT"]?.value ?: 0f), 
+            "FB_BLUR" to (mixerParams["MF_FB_BLUR"]?.value ?: 0f), 
+            "TRAILS" to (mixerParams["MF_TRAILS"]?.value ?: 0f), 
+            "SNAP_COUNT" to (mixerParams["MF_SNAP_COUNT"]?.value ?: 0.5f), 
+            "SNAP_MODE" to (mixerParams["MF_SNAP_MODE"]?.value ?: 0f), 
+            "SNAP_BLEND" to (mixerParams["MF_SNAP_BLEND"]?.value ?: 0f), 
+            "SNAP_TRIG" to (mixerParams["MF_SNAP_TRIG"]?.value ?: 0f)
+        )
         compositeWithFX({ GLES30.glUseProgram(mixerProgram); GLES30.glActiveTexture(GLES30.GL_TEXTURE0); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, tA); GLES30.glUniform1i(uMixTex1Loc, 0); GLES30.glActiveTexture(GLES30.GL_TEXTURE1); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, tB); GLES30.glUniform1i(uMixTex2Loc, 1); GLES30.glUniform1i(uMixModeLoc, ((mixerParams["MF_MODE"]?.value ?: 0f) * (MixerMode.entries.size - 1)).roundToInt()); GLES30.glUniform1f(uMixBalLoc, mixerParams["MF_BAL"]?.value ?: 0.5f); GLES30.glUniform1f(uMixAlphaLoc, mixerParams["MF_GAIN"]?.value ?: 1f); GLES30.glDisable(GLES30.GL_BLEND); GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4); GLES30.glEnable(GLES30.GL_BLEND) }, fx, false, 6)
     }
 

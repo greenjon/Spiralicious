@@ -46,11 +46,11 @@ fun MixerEditorScreen(
     val layer = navStack.lastOrNull { it.type == LayerType.MIXER }
     
     var currentPatch by remember { 
-        mutableStateOf(layer?.data as? MixerPatch ?: MixerPatch(name = "New Mixer", slots = List(4) { MixerSlotData() })) 
+        mutableStateOf((layer?.data as? MixerLayerContent)?.mixer ?: MixerPatch(name = "New Mixer", slots = List(4) { MixerSlotData() })) 
     }
     
     LaunchedEffect(layer?.data) {
-        (layer?.data as? MixerPatch)?.let {
+        (layer?.data as? MixerLayerContent)?.mixer?.let {
             if (it.id != currentPatch.id) {
                 currentPatch = it
             }
@@ -78,7 +78,7 @@ fun MixerEditorScreen(
     LaunchedEffect(currentPatch) {
         val index = navStack.indexOfLast { it.type == LayerType.MIXER }
         if (index != -1) {
-            vm.updateLayerData(index, currentPatch)
+            vm.updateLayerData(index, MixerLayerContent(currentPatch))
         }
     }
 

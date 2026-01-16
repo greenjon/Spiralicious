@@ -44,7 +44,7 @@ fun MandalaSetEditorScreen(
     val navStack by vm.navStack.collectAsState()
     val layer = navStack.lastOrNull { it.type == LayerType.SET }
     
-    var currentSet by remember { mutableStateOf(layer?.data as? MandalaSet) }
+    var currentSet by remember { mutableStateOf((layer?.data as? SetLayerContent)?.set) }
     var focusedMandalaId by remember { mutableStateOf<String?>(null) }
     var showMandalaPicker by remember { mutableStateOf(false) }
     
@@ -53,7 +53,7 @@ fun MandalaSetEditorScreen(
 
     // Update local state if nav data changes (e.g. from Manage overlay)
     LaunchedEffect(layer?.data) {
-        (layer?.data as? MandalaSet)?.let {
+        (layer?.data as? SetLayerContent)?.set?.let {
             if (it.id != (currentSet?.id ?: "")) {
                 currentSet = it
                 focusedMandalaId = it.orderedMandalaIds.firstOrNull()
@@ -291,8 +291,9 @@ fun MandalaSetEditorScreen(
     LaunchedEffect(currentSet) {
         val stack = vm.navStack.value
         val index = stack.indexOfLast { it.type == LayerType.SET }
-        if (index != -1 && currentSet != null) {
-            vm.updateLayerData(index, currentSet)
+        val setToUpdate = currentSet
+        if (index != -1 && setToUpdate != null) {
+            vm.updateLayerData(index, SetLayerContent(setToUpdate))
         }
     }
 }

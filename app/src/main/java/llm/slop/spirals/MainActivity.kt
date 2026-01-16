@@ -417,7 +417,7 @@ class MainActivity : ComponentActivity() {
                         vm = vm,
                         onMixerSelected = { mixer ->
                             vm.createAndResetStack(LayerType.MIXER)
-                            vm.updateLayerData(0, mixer)
+                            vm.updateLayerData(0, MixerLayerContent(mixer))
                             vm.updateLayerName(0, mixer.name)
                             showOpenMixerDialog = false
                         },
@@ -430,7 +430,7 @@ class MainActivity : ComponentActivity() {
                         vm = vm,
                         onPatchSelected = { patch ->
                             vm.createAndResetStack(LayerType.MANDALA)
-                            vm.updateLayerData(0, patch)
+                            vm.updateLayerData(0, MandalaLayerContent(patch))
                             vm.updateLayerName(0, patch.name)
                             vm.setCurrentPatch(patch)
                             showOpenPatchDialog = false
@@ -450,7 +450,7 @@ class MainActivity : ComponentActivity() {
                                 orderedMandalaIds = Json.decodeFromString(setEntity.jsonOrderedMandalaIds),
                                 selectionPolicy = SelectionPolicy.valueOf(setEntity.selectionPolicy)
                             )
-                            vm.updateLayerData(0, set)
+                            vm.updateLayerData(0, SetLayerContent(set))
                             vm.updateLayerName(0, set.name)
                             showOpenSetDialog = false
                         },
@@ -464,7 +464,7 @@ class MainActivity : ComponentActivity() {
                         onShowSelected = { showEntity ->
                             vm.createAndResetStack(LayerType.SHOW)
                             val show = Json.decodeFromString<ShowPatch>(showEntity.jsonSettings)
-                            vm.updateLayerData(0, show)
+                            vm.updateLayerData(0, ShowLayerContent(show))
                             vm.updateLayerName(0, show.name)
                             showOpenShowDialog = false
                         },
@@ -587,7 +587,7 @@ class MainActivity : ComponentActivity() {
             val index = stack.indexOfLast { it.type == LayerType.MANDALA }
             if (index != -1 && stack[index].data != null) { // Only update if we have actual data
                 val realDirty = PatchMapper.isDirty(visualSource, lastLoadedPatch)
-                vm.updateLayerData(index, patchData, isDirty = realDirty)
+                vm.updateLayerData(index, MandalaLayerContent(patchData), isDirty = realDirty)
             }
         }
 
@@ -664,7 +664,7 @@ class MainActivity : ComponentActivity() {
                                 val stack = vm.navStack.value
                                 val idx = stack.indexOfLast { it.type == LayerType.MANDALA }
                                 if (idx != -1) {
-                                    vm.updateLayerData(idx, data)
+                                    vm.updateLayerData(idx, MandalaLayerContent(data))
                                     vm.updateLayerName(idx, data.name)
                                 }
                             }

@@ -94,12 +94,20 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) 
                 }
                 
+                // Auto-show Manage overlay when opening from menu
+                LaunchedEffect(currentLayer.id, currentLayer.openedFromMenu) {
+                    if (currentLayer.openedFromMenu && !showManager) {
+                        showManager = true
+                        // Clear the flag after showing once
+                        val index = navStack.indexOfLast { it.id == currentLayer.id }
+                        if (index != -1) {
+                            vm.clearOpenedFromMenuFlag(index)
+                        }
+                    }
+                }
+                
                 var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
                 var showRenameDialog by remember { mutableStateOf(false) }
-                var showOpenMixerDialog by remember { mutableStateOf(false) }
-                var showOpenPatchDialog by remember { mutableStateOf(false) }
-                var showOpenSetDialog by remember { mutableStateOf(false) }
-                var showOpenShowDialog by remember { mutableStateOf(false) }
                 var showDeleteConfirm by remember { mutableStateOf(false) }
 
                 // 1. Start the CV Sync Registry immediately
@@ -190,44 +198,15 @@ class MainActivity : ComponentActivity() {
                                             },
                                             enabled = canSwitch
                                         )
-                                        DropdownMenuItem(
-                                            text = { Text("Open $editorName", color = if (canSwitch) AppAccent else disabledColor) },
-                                            onClick = { 
-                                                if (canSwitch) {
-                                                    when(currentLayer.type) {
-                                                        LayerType.MIXER -> showOpenMixerDialog = true
-                                                        LayerType.SET -> showOpenSetDialog = true
-                                                        LayerType.MANDALA -> showOpenPatchDialog = true
-                                                        LayerType.SHOW -> showOpenShowDialog = true
-                                                    }
-                                                    showHeaderMenu = false
-                                                }
-                                            },
-                                            enabled = canSwitch
-                                        )
 
                                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
 
-                                        // --- DATA GROUP ---
-                                        DropdownMenuItem(
-                                            text = { Text("Save", color = if (hasActiveData) AppText else disabledColor) }, 
-                                            onClick = { vm.saveLayer(currentLayer); showHeaderMenu = false },
-                                            enabled = hasActiveData
-                                        )
+                                        // --- CURRENT ITEM ACTIONS ---
                                         DropdownMenuItem(
                                             text = { Text("Rename", color = if (hasActiveData) AppText else disabledColor) }, 
                                             onClick = { showRenameDialog = true; showHeaderMenu = false },
                                             enabled = hasActiveData
                                         )
-                                        DropdownMenuItem(
-                                            text = { Text("Clone", color = if (hasActiveData) AppText else disabledColor) }, 
-                                            onClick = { vm.cloneLayer(navStack.lastIndex); showHeaderMenu = false },
-                                            enabled = hasActiveData
-                                        )
-
-                                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-
-                                        // --- DELETE GROUP ---
                                         DropdownMenuItem(
                                             text = { Text("Delete", color = if (hasActiveData) Color.Red else disabledColor) }, 
                                             onClick = { showDeleteConfirm = true; showHeaderMenu = false },
@@ -264,7 +243,7 @@ class MainActivity : ComponentActivity() {
                                                         Text(label, color = AppAccent)
                                                     }
                                                 },
-                                                onClick = { vm.createAndResetStack(type); showHeaderMenu = false },
+                                                onClick = { vm.createAndResetStack(type, openedFromMenu = true); showHeaderMenu = false },
                                                 enabled = canSwitch
                                             )
                                         }
@@ -413,65 +392,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                if (showOpenMixerDialog) {
-                    OpenMixerDialog(
-                        vm = vm,
-                        onMixerSelected = { mixer ->
-                            vm.createAndResetStack(LayerType.MIXER)
-                            vm.updateLayerData(0, MixerLayerContent(mixer))
-                            vm.updateLayerName(0, mixer.name)
-                            showOpenMixerDialog = false
-                        },
-                        onDismiss = { showOpenMixerDialog = false }
-                    )
-                }
 
-                if (showOpenPatchDialog) {
-                    OpenPatchDialog(
-                        vm = vm,
-                        onPatchSelected = { patch ->
-                            vm.createAndResetStack(LayerType.MANDALA)
-                            vm.updateLayerData(0, MandalaLayerContent(patch))
-                            vm.updateLayerName(0, patch.name)
-                            vm.setCurrentPatch(patch)
-                            showOpenPatchDialog = false
-                        },
-                        onDismiss = { showOpenPatchDialog = false }
-                    )
-                }
-
-                if (showOpenSetDialog) {
-                    OpenSetDialog(
-                        vm = vm,
-                        onSetSelected = { setEntity ->
-                            vm.createAndResetStack(LayerType.SET)
-                            val set = MandalaSet(
-                                id = setEntity.id,
-                                name = setEntity.name,
-                                orderedMandalaIds = Json.decodeFromString(setEntity.jsonOrderedMandalaIds),
-                                selectionPolicy = SelectionPolicy.valueOf(setEntity.selectionPolicy)
-                            )
-                            vm.updateLayerData(0, SetLayerContent(set))
-                            vm.updateLayerName(0, set.name)
-                            showOpenSetDialog = false
-                        },
-                        onDismiss = { showOpenSetDialog = false }
-                    )
-                }
-
-                if (showOpenShowDialog) {
-                    OpenShowDialog(
-                        vm = vm,
-                        onShowSelected = { showEntity ->
-                            vm.createAndResetStack(LayerType.SHOW)
-                            val show = Json.decodeFromString<ShowPatch>(showEntity.jsonSettings)
-                            vm.updateLayerData(0, ShowLayerContent(show))
-                            vm.updateLayerName(0, show.name)
-                            showOpenShowDialog = false
-                        },
-                        onDismiss = { showOpenShowDialog = false }
-                    )
-                }
             }
         }
     }
@@ -559,7 +480,6 @@ class MainActivity : ComponentActivity() {
     ) {
         var focusedParameterId by remember { mutableStateOf("L1") }
         var recipeExpanded by remember { mutableStateOf(false) }
-        var showOpenDialog by remember { mutableStateOf(false) }
         
         // Get the current layer name from the nav stack (handles renames)
         val navStack by vm.navStack.collectAsState()
@@ -790,6 +710,7 @@ class MainActivity : ComponentActivity() {
                     patches = allPatches.map { it.name to it.name },
                     selectedId = patchName,
                     onSelect = { id ->
+                        // Preview instantly on tap
                         val entity = allPatches.find { it.name == id }
                         entity?.let {
                             val data = PatchMapper.fromJson(it.jsonSettings)
@@ -803,6 +724,24 @@ class MainActivity : ComponentActivity() {
                                     vm.updateLayerData(idx, MandalaLayerContent(data))
                                     vm.updateLayerName(idx, data.name)
                                 }
+                            }
+                        }
+                    },
+                    onOpen = { id ->
+                        // Open and close overlay
+                        val entity = allPatches.find { it.name == id }
+                        entity?.let {
+                            val data = PatchMapper.fromJson(it.jsonSettings)
+                            if (data != null) {
+                                PatchMapper.applyToVisualSource(data, visualSource)
+                                vm.setCurrentPatch(data)
+                                val stack = vm.navStack.value
+                                val idx = stack.indexOfLast { it.type == LayerType.MANDALA }
+                                if (idx != -1) {
+                                    vm.updateLayerData(idx, MandalaLayerContent(data))
+                                    vm.updateLayerName(idx, data.name)
+                                }
+                                onHideManager()
                             }
                         }
                     },
@@ -820,13 +759,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        if (showOpenDialog) {
-            OpenPatchDialog(vm, onPatchSelected = { 
-                PatchMapper.applyToVisualSource(it, visualSource)
-                vm.setCurrentPatch(it)
-                showOpenDialog = false 
-            }, onDismiss = { showOpenDialog = false })
-        }
     }
 
     override fun onPause() { super.onPause(); spiralSurfaceView?.onPause(); audioEngine.stop() }
@@ -900,96 +832,3 @@ fun RenamePatchDialog(initialName: String, onRename: (String) -> Unit, onDismiss
     )
 }
 
-@Composable
-fun OpenPatchDialog(vm: MandalaViewModel, onPatchSelected: (PatchData) -> Unit, onDismiss: () -> Unit) {
-    val allPatches by vm.allPatches.collectAsState(initial = emptyList())
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = MaterialTheme.shapes.medium, color = AppBackground) {
-            Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
-                Text("Saved Patches", style = MaterialTheme.typography.titleLarge, color = AppText)
-                Spacer(modifier = Modifier.height(8.dp))
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    allPatches.forEach { entity ->
-                        Row(modifier = Modifier.fillMaxWidth().clickable { 
-                            val data = PatchMapper.fromJson(entity.jsonSettings)
-                            if (data != null) onPatchSelected(data)
-                        }.padding(12.dp)) {
-                            Text(entity.name, style = MaterialTheme.typography.bodyLarge, color = AppText)
-                        }
-                    }
-                }
-                if (allPatches.isEmpty()) Text("No patches saved yet.", color = AppText.copy(alpha = 0.5f))
-            }
-        }
-    }
-}
-
-@Composable
-fun OpenMixerDialog(vm: MandalaViewModel, onMixerSelected: (MixerPatch) -> Unit, onDismiss: () -> Unit) {
-    val allMixers by vm.allMixerPatches.collectAsState(initial = emptyList())
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = MaterialTheme.shapes.medium, color = AppBackground) {
-            Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
-                Text("Saved Mixers", style = MaterialTheme.typography.titleLarge, color = AppText)
-                Spacer(modifier = Modifier.height(8.dp))
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    allMixers.forEach { entity ->
-                        Row(modifier = Modifier.fillMaxWidth().clickable { 
-                            val mixer = Json.decodeFromString<MixerPatch>(entity.jsonSettings)
-                            onMixerSelected(mixer)
-                        }.padding(12.dp)) {
-                            Text(entity.name, style = MaterialTheme.typography.bodyLarge, color = AppText)
-                        }
-                    }
-                }
-                if (allMixers.isEmpty()) Text("No mixers saved yet.", color = AppText.copy(alpha = 0.5f))
-            }
-        }
-    }
-}
-
-@Composable
-fun OpenSetDialog(vm: MandalaViewModel, onSetSelected: (MandalaSetEntity) -> Unit, onDismiss: () -> Unit) {
-    val allSets by vm.allSets.collectAsState(initial = emptyList())
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = MaterialTheme.shapes.medium, color = AppBackground) {
-            Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
-                Text("Saved Sets", style = MaterialTheme.typography.titleLarge, color = AppText)
-                Spacer(modifier = Modifier.height(8.dp))
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    allSets.forEach { entity ->
-                        Row(modifier = Modifier.fillMaxWidth().clickable { 
-                            onSetSelected(entity)
-                        }.padding(12.dp)) {
-                            Text(entity.name, style = MaterialTheme.typography.bodyLarge, color = AppText)
-                        }
-                    }
-                }
-                if (allSets.isEmpty()) Text("No sets saved yet.", color = AppText.copy(alpha = 0.5f))
-            }
-        }
-    }
-}
-
-@Composable
-fun OpenShowDialog(vm: MandalaViewModel, onShowSelected: (ShowPatchEntity) -> Unit, onDismiss: () -> Unit) {
-    val allShows by vm.allShowPatches.collectAsState(initial = emptyList())
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = MaterialTheme.shapes.medium, color = AppBackground) {
-            Column(modifier = Modifier.padding(16.dp).fillMaxHeight(0.7f)) {
-                Text("Saved Shows", style = MaterialTheme.typography.titleLarge, color = AppText)
-                Spacer(modifier = Modifier.height(8.dp))
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    allShows.forEach { entity ->
-                        Row(modifier = Modifier.fillMaxWidth().clickable { 
-                            onShowSelected(entity)
-                        }.padding(12.dp)) {
-                            Text(entity.name, style = MaterialTheme.typography.bodyLarge, color = AppText)
-                        }
-                    }
-                }
-                if (allShows.isEmpty()) Text("No shows saved yet.", color = AppText.copy(alpha = 0.5f))
-            }
-        }
-    }
-}

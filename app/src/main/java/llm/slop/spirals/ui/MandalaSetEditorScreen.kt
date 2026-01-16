@@ -186,11 +186,22 @@ fun MandalaSetEditorScreen(
                 patches = allSets.map { it.name to it.id },
                 selectedId = currentSet?.id,
                 onSelect = { id ->
+                    // Preview instantly on tap
                     selectSet(id)
                     val set = allSets.find { it.id == id }
                     if (set != null) {
                         val idx = navStack.indexOfLast { it.type == LayerType.SET }
                         if (idx != -1) vm.updateLayerName(idx, set.name)
+                    }
+                },
+                onOpen = { id ->
+                    // Open and close overlay
+                    selectSet(id)
+                    val set = allSets.find { it.id == id }
+                    if (set != null) {
+                        val idx = navStack.indexOfLast { it.type == LayerType.SET }
+                        if (idx != -1) vm.updateLayerName(idx, set.name)
+                        onHideManager()
                     }
                 },
                 onRename = { newName ->

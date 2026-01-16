@@ -13,6 +13,51 @@ import llm.slop.spirals.models.MixerSlotData
 import llm.slop.spirals.models.VideoSourceType
 import java.util.UUID
 
+/**
+ * MandalaViewModel - The central hub for navigation, data persistence, and business logic.
+ * 
+ * RESPONSIBILITIES:
+ * 1. Navigation Stack Management - Maintains the editing path through the hierarchy
+ * 2. Data Persistence - Saves/loads patches to/from Room database
+ * 3. Cascade System - Implements breadcrumb navigation with auto-save and auto-link
+ * 4. Workspace Restoration - Remembers user's editing state between app launches
+ * 
+ * KEY CONCEPTS:
+ * 
+ * Navigation Stack (_navStack):
+ * - List<NavLayer> representing the editing path
+ * - Example: [Show1, Mix001, Set001] = editing Set001 within Mix001 within Show1
+ * - Each layer tracks its data, dirty state, and parent relationship
+ * 
+ * Breadcrumb Cascade System:
+ * - When user clicks parent breadcrumb, cascade save/link happens
+ * - Walks from current layer down to target, saving and linking each
+ * - See popToLayer() and linkChildToParent() for implementation
+ * - Enables fast workflow: create child, edit, click parent breadcrumb = auto-linked
+ * 
+ * Hybrid Auto-Save:
+ * - Items saved immediately on creation and changes
+ * - Linking to parent happens on breadcrumb navigation
+ * - Prevents data loss while avoiding UI clutter
+ * 
+ * Database Flows:
+ * - allPatches, allSets, allMixerPatches, allShowPatches
+ * - StateFlows that auto-update UI when database changes
+ * - Used by editors to populate pickers and managers
+ * 
+ * IMPORTANT FUNCTIONS:
+ * - createAndPushLayer() - Creates new patch and pushes to stack
+ * - popToLayer() - Pops to target with cascade save/link
+ * - linkChildToParent() - Adds child to parent's collection
+ * - renameLayer() - Renames patch (updates both layer and data)
+ * - saveLayer() - Persists layer to database
+ * 
+ * NOTE TO FUTURE AI: This ViewModel is the backbone of the navigation system.
+ * Changes here affect the entire app's UX. Read DESIGN.md before modifying.
+ * Test thoroughly with deep hierarchies (Show>Mixer>Set>Mandala).
+ * 
+ * Feel free to add more documentation as you discover patterns or edge cases!
+ */
 class MandalaViewModel(application: Application) : AndroidViewModel(application) {
     private val db = MandalaDatabase.getDatabase(application)
     private val tagDao = db.mandalaTagDao()
@@ -90,6 +135,27 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         saveWorkspaceIfEnabled()
     }
 
+    /**
+     * Creates a new layer and pushes it onto the navigation stack.
+     * 
+     * This is the primary way to create new patches from within a parent context.
+     * Example: User is editing Mix001 and clicks "Create new Set" on slot 2.
+     * 
+     * IMPORTANT BEHAVIORS:
+     * - Generates a unique name (e.g., "Set001", "Man042")
+     * - Creates initial data structure with defaults
+     * - Saves immediately to database (hybrid auto-save approach)
+     * - Sets createdFromParent=true for auto-linking on breadcrumb navigation
+     * - Stores parentSlotIndex for Mixer children (which slot to insert into)
+     * 
+     * @param type The layer type to create (SHOW, MIXER, SET, or MANDALA)
+     * @param parentSlotIndex For Mixer children: which slot (0-3) this belongs to.
+     *                        Null for non-Mixer parents or creating at root level.
+     * 
+     * NOTE TO FUTURE AI: This function is part of the breadcrumb cascade system.
+     * The auto-save here ensures work is never lost, while the createdFromParent flag
+     * enables auto-linking when user clicks parent breadcrumb. See DESIGN.md for details.
+     */
     fun createAndPushLayer(type: LayerType, parentSlotIndex: Int? = null) {
         val name = generateNextName(type)
         val id = UUID.randomUUID().toString()
@@ -114,7 +180,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         
         pushLayer(newLayer)
         
-        // Auto-save immediately
+        // Auto-save immediately (hybrid approach: save on creation, link on navigation)
         saveLayer(newLayer)
         
         // Set current patch if it's a Mandala
@@ -123,10 +189,10 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun createAndResetStack(type: LayerType) {
+    fun createAndResetStack(type: LayerType, openedFromMenu: Boolean = false) {
         val name = getGenericName(type)
         val id = UUID.randomUUID().toString()
-        _navStack.value = listOf(NavLayer(id, name, type, isDirty = false))
+        _navStack.value = listOf(NavLayer(id, name, type, isDirty = false, openedFromMenu = openedFromMenu))
         saveWorkspaceIfEnabled()
     }
 
@@ -156,7 +222,29 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
 
     /**
      * Updates the data associated with a specific layer in the stack.
-     * Useful for capturing "Work in progress" before a pop or save.
+     * 
+     * ⚠️ IMPORTANT: This is IN-MEMORY ONLY - does NOT save to database!
+     * 
+     * WHEN THIS IS CALLED:
+     * - Every time user edits parameters (via LaunchedEffect in editors)
+     * - When loading a patch from Manage overlay (preview)
+     * - When setting initial data for a new layer
+     * - After linking child to parent (updates parent's data)
+     * 
+     * PATTERN IN EDITORS:
+     * ```kotlin
+     * LaunchedEffect(currentPatch, someParameter) {
+     *     val patchData = PatchMapper.fromVisualSource(name, visualSource)
+     *     vm.updateLayerData(index, MandalaLayerContent(patchData))
+     * }
+     * ```
+     * 
+     * This captures work-in-progress so it's available during cascade save.
+     * Database write happens later via saveLayer() during navigation.
+     * 
+     * @param index Index of the layer in navStack to update
+     * @param data The new LayerContent (Mandala/Set/Mixer/Show data)
+     * @param isDirty Optional dirty flag override
      */
     fun updateLayerData(index: Int, data: LayerContent?, isDirty: Boolean? = null) {
         if (index < 0 || index >= _navStack.value.size) return
@@ -177,22 +265,52 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         _navStack.value = current
         saveWorkspaceIfEnabled()
     }
+    
+    fun clearOpenedFromMenuFlag(index: Int) {
+        if (index < 0 || index >= _navStack.value.size) return
+        val current = _navStack.value.toMutableList()
+        current[index] = current[index].copy(openedFromMenu = false)
+        _navStack.value = current
+    }
 
+    /**
+     * Pops the navigation stack to a specific layer, optionally saving and linking children.
+     * 
+     * This is the CORE of the breadcrumb cascade system. When a user clicks a parent
+     * breadcrumb, this function:
+     * 1. Walks from current layer DOWN to target layer
+     * 2. Saves each child layer
+     * 3. Links children to parents if createdFromParent=true
+     * 4. Pops everything above the target
+     * 
+     * EXAMPLE: Stack is [Show1, Mix001, Set001, Man001] and user clicks "Mix001"
+     * - Saves Man001 and links to Set001
+     * - Saves Set001 and links to Mix001 slot (using parentSlotIndex)
+     * - Pops Man001 and Set001, leaving [Show1, Mix001]
+     * 
+     * @param index The target layer index to pop to (0-based)
+     * @param save If true, performs cascade save/link. If false, just pops (for "Discard")
+     * 
+     * NOTE TO FUTURE AI: This function is critical! Changes here affect the entire
+     * navigation UX. Test thoroughly with deep hierarchies. See DESIGN.md for full
+     * explanation of the cascade system and why it works this way.
+     */
     fun popToLayer(index: Int, save: Boolean = true) {
         if (index < -1) return
         if (index >= _navStack.value.size) return
         
         if (save) {
             // Process layers from current down to target+1, saving and linking
+            // IMPORTANT: Walk backwards so children are saved before parents are updated
             for (i in _navStack.value.lastIndex downTo index + 1) {
                 val child = _navStack.value[i]
                 
-                // Save the child layer
+                // Save the child layer to database
                 if (child.isDirty || child.data != null) {
                     saveLayer(child)
                 }
                 
-                // If created from parent, link it back
+                // If created from parent, link it back to parent's collection
                 if (child.createdFromParent && i > 0) {
                     val parentIndex = i - 1
                     linkChildToParent(child, parentIndex)
@@ -216,6 +334,30 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         saveWorkspaceIfEnabled()
     }
     
+    /**
+     * Links a child layer to its parent's collection.
+     * 
+     * This is called during breadcrumb cascade to add the child to the parent's
+     * appropriate collection. Each parent type has different linking logic:
+     * 
+     * - SHOW → Adds mixer.name to show.mixerNames list
+     * - MIXER → Adds set.id OR mandala.name to mixer.slots[parentSlotIndex]
+     * - SET → Adds mandala.name to set.orderedMandalaIds list (at end)
+     * - MANDALA → Cannot have children
+     * 
+     * IMPORTANT: Always checks for duplicates before adding to prevent double-linking
+     * if user navigates back and forth multiple times.
+     * 
+     * @param child The child layer to link
+     * @param parentIndex Index of the parent layer in the current stack
+     * 
+     * NOTE TO FUTURE AI: If you add "Edit" functionality (vs only "Create new"), you'll
+     * need to set createdFromParent=false to prevent re-linking existing items. The
+     * duplicate checks here provide safety, but explicit tracking is cleaner.
+     * 
+     * CRITICAL: Uses data.name (not layer.name) for linking because renames update data
+     * first, and we want the current/correct name. See renameLayer() for details.
+     */
     private fun linkChildToParent(child: NavLayer, parentIndex: Int) {
         if (parentIndex < 0 || parentIndex >= _navStack.value.size) return
         val parent = _navStack.value[parentIndex]
@@ -223,10 +365,11 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         
         when (parent.type) {
             LayerType.SHOW -> {
+                // SHOW parent: Add Mixer to show's mixer list
                 val show = (parentData as? ShowLayerContent)?.show ?: return
                 val mixer = (child.data as? MixerLayerContent)?.mixer ?: return
                 
-                // Add mixer to show if not already present
+                // Add mixer to show if not already present (prevents duplicates)
                 if (!show.mixerNames.contains(mixer.name)) {
                     val updatedShow = show.copy(mixerNames = show.mixerNames + mixer.name)
                     updateLayerData(parentIndex, ShowLayerContent(updatedShow), isDirty = true)
@@ -234,15 +377,16 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
             LayerType.MIXER -> {
+                // MIXER parent: Add Set or Mandala to specific slot
                 val mixer = (parentData as? MixerLayerContent)?.mixer ?: return
-                val slotIndex = child.parentSlotIndex ?: return
+                val slotIndex = child.parentSlotIndex ?: return  // Must have slot index!
                 
                 when (child.type) {
                     LayerType.SET -> {
                         val set = (child.data as? SetLayerContent)?.set ?: return
                         val newSlots = mixer.slots.toMutableList()
                         
-                        // Only update if not already set to this Set
+                        // Only update if not already set to this Set (prevents duplicate updates)
                         if (newSlots[slotIndex].mandalaSetId != set.id) {
                             newSlots[slotIndex] = newSlots[slotIndex].copy(
                                 mandalaSetId = set.id,
@@ -288,6 +432,27 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * Saves a layer to the Room database.
+     * 
+     * CRITICAL: This is where actual persistence happens. Everything else is in-memory.
+     * 
+     * WHEN THIS IS CALLED:
+     * - Immediately after createAndPushLayer() creates a new child
+     * - During popToLayer() cascade (saves each layer before linking)
+     * - On manual "Save" menu action
+     * - During renameLayer() (after deleting old entry)
+     * 
+     * WHAT IT DOES:
+     * 1. Extracts the data from layer.data (Mandala/Set/Mixer/Show)
+     * 2. Ensures layer.name is used as the patch name (handles renames correctly)
+     * 3. Inserts into Room database (upsert: updates if exists, inserts if new)
+     * 4. Clears isDirty flag in the nav stack
+     * 
+     * NOTE: This does NOT link to parent. That's linkChildToParent()'s job.
+     * 
+     * @param layer The NavLayer containing data to persist
+     */
     fun saveLayer(layer: NavLayer) {
         val data = layer.data ?: return
         viewModelScope.launch {
@@ -317,12 +482,37 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * Renames a layer, updating BOTH the layer name AND the data inside.
+     * 
+     * CRITICAL BEHAVIOR: This function must update TWO places:
+     * 1. layer.name (what breadcrumb displays)
+     * 2. data.*.name (patch.name, mixer.name, etc.) - what gets linked to parent
+     * 
+     * WHY BOTH? Because linkChildToParent uses data.name for linking. If we only
+     * updated layer.name, the breadcrumb would show the new name but linking would
+     * use the old name, causing the item to "disappear" from the parent.
+     * 
+     * PROCESS:
+     * 1. Delete old database entry (by old name/id)
+     * 2. Update data to use new name
+     * 3. Update layer name in stack
+     * 4. Save with new name (creates new database entry)
+     * 
+     * @param index Index of layer to rename
+     * @param oldName Previous name (for deletion)
+     * @param newName New name to apply
+     * 
+     * NOTE TO FUTURE AI: If you see bugs where renamed items don't appear in parents,
+     * check that both layer.name and data.name are being updated. This was a tricky
+     * bug that took time to track down. See DESIGN.md for more details.
+     */
     fun renameLayer(index: Int, oldName: String, newName: String) {
         if (index < 0 || index >= _navStack.value.size) return
         val layer = _navStack.value[index]
         
         viewModelScope.launch {
-            // Delete old entry
+            // Delete old entry from database
             when (val data = layer.data) {
                 is MandalaLayerContent -> deletePatch(oldName)
                 is SetLayerContent -> deleteSet(data.set.id)
@@ -331,7 +521,8 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 null -> { /* no data to delete */ }
             }
             
-            // Update the data to use the new name
+            // CRITICAL: Update the data to use the new name
+            // This ensures linkChildToParent uses the correct name
             val updatedData: LayerContent? = when (val data = layer.data) {
                 is MandalaLayerContent -> MandalaLayerContent(data.patch.copy(name = newName))
                 is SetLayerContent -> SetLayerContent(data.set.copy(name = newName))
@@ -350,7 +541,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 _currentPatch.value = updatedData.patch
             }
             
-            // Save with new name
+            // Save with new name (creates new database entry)
             saveLayer(_navStack.value[index])
             saveWorkspaceIfEnabled()
         }

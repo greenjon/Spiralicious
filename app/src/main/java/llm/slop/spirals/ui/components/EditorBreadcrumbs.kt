@@ -20,6 +20,28 @@ import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 
+/**
+ * EditorBreadcrumbs - Navigation header showing the editing path.
+ * 
+ * Displays the navigation stack as clickable breadcrumbs with wrapping support.
+ * Example: "Show1 > Mix001 > Set001 > Man001"
+ * 
+ * KEY DESIGN DECISIONS:
+ * - Uses FlowRow with maxLines=2 to wrap long paths without pushing menu off screen
+ * - Each breadcrumb + arrow is a single Row unit (no mid-item line breaks)
+ * - Individual names truncated at 100dp to prevent excessive width
+ * - Reserves fixed 48dp for menu button (always accessible)
+ * - Only shows layers with data (hides generic "Editor" labels)
+ * - Extracts name from data (not layer.name) to handle rename timing issues
+ * 
+ * @param stack The navigation stack to display
+ * @param onLayerClick Callback when a breadcrumb is clicked (triggers cascade)
+ * @param actions Content for the right side (typically overflow menu button)
+ * 
+ * NOTE TO FUTURE AI: The breadcrumb click triggers popToLayer() which performs
+ * the cascade save/link. This is a core UX pattern. See DESIGN.md for details.
+ * If you modify this, test with deep paths like Show>Mixer>Set>Mandala.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EditorBreadcrumbs(

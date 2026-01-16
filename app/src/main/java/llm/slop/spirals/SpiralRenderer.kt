@@ -18,6 +18,24 @@ import llm.slop.spirals.models.*
 
 val LocalSpiralRenderer = staticCompositionLocalOf<SpiralRenderer?> { null }
 
+/**
+ * Main OpenGL renderer for Spirals app.
+ * 
+ * Architecture:
+ * - Renders mandalas and mixer output using OpenGL ES 3.0
+ * - Manages texture pool shared across multiple GL contexts (via SharedEGLContextFactory)
+ * - Implements per-slot persistent feedback system (8 textures = 2 per slot for ping-pong)
+ * - No ghost/trail system (removed to save 86MB VRAM)
+ * 
+ * Key Texture Layout:
+ * - masterTextures[0-3]: Mixer slot outputs (sources 1-4)
+ * - masterTextures[4-5]: Mixer A/B stage outputs  
+ * - masterTextures[6]: Final mixer output (F)
+ * - slotFeedback[0-7]: Per-slot feedback buffers (2 per slot, ping-pong)
+ * 
+ * Important: Shader programs and VAOs are NOT shared between contexts!
+ * Only textures/buffers are shared. See SimpleBlitHelper for secondary context rendering.
+ */
 class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     companion object {

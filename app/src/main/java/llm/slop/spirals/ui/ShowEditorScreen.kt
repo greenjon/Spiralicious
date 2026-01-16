@@ -197,11 +197,22 @@ fun ShowEditorScreen(
                 patches = allShowPatches.map { it.name to it.jsonSettings },
                 selectedId = Json.encodeToString<ShowPatch>(currentShow),
                 onSelect = { json ->
+                    // Preview instantly on tap
                     try {
                         val selected = Json.decodeFromString<ShowPatch>(json)
                         currentShow = selected
                         val idx = navStack.indexOfLast { it.type == LayerType.SHOW }
                         if (idx != -1) vm.updateLayerName(idx, selected.name)
+                    } catch (e: Exception) {}
+                },
+                onOpen = { json ->
+                    // Open and close overlay
+                    try {
+                        val selected = Json.decodeFromString<ShowPatch>(json)
+                        currentShow = selected
+                        val idx = navStack.indexOfLast { it.type == LayerType.SHOW }
+                        if (idx != -1) vm.updateLayerName(idx, selected.name)
+                        onHideManager()
                     } catch (e: Exception) {}
                 },
                 onRename = { newName ->

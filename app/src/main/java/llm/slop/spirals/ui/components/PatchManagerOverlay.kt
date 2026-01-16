@@ -25,7 +25,8 @@ fun PatchManagerOverlay(
     title: String,
     patches: List<Pair<String, String>>, // Name, ID or JSON
     selectedId: String?,
-    onSelect: (String) -> Unit,
+    onSelect: (String) -> Unit, // Preview instantly
+    onOpen: ((String) -> Unit)? = null, // Open and close overlay
     onRename: (String) -> Unit,
     onClone: (String) -> Unit,
     onDelete: (String) -> Unit,
@@ -80,25 +81,28 @@ fun PatchManagerOverlay(
                 ) {
                     patches.forEach { (name, id) ->
                         val isSelected = id == selectedId
-                        AssistChip(
-                            onClick = { onSelect(id) },
-                            label = { Text(name) },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = if (isSelected) AppAccent.copy(alpha = 0.2f) else Color.Transparent,
-                                labelColor = if (isSelected) AppAccent else AppText
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = if (isSelected) AppAccent.copy(alpha = 0.2f) else Color.Transparent,
+                            border = androidx.compose.foundation.BorderStroke(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) AppAccent else AppText.copy(alpha = 0.3f)
                             ),
-                            border = AssistChipDefaults.assistChipBorder(
-                                enabled = true,
-                                borderColor = if (isSelected) AppAccent else AppText.copy(alpha = 0.3f),
-                                borderWidth = if (isSelected) 2.dp else 1.dp
-                            ),
-                            modifier = Modifier.pointerInput(id) {
-                                detectTapGestures(
-                                    onTap = { onSelect(id) },
-                                    onLongPress = { showLongPressMenu = id }
-                                )
-                            }
-                        )
+                            modifier = Modifier
+                                .pointerInput(id) {
+                                    detectTapGestures(
+                                        onTap = { onSelect(id) },
+                                        onLongPress = { showLongPressMenu = id }
+                                    )
+                                }
+                        ) {
+                            Text(
+                                text = name,
+                                color = if (isSelected) AppAccent else AppText,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
                     }
                 }
             }
@@ -110,9 +114,22 @@ fun PatchManagerOverlay(
         val name = patches.find { it.second == id }?.first ?: ""
         AlertDialog(
             onDismissRequest = { showLongPressMenu = null },
-            title = { Text(name, color = AppText) },
+            title = { Text(name, color = AppText, style = MaterialTheme.typography.titleLarge) },
             text = {
                 Column {
+                    // Open option (if provided)
+                    onOpen?.let { openCallback ->
+                        ListItem(
+                            headlineContent = { Text("Open", color = AppAccent) },
+                            modifier = Modifier.clickable { 
+                                openCallback(id)
+                                showLongPressMenu = null
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                        HorizontalDivider(color = AppText.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
+                    }
+                    
                     ListItem(
                         headlineContent = { Text("Rename", color = AppText) },
                         modifier = Modifier.clickable { 
@@ -129,6 +146,9 @@ fun PatchManagerOverlay(
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                     )
+                    
+                    HorizontalDivider(color = AppText.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
+                    
                     ListItem(
                         headlineContent = { Text("Delete", color = Color.Red) },
                         modifier = Modifier.clickable { 

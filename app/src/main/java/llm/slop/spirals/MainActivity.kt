@@ -608,6 +608,26 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             
+                            // Randomize button (center-left)
+                            IconButton(
+                                onClick = {
+                                    randomizeMandala(visualSource)
+                                    onInteraction()
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.CenterStart)
+                                    .padding(8.dp)
+                                    .size(48.dp)
+                                    .background(AppBackground.copy(alpha = 0.7f), MaterialTheme.shapes.small)
+                            ) {
+                                Icon(
+                                    Icons.Default.Refresh,
+                                    contentDescription = "Randomize",
+                                    tint = AppAccent,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                            }
+                            
                             // Star/Trash buttons on the right side
                             Column(
                                 modifier = Modifier
@@ -839,6 +859,72 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+    }
+
+    private fun randomizeMandala(visualSource: MandalaVisualSource) {
+        val random = kotlin.random.Random.Default
+        
+        // 1. Random recipe
+        visualSource.recipe = MandalaLibrary.MandalaRatios.random()
+        
+        // 2. Hue Sweep = petals (scaled by 9.0 in render code)
+        visualSource.parameters["Hue Sweep"]?.let { param ->
+            param.baseValue = visualSource.recipe.petals / 9.0f
+            param.modulators.clear()
+        }
+        
+        // 3. L1-L4 (arm lengths)
+        listOf("L1", "L2", "L3", "L4").forEach { paramName ->
+            visualSource.parameters[paramName]?.let { param ->
+                param.baseValue = 0.2f // Base 20%
+                param.modulators.clear()
+                param.modulators.add(
+                    llm.slop.spirals.cv.CvModulator(
+                        sourceId = "beatPhase",
+                        operator = llm.slop.spirals.cv.ModulationOperator.ADD,
+                        waveform = if (random.nextBoolean()) llm.slop.spirals.cv.Waveform.SINE else llm.slop.spirals.cv.Waveform.TRIANGLE,
+                        slope = 0.5f,
+                        weight = random.nextFloat() * 0.5f + 0.1f, // 10-60% -> 0.1-0.6
+                        phaseOffset = random.nextFloat(),
+                        subdivision = random.nextInt(8, 33).toFloat() // 8-32
+                    )
+                )
+            }
+        }
+        
+        // 4. Rotation
+        visualSource.parameters["Rotation"]?.let { param ->
+            param.baseValue = 0f
+            param.modulators.clear()
+            param.modulators.add(
+                llm.slop.spirals.cv.CvModulator(
+                    sourceId = "beatPhase",
+                    operator = llm.slop.spirals.cv.ModulationOperator.ADD,
+                    waveform = llm.slop.spirals.cv.Waveform.TRIANGLE,
+                    slope = if (random.nextBoolean()) 0f else 1f, // 0 or 100
+                    weight = 1.0f, // 100%
+                    phaseOffset = random.nextFloat(),
+                    subdivision = random.nextInt(4, 129).toFloat() // 4-128
+                )
+            )
+        }
+        
+        // 5. Hue Offset
+        visualSource.parameters["Hue Offset"]?.let { param ->
+            param.baseValue = 0f
+            param.modulators.clear()
+            param.modulators.add(
+                llm.slop.spirals.cv.CvModulator(
+                    sourceId = "beatPhase",
+                    operator = llm.slop.spirals.cv.ModulationOperator.ADD,
+                    waveform = llm.slop.spirals.cv.Waveform.TRIANGLE,
+                    slope = if (random.nextBoolean()) 0f else 1f, // 0 or 100
+                    weight = 1.0f, // 100%
+                    phaseOffset = random.nextFloat(),
+                    subdivision = random.nextInt(4, 17).toFloat() // 4-16
+                )
+            )
+        }
     }
 
     override fun onPause() { super.onPause(); spiralSurfaceView?.onPause(); audioEngine.stop() }

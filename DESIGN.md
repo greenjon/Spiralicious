@@ -567,6 +567,87 @@ sealed interface LayerContent
 - Sorting by Favorites lets you browse only your curated collection
 - RecipePickerDialog receives/updates `recipeSortMode` to keep navigation and picker in sync
 
+### Randomize Feature
+
+**Purpose:** Generate instant creative variations for exploration. Creates beat-synced, rhythmic mandalas with harmonious colors and movement.
+
+**UI Location:**
+- Refresh icon (🔄) on **center-left** of preview area in Mandala Editor
+- Opposite the star/trash buttons on center-right
+- Styled with accent color on semi-transparent background
+- Single click triggers randomization
+
+**What Gets Randomized:**
+
+1. **Recipe** - Random selection from entire library (~350 recipes)
+
+2. **Hue Sweep** - Auto-set to `recipe.petals / 9.0` (aligns rainbow with petal structure)
+
+3. **L1-L4 (Arm Lengths):**
+   - Base value: 0.2 (20%)
+   - CV Source: Beat (beatPhase)
+   - Operator: ADD
+   - Waveform: Randomly SINE or TRIANGLE
+   - Slope: 0.5 (50%)
+   - Weight: 0.1-0.6 (10-60%, randomized)
+   - Phase Offset: Random (0.0-1.0)
+   - Beat Subdivision: 8-32 (randomized)
+
+4. **Rotation:**
+   - Base value: 0
+   - CV Source: Beat (beatPhase)
+   - Operator: ADD
+   - Waveform: TRIANGLE
+   - Slope: 0 or 1 (sharp ramp up or down, randomized)
+   - Weight: 1.0 (100%)
+   - Phase Offset: Random (0.0-1.0)
+   - Beat Subdivision: 4-128 (randomized)
+
+5. **Hue Offset:**
+   - Base value: 0
+   - CV Source: Beat (beatPhase)
+   - Operator: ADD
+   - Waveform: TRIANGLE
+   - Slope: 0 or 1 (randomized)
+   - Weight: 1.0 (100%)
+   - Phase Offset: Random (0.0-1.0)
+   - Beat Subdivision: 4-16 (randomized)
+
+**What Stays Untouched:**
+- Scale, Thickness, Depth (preserve basic visual structure)
+- All Feedback parameters (avoid chaotic feedback states)
+- Global Alpha (maintain visibility)
+
+**Design Rationale:**
+
+**Guardrails:**
+- All modulation uses Beat source for rhythmic coherence
+- All operators are ADD (predictable, non-destructive)
+- Arm lengths use moderate weights (10-60%) to avoid extreme deformation
+- Rotation and Hue use 100% weight for dramatic effect
+- Beat subdivisions constrained to musically meaningful ranges
+- Phase offsets randomized for variation between arms
+
+**Why Beat-Only:**
+- Creates rhythmic, pulsing animations synchronized to music
+- Predictable and visually pleasing results
+- Easy to perform with (live VJ context)
+- Users can manually add other CV sources if desired
+
+**Why These Parameters:**
+- L1-L4 control the mandala's fundamental shape (core variation)
+- Rotation adds motion and dynamism
+- Hue Offset + Hue Sweep create shifting color palettes
+- Together: Maximum visual variation while maintaining structure
+
+**Implementation:** `randomizeMandala()` function in `MainActivity.kt`
+
+**Typical Workflow:**
+1. Click randomize → Get instant interesting result
+2. Tweak individual parameters if desired
+3. Save favorites via normal patch system
+4. Use as creative starting point for further refinement
+
 ---
 
 ## Audio & CV System
@@ -618,6 +699,376 @@ sealed interface LayerContent
 
 ---
 
+## RSet (Random Set) - Planned Feature
+
+**Status:** Designed but not yet implemented. This section captures the complete design specification.
+
+### Concept
+
+**Purpose:** Generative patch templates for infinite mandala variations within controlled aesthetic boundaries. Enables "prep before show" workflow where you curate guardrails rather than individual mandalas.
+
+**Use Case:** Load an RSet into a Mixer slot. Each time "Next" is triggered, a fresh mandala is generated matching the template's constraints. Perfect for live performance with controlled randomness.
+
+**Philosophy:** The RSet template IS the creative work - thoughtfully defining constraints that produce a consistent aesthetic. Templates become reusable building blocks ("5Petal_Chill", "Chaos_Mode", "Heavy_Rotation").
+
+### Hierarchy Position
+
+RSet is a **peer to Mandala and Set**, not a variant:
+
+```
+Show
+ └─> Mixer
+      └─> Slot 1: Mandala "Man001"
+      └─> Slot 2: Set "Set003" 
+      └─> Slot 3: RSet "5Petal_Chill"  ← New type
+      └─> Slot 4: RSet "Chaos_Mode"
+```
+
+### Data Structure
+
+```kotlin
+@Serializable
+data class RandomSet(
+    val id: String,
+    val name: String,
+    
+    // Recipe Constraints
+    val recipeFilter: RecipeFilter,
+    val autoHueSweep: Boolean = true, // Match petals
+    
+    // Per-Parameter Constraints (all optional, null = use defaults)
+    val l1Constraints: ArmConstraints? = null,
+    val l2Constraints: ArmConstraints? = null,
+    val l3Constraints: ArmConstraints? = null,
+    val l4Constraints: ArmConstraints? = null,
+    
+    val rotationConstraints: RotationConstraints? = null,
+    val hueOffsetConstraints: HueOffsetConstraints? = null,
+    
+    // Feedback (if/when implemented)
+    val feedbackMode: FeedbackMode = FeedbackMode.NONE,
+    
+    // Other parameters can be added as needed...
+)
+
+enum class RecipeFilter {
+    ALL,
+    FAVORITES_ONLY,
+    PETALS_EXACT, // + petalCount: Int
+    PETALS_RANGE, // + min/max
+    SPECIFIC_IDS  // + list of recipe IDs
+}
+
+@Serializable
+data class ArmConstraints(
+    val baseLengthRange: IntRange, // 0-100
+    val enableBeat: Boolean,
+    val enableLfo: Boolean,
+    val allowedWaveforms: Set<Waveform>, // SINE, TRIANGLE
+    val weightRange: IntRange, // -100 to 100
+    val beatDivRange: BeatDivRange, // min/max from discrete values
+    val lfoSpeedMode: LfoSpeedMode?, // SLOW/MEDIUM/FAST
+    val lfoTimeRange: FloatRange? // seconds, within speed mode
+)
+
+@Serializable
+data class RotationConstraints(
+    val enableClockwise: Boolean,
+    val enableCounterClockwise: Boolean,
+    val speedControl: SpeedControl // BEAT or LFO + ranges
+)
+
+@Serializable
+data class HueOffsetConstraints(
+    val enableForward: Boolean,
+    val enableReverse: Boolean,
+    val speedControl: SpeedControl
+)
+
+enum class FeedbackMode {
+    NONE,
+    LIGHT,   // Preset ranges
+    MEDIUM,  // Preset ranges
+    HEAVY,   // Preset ranges
+    CUSTOM   // User-defined ranges
+}
+```
+
+### UI Design
+
+#### Overall Structure
+
+**Tabs + Collapsible Sections:**
+```
+┌─────────────────────────────────────┐
+│ [Recipe] [Arms] [Motion] [Color] [FX] │  ← Tabs
+├─────────────────────────────────────┤
+│ ▼ Section 1 [configured ✓]          │
+│   ... controls ...                   │
+│ ▶ Section 2 [using defaults]        │
+│ ▼ Section 3 [configured ✓]          │
+│   ... controls ...                   │
+└─────────────────────────────────────┘
+```
+
+**Benefits:**
+- Clear categorization via tabs
+- Compact view with collapsed sections
+- Deep control when needed
+- Visual feedback shows what's customized
+
+#### Tab 1: Recipe
+
+```
+┌─────────────────────────────────────┐
+│ Recipe Filter                        │
+│ ○ All Recipes                       │
+│ ● Specific Petal Count: [5]         │
+│ ○ Petal Range: [3] to [9]          │
+│ ○ Favorites Only                    │
+│ ○ Specific Recipes (picker...)      │
+│                                      │
+│ ☑ Auto-set Hue Sweep to petals     │
+└─────────────────────────────────────┘
+```
+
+#### Tab 2: Arms
+
+```
+┌─────────────────────────────────────┐
+│ ▼ L1 (Outer Arm) [configured ✓]    │
+│   Base Length:                       │
+│   ├●━━━━━━━━━━━━━━━━●┤             │
+│    0                100              │
+│                                      │
+│   Movement:                          │
+│   ☑ Beat  ☑ LFO                     │
+│                                      │
+│   Waveform:                          │
+│   ☑ Sine  ☑ Triangle  ☐ Square      │
+│                                      │
+│   Weight (Intensity):                │
+│   ├━━●━━━━━━━━━━━●━━┤              │
+│   -100  -20       40  100            │
+│                                      │
+│   Speed (Beat):                      │
+│   ├●━━━━━━━━━━━━━━━━●┤             │
+│   1/16 ... 8 ... 32 ... 256          │
+│   (snaps to: 1/16, 1/8, 1/4, 1/2,   │
+│    1, 2, 4, 8, 16, 32, 64, 128, 256) │
+│                                      │
+│   Speed (LFO):                       │
+│   ○ Fast (0.1s-10s)                 │
+│   ● Medium (1s-15min)               │
+│   ○ Slow (10s-24h)                  │
+│   ├━━●━━━━━━━━━━━●━━┤              │
+│    2s              30s               │
+│                                      │
+├─────────────────────────────────────┤
+│ ▶ L2 [using defaults]               │
+│ ▶ L3 [using defaults]               │
+│ ▶ L4 [using defaults]               │
+└─────────────────────────────────────┘
+```
+
+#### Tab 3: Motion
+
+```
+┌─────────────────────────────────────┐
+│ Rotation                             │
+│ ☑ Clockwise                         │
+│ ☑ Counter-Clockwise                 │
+│                                      │
+│ Speed Control:                       │
+│ ● Beat                              │
+│   Division Range:                    │
+│   ├●━━━━━━━━━━━━━●┤                │
+│    4 ... 16 ... 128                  │
+│                                      │
+│ ○ LFO                               │
+│   Mode: ○ Fast ● Med ○ Slow         │
+│   Time Range:                        │
+│   ├━━●━━━━━━━━●━━┤                 │
+│    5s         30s                    │
+└─────────────────────────────────────┘
+```
+
+#### Tab 4: Color
+
+```
+┌─────────────────────────────────────┐
+│ Hue Offset (Color Cycling)          │
+│ ☑ Forward (Red→Orange→Yellow...)    │
+│ ☑ Reverse (Red→Purple→Blue...)      │
+│                                      │
+│ Speed Control:                       │
+│ ● Beat                              │
+│   Division Range:                    │
+│   ├●━━━━━━━━━━━━━●┤                │
+│    4 ... 8 ... 16                    │
+│                                      │
+│ ○ LFO                               │
+│   Mode: ○ Fast ● Med ○ Slow         │
+│   Time Range:                        │
+│   ├━━●━━━━━━━━●━━┤                 │
+│    10s        60s                    │
+└─────────────────────────────────────┘
+```
+
+#### Tab 5: FX (Feedback)
+
+```
+┌─────────────────────────────────────┐
+│ Feedback Mode                        │
+│ ● None                              │
+│ ○ Light (subtle trails)             │
+│ ○ Medium (noticeable)               │
+│ ○ Heavy (intense)                   │
+│ ○ Custom (advanced controls...)     │
+└─────────────────────────────────────┘
+```
+
+### UI Component Notes
+
+**All range sliders use dual-handle `RangeSlider` from Material3:**
+```kotlin
+var weightRange by remember { mutableStateOf(-20f..40f) }
+RangeSlider(
+    value = weightRange,
+    onValueChange = { weightRange = it },
+    valueRange = -100f..100f
+)
+```
+
+**Beat Division uses discrete snapping:**
+- Values: 1/16, 1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32, 64, 128, 256
+- Internally stored as floats: 0.0625, 0.125, 0.25, 0.5, 1.0, 2.0, etc.
+- UI snaps handles to nearest discrete value
+
+**0-100 scale throughout** (matches Mandala Editor conventions)
+
+### Parameter Design Patterns
+
+#### High-Level (Plain English) Controls
+
+**Rotation & Hue Offset** are abstracted to user intent:
+- Under the hood: Weight=100%, Triangle wave, Slope=0 or 1
+- User sees: Simple direction toggles + speed control
+- Rationale: Only one "correct" way to do smooth rotation/cycling
+
+#### Granular Controls
+
+**Arms (L1-L4)** need full control:
+- Different weight ranges create different aesthetics
+- Mixing waveforms creates complex movement
+- User is composing the "feel" of the mandala
+
+#### Smart Defaults
+
+**Unconfigured parameters** → Use current randomize logic as fallback
+- L2, L3, L4 collapsed by default
+- Only customize what matters for the aesthetic
+- Reduces decision fatigue
+
+### Generation Logic
+
+**When Mixer requests slot content:**
+
+1. Check `slot.sourceType == VideoSourceType.RANDOM_SET`
+2. Load RSet template from database
+3. Generate ephemeral mandala:
+   ```kotlin
+   fun generateFromRSet(rset: RandomSet): PatchData {
+       val recipe = selectRecipe(rset.recipeFilter)
+       val mandala = createEmptyPatch()
+       
+       // Recipe
+       mandala.recipe = recipe
+       if (rset.autoHueSweep) {
+           mandala.hueSweep = recipe.petals / 9.0f
+       }
+       
+       // For each parameter with constraints:
+       if (rset.l1Constraints != null) {
+           applyArmConstraints(mandala.l1, rset.l1Constraints)
+       } else {
+           applyDefaultRandomization(mandala.l1)
+       }
+       
+       // ... repeat for other params
+       
+       return mandala
+   }
+   ```
+
+4. Apply to visual source (ephemeral - not saved)
+5. "Next" button triggers fresh generation
+
+### Integration Points
+
+**Database:**
+- New table: `random_sets` (id, name, jsonSettings)
+- DAO: `RandomSetDao` with standard CRUD operations
+- Serialization: Use kotlinx.serialization for RandomSet data class
+
+**Navigation:**
+- New `LayerType.RANDOM_SET`
+- New `RandomSetLayerContent(rset: RandomSet)`
+- RSet Editor screen (similar structure to Set Editor)
+
+**Mixer:**
+- Add `VideoSourceType.RANDOM_SET`
+- Add `randomSetId: String?` to `MixerSlotData`
+- Picker dialog: "Select Mandala / Set / RSet"
+
+**Renderer:**
+- When rendering slot with RSet, generate mandala on-demand
+- Cache generated mandala for current render cycle
+- Regenerate on "Next" trigger
+
+### Design Rationale
+
+**Why Single LFO Speed Mode:**
+- Cross-mode ranges are edge cases
+- Forces intentional aesthetic choices
+- Templates have distinct personalities
+- Need both fast+slow? Make two templates
+
+**Why -100 to 100 Weight:**
+- Enables "shrinking" arms (negative weights)
+- Enables "unpredictable" arms (negative to positive)
+- Different from basic randomize (always positive)
+- More expressive template definitions
+
+**Why Plain English for Rotation/Hue:**
+- Only one correct parameter combo for smooth rotation
+- Exposing raw params is confusing without benefit
+- User thinks in effects, not parameters
+
+**Why Granular for Arms:**
+- Different combos = fundamentally different aesthetics
+- No "one right way" to set arm movement
+- Composition tool, not preset
+
+### Future Enhancements
+
+**Phase 1 (Initial Implementation):**
+- Recipe filter, arms, rotation, hue offset
+- Feedback: None/Light/Medium/Heavy presets
+- Basic generation logic
+
+**Phase 2:**
+- "Save this variation" button in Mixer
+- Template library UI improvements
+- More granular feedback controls
+
+**Phase 3:**
+- "Template from current mandala" - copy current settings as starting point
+- Recipe similarity matching - "like this recipe but randomized"
+- Template tags/categories for organization
+
+---
+
 ## Questions? Discoveries?
 
 **If you're a future AI instance working on this:**
@@ -639,3 +1090,4 @@ sealed interface LayerContent
 - **Library Overlay:** No close button by design - prevents "undefined state" where user views controls for nothing in particular
 - **Library Navigation:** Sets/Shows need `navigationLabel`, `navigationIndex`, `navigationTotal` params for Prev/Next controls
 - **Chip Gestures:** Both tap overflow icon AND long-press open context menu (dual affordance for discoverability)
+- **Hue Sweep Calculation:** Render code multiplies by 9.0 and quantizes. To set to N petals: `baseValue = N / 9.0f` (not `/360.0f`)

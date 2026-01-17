@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import llm.slop.spirals.*
 import llm.slop.spirals.models.*
+import llm.slop.spirals.models.STANDARD_BEAT_VALUES
 import llm.slop.spirals.ui.components.PatchManagerOverlay
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
@@ -216,12 +217,10 @@ fun RandomSetEditorScreen(
                     val entity = allRandomSets.find { it.name == name }
                     entity?.let { selectRSet(it.id) }
                 },
-                onOpen = { name ->
-                    val entity = allRandomSets.find { it.name == name }
-                    entity?.let { 
-                        selectRSet(it.id)
-                        onHideManager()
-                    }
+                onOpen = { id ->
+                    // Directly use the ID that was passed
+                    selectRSet(id)
+                    onHideManager()
                 },
                 onCreateNew = {
                     vm.startNewPatch(LayerType.RANDOM_SET)
@@ -580,6 +579,91 @@ fun ArmConstraintSection(
                     }
                 }
                 
+                // Beat division controls (only shown when Beat is enabled)
+                if (currentConstraints.enableBeat) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    val beatValues = STANDARD_BEAT_VALUES
+                    val minValueIndex = beatValues.indexOfFirst { it >= currentConstraints.beatDivMin }.coerceAtLeast(0)
+                    val maxValueIndex = beatValues.indexOfLast { it <= currentConstraints.beatDivMax }.coerceAtMost(beatValues.lastIndex)
+                    
+                    val formatBeatValue = { value: Float ->
+                        when {
+                            value < 1 -> "1/${(1/value).toInt()}"
+                            else -> value.toInt().toString()
+                        }
+                    }
+                    
+                    Text(
+                        text = "Beat Division: ${formatBeatValue(beatValues[minValueIndex])}-${formatBeatValue(beatValues[maxValueIndex])}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppText,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    
+                    // Labels for min and max
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = formatBeatValue(beatValues[minValueIndex]),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppText.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            text = formatBeatValue(beatValues[maxValueIndex]),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppText.copy(alpha = 0.7f)
+                        )
+                    }
+                    
+                    // Dual slider
+                    RangeSlider(
+                        value = minValueIndex.toFloat()..maxValueIndex.toFloat(),
+                        onValueChange = { range ->
+                            val newMin = beatValues[range.start.toInt()]
+                            val newMax = beatValues[range.endInclusive.toInt()]
+                            onUpdate(currentConstraints.copy(
+                                beatDivMin = newMin,
+                                beatDivMax = newMax
+                            ))
+                        },
+                        valueRange = 0f..(beatValues.size - 1).toFloat(),
+                        steps = beatValues.size - 2,
+                        colors = SliderDefaults.colors(
+                            thumbColor = AppAccent,
+                            activeTrackColor = AppAccent
+                        )
+                    )
+                }
+                
+                // LFO time controls (only shown when LFO is enabled)
+                if (currentConstraints.enableLfo) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Text(
+                        text = "LFO Time: ${currentConstraints.lfoTimeMin.toInt()}s-${currentConstraints.lfoTimeMax.toInt()}s",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppText,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    RangeSlider(
+                        value = currentConstraints.lfoTimeMin..currentConstraints.lfoTimeMax,
+                        onValueChange = { range ->
+                            onUpdate(currentConstraints.copy(
+                                lfoTimeMin = range.start,
+                                lfoTimeMax = range.endInclusive
+                            ))
+                        },
+                        valueRange = 1f..600f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = AppAccent,
+                            activeTrackColor = AppAccent
+                        )
+                    )
+                }
+                
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 // Waveforms
@@ -803,21 +887,54 @@ fun MotionTab(
                     Spacer(modifier = Modifier.height(12.dp))
                     
                     if (constraints.speedSource == SpeedSource.BEAT) {
+                        val beatValues = STANDARD_BEAT_VALUES
+                        val minValueIndex = beatValues.indexOfFirst { it >= constraints.beatDivMin }.coerceAtLeast(0)
+                        val maxValueIndex = beatValues.indexOfLast { it <= constraints.beatDivMax }.coerceAtMost(beatValues.lastIndex)
+                        
+                        val formatBeatValue = { value: Float ->
+                            when {
+                                value < 1 -> "1/${(1/value).toInt()}"
+                                else -> value.toInt().toString()
+                            }
+                        }
+                        
                         Text(
-                            text = "Beat Division: ${constraints.beatDivMin.toInt()}-${constraints.beatDivMax.toInt()}",
+                            text = "Beat Division: ${formatBeatValue(beatValues[minValueIndex])}-${formatBeatValue(beatValues[maxValueIndex])}",
                             style = MaterialTheme.typography.bodySmall,
                             color = AppText,
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
+                        
+                        // Labels for min and max
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = formatBeatValue(beatValues[minValueIndex]),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppText.copy(alpha = 0.7f)
+                            )
+                            Text(
+                                text = formatBeatValue(beatValues[maxValueIndex]),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppText.copy(alpha = 0.7f)
+                            )
+                        }
+                        
+                        // Dual slider
                         RangeSlider(
-                            value = constraints.beatDivMin..constraints.beatDivMax,
+                            value = minValueIndex.toFloat()..maxValueIndex.toFloat(),
                             onValueChange = { range ->
+                                val newMin = beatValues[range.start.toInt()]
+                                val newMax = beatValues[range.endInclusive.toInt()]
                                 onUpdate(rset.copy(rotationConstraints = constraints.copy(
-                                    beatDivMin = range.start,
-                                    beatDivMax = range.endInclusive
+                                    beatDivMin = newMin,
+                                    beatDivMax = newMax
                                 )))
                             },
-                            valueRange = 1f..256f,
+                            valueRange = 0f..(beatValues.size - 1).toFloat(),
+                            steps = beatValues.size - 2,
                             colors = SliderDefaults.colors(
                                 thumbColor = AppAccent,
                                 activeTrackColor = AppAccent
@@ -983,21 +1100,54 @@ fun ColorTab(
                     Spacer(modifier = Modifier.height(12.dp))
                     
                     if (constraints.speedSource == SpeedSource.BEAT) {
+                        val beatValues = STANDARD_BEAT_VALUES
+                        val minValueIndex = beatValues.indexOfFirst { it >= constraints.beatDivMin }.coerceAtLeast(0)
+                        val maxValueIndex = beatValues.indexOfLast { it <= constraints.beatDivMax }.coerceAtMost(beatValues.lastIndex)
+                        
+                        val formatBeatValue = { value: Float ->
+                            when {
+                                value < 1 -> "1/${(1/value).toInt()}"
+                                else -> value.toInt().toString()
+                            }
+                        }
+                        
                         Text(
-                            text = "Beat Division: ${constraints.beatDivMin.toInt()}-${constraints.beatDivMax.toInt()}",
+                            text = "Beat Division: ${formatBeatValue(beatValues[minValueIndex])}-${formatBeatValue(beatValues[maxValueIndex])}",
                             style = MaterialTheme.typography.bodySmall,
                             color = AppText,
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
+                        
+                        // Labels for min and max
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = formatBeatValue(beatValues[minValueIndex]),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppText.copy(alpha = 0.7f)
+                            )
+                            Text(
+                                text = formatBeatValue(beatValues[maxValueIndex]),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppText.copy(alpha = 0.7f)
+                            )
+                        }
+                        
+                        // Dual slider
                         RangeSlider(
-                            value = constraints.beatDivMin..constraints.beatDivMax,
+                            value = minValueIndex.toFloat()..maxValueIndex.toFloat(),
                             onValueChange = { range ->
+                                val newMin = beatValues[range.start.toInt()]
+                                val newMax = beatValues[range.endInclusive.toInt()]
                                 onUpdate(rset.copy(hueOffsetConstraints = constraints.copy(
-                                    beatDivMin = range.start,
-                                    beatDivMax = range.endInclusive
+                                    beatDivMin = newMin,
+                                    beatDivMax = newMax
                                 )))
                             },
-                            valueRange = 1f..64f,
+                            valueRange = 0f..(beatValues.size - 1).toFloat(),
+                            steps = beatValues.size - 2,
                             colors = SliderDefaults.colors(
                                 thumbColor = AppAccent,
                                 activeTrackColor = AppAccent

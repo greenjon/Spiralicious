@@ -182,6 +182,7 @@ fun PatchManagerOverlay(
                         ListItem(
                             headlineContent = { Text("Open", color = AppAccent) },
                             modifier = Modifier.clickable { 
+                                // Pass the id for consistent unique identification
                                 openCallback(id)
                                 showLongPressMenu = null
                             },

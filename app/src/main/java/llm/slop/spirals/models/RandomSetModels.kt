@@ -4,6 +4,12 @@ import kotlinx.serialization.Serializable
 import java.util.UUID
 
 /**
+ * Standardized beat division values to be used throughout the app.
+ * Ensures consistent options: 1/16, 1/8, 1/4, 1/2, 1, 2, 4, 8, 16, 32, 64, 128, 256
+ */
+val STANDARD_BEAT_VALUES = listOf(0.0625f, 0.125f, 0.25f, 0.5f, 1f, 2f, 4f, 8f, 16f, 32f, 64f, 128f, 256f)
+
+/**
  * RSet (Random Set) - Generative patch templates for infinite mandala variations.
  * 
  * Philosophy: The RSet template IS the creative work - thoughtfully defining constraints
@@ -68,7 +74,7 @@ data class ArmConstraints(
     val weightMax: Int = 100,
     
     // Beat division range (discrete values as floats)
-    val beatDivMin: Float = 1.0f,
+    val beatDivMin: Float = 0.0625f, // 1/16
     val beatDivMax: Float = 32.0f,
     
     // LFO speed control
@@ -94,8 +100,8 @@ data class RotationConstraints(
     val speedSource: SpeedSource = SpeedSource.BEAT,
     
     // Beat division range (when speedSource == BEAT)
-    val beatDivMin: Float = 4.0f,
-    val beatDivMax: Float = 128.0f,
+    val beatDivMin: Float = 0.0625f, // 1/16
+    val beatDivMax: Float = 256.0f,
     
     // LFO time range (when speedSource == LFO)
     val lfoSpeedMode: LfoSpeedMode = LfoSpeedMode.MEDIUM,
@@ -113,8 +119,8 @@ data class HueOffsetConstraints(
     val speedSource: SpeedSource = SpeedSource.BEAT,
     
     // Beat division range (when speedSource == BEAT)
-    val beatDivMin: Float = 4.0f,
-    val beatDivMax: Float = 16.0f,
+    val beatDivMin: Float = 0.0625f, // 1/16
+    val beatDivMax: Float = 256.0f,
     
     // LFO time range (when speedSource == LFO)
     val lfoSpeedMode: LfoSpeedMode = LfoSpeedMode.MEDIUM,

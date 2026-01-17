@@ -6,6 +6,7 @@ import llm.slop.spirals.cv.ModulationOperator
 import llm.slop.spirals.cv.Waveform
 import llm.slop.spirals.models.RandomSet
 import llm.slop.spirals.models.RecipeFilter
+import llm.slop.spirals.models.STANDARD_BEAT_VALUES
 
 /**
  * RandomSetGenerator - Generates ephemeral mandala patches from RSet templates.
@@ -114,7 +115,14 @@ class RandomSetGenerator(private val context: Context) {
                 
                 if (useBeat) {
                     // Beat subdivision from range
-                    val subdivision = random.nextInt(c.beatDivMin.toInt(), c.beatDivMax.toInt() + 1).toFloat()
+                    // Use the standardized beat values and pick one in the valid range
+                val validValues = STANDARD_BEAT_VALUES.filter { it in c.beatDivMin..c.beatDivMax }
+                val subdivision = if (validValues.isNotEmpty()) {
+                    validValues.random(random)
+                } else {
+                    // Fallback to nearest allowed value
+                    STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - c.beatDivMin) } ?: 1f
+                }
                     
                     param.modulators.add(
                         CvModulator(
@@ -160,6 +168,10 @@ class RandomSetGenerator(private val context: Context) {
             visualSource.parameters["Rotation"]?.let { param ->
                 param.baseValue = 0f
                 param.modulators.clear()
+                
+                // Select values 4 and above for default behavior (matching previous range)
+                val usableValues = STANDARD_BEAT_VALUES.filter { it >= 4f && it <= 128f }
+                
                 param.modulators.add(
                     CvModulator(
                         sourceId = "beatPhase",
@@ -168,7 +180,7 @@ class RandomSetGenerator(private val context: Context) {
                         slope = if (random.nextBoolean()) 0f else 1f,
                         weight = 1.0f,
                         phaseOffset = random.nextFloat(),
-                        subdivision = random.nextInt(4, 129).toFloat()
+                        subdivision = usableValues.random(random)
                     )
                 )
             }
@@ -195,7 +207,14 @@ class RandomSetGenerator(private val context: Context) {
             
             if (constraints.speedSource == llm.slop.spirals.models.SpeedSource.BEAT) {
                 sourceId = "beatPhase"
-                subdivision = random.nextInt(constraints.beatDivMin.toInt(), constraints.beatDivMax.toInt() + 1).toFloat()
+                // Use the standardized beat values and pick one in the valid range
+                val validValues = STANDARD_BEAT_VALUES.filter { it in constraints.beatDivMin..constraints.beatDivMax }
+                subdivision = if (validValues.isNotEmpty()) {
+                    validValues.random(random)
+                } else {
+                    // Fallback to nearest allowed value
+                    STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
+                }
             } else {
                 sourceId = "lfo1"
                 subdivision = random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
@@ -228,6 +247,10 @@ class RandomSetGenerator(private val context: Context) {
             visualSource.parameters["Hue Offset"]?.let { param ->
                 param.baseValue = 0f
                 param.modulators.clear()
+                
+                // Select values 4 to 16 for default behavior (matching previous range)
+                val usableValues = STANDARD_BEAT_VALUES.filter { it >= 4f && it <= 16f }
+                
                 param.modulators.add(
                     CvModulator(
                         sourceId = "beatPhase",
@@ -236,7 +259,7 @@ class RandomSetGenerator(private val context: Context) {
                         slope = if (random.nextBoolean()) 0f else 1f,
                         weight = 1.0f,
                         phaseOffset = random.nextFloat(),
-                        subdivision = random.nextInt(4, 17).toFloat()
+                        subdivision = usableValues.random(random)
                     )
                 )
             }
@@ -263,7 +286,14 @@ class RandomSetGenerator(private val context: Context) {
             
             if (constraints.speedSource == llm.slop.spirals.models.SpeedSource.BEAT) {
                 sourceId = "beatPhase"
-                subdivision = random.nextInt(constraints.beatDivMin.toInt(), constraints.beatDivMax.toInt() + 1).toFloat()
+                // Use the standardized beat values and pick one in the valid range
+                val validValues = STANDARD_BEAT_VALUES.filter { it in constraints.beatDivMin..constraints.beatDivMax }
+                subdivision = if (validValues.isNotEmpty()) {
+                    validValues.random(random)
+                } else {
+                    // Fallback to nearest allowed value
+                    STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
+                }
             } else {
                 sourceId = "lfo1"
                 subdivision = random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()

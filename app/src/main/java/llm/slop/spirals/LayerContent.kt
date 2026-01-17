@@ -2,6 +2,7 @@ package llm.slop.spirals
 
 import kotlinx.serialization.Serializable
 import llm.slop.spirals.models.MixerPatch
+import llm.slop.spirals.models.RandomSet
 import llm.slop.spirals.models.ShowPatch
 
 /**
@@ -35,3 +36,6 @@ data class MixerLayerContent(val mixer: MixerPatch) : LayerContent
 
 @Serializable
 data class ShowLayerContent(val show: ShowPatch) : LayerContent
+
+@Serializable
+data class RandomSetLayerContent(val randomSet: RandomSet) : LayerContent

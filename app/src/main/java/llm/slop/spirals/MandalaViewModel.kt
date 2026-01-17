@@ -65,6 +65,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     private val setDao = db.mandalaSetDao()
     private val mixerDao = db.mixerPatchDao()
     private val showDao = db.showPatchDao()
+    private val randomSetDao = db.randomSetDao()
     private val appConfig = AppConfig(application)
 
     // 1. Declare Data Flows first
@@ -72,6 +73,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     val allSets = setDao.getAllSets().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val allMixerPatches = mixerDao.getAllMixerPatches().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val allShowPatches = showDao.getAllShowPatches().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val allRandomSets = randomSetDao.getAllRandomSets().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     private val _currentPatch = MutableStateFlow<PatchData?>(null)
     val currentPatch: StateFlow<PatchData?> = _currentPatch.asStateFlow()
@@ -112,6 +114,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         LayerType.SET -> "Set Editor"
         LayerType.MANDALA -> "Mandala Editor"
         LayerType.SHOW -> "Show Editor"
+        LayerType.RANDOM_SET -> "RSet Editor"
     }
 
     fun generateNextName(type: LayerType): String {
@@ -120,6 +123,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.SET -> "Set" to allSets.value.map { it.name }
             LayerType.MANDALA -> "Man" to allPatches.value.map { it.name }
             LayerType.SHOW -> "Show" to allShowPatches.value.map { it.name }
+            LayerType.RANDOM_SET -> "RSet" to allRandomSets.value.map { it.name }
         }
         
         val regex = Regex("${prefix}(\\d+)")
@@ -166,6 +170,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.SET -> SetLayerContent(MandalaSet(id = id, name = name, orderedMandalaIds = mutableListOf()))
             LayerType.MANDALA -> MandalaLayerContent(PatchData(name = name, recipeId = MandalaLibrary.MandalaRatios.first().id, parameters = emptyList()))
             LayerType.SHOW -> ShowLayerContent(ShowPatch(id = id, name = name))
+            LayerType.RANDOM_SET -> RandomSetLayerContent(llm.slop.spirals.models.RandomSet(id = id, name = name))
         }
         
         val newLayer = NavLayer(
@@ -204,6 +209,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.SET -> SetLayerContent(MandalaSet(id = id, name = name, orderedMandalaIds = mutableListOf()))
             LayerType.SHOW -> ShowLayerContent(ShowPatch(id = id, name = name))
             LayerType.MANDALA -> MandalaLayerContent(PatchData(name = name, recipeId = MandalaLibrary.MandalaRatios.first().id, parameters = emptyList()))
+            LayerType.RANDOM_SET -> RandomSetLayerContent(llm.slop.spirals.models.RandomSet(id = id, name = name))
         }
         
         val newLayer = NavLayer(id, name, type, isDirty = true, data = data)
@@ -377,7 +383,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
             LayerType.MIXER -> {
-                // MIXER parent: Add Set or Mandala to specific slot
+                // MIXER parent: Add Set, Mandala, or RSet to specific slot
                 val mixer = (parentData as? MixerLayerContent)?.mixer ?: return
                 val slotIndex = child.parentSlotIndex ?: return  // Must have slot index!
                 
@@ -412,6 +418,21 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                             saveLayer(_navStack.value[parentIndex])
                         }
                     }
+                    LayerType.RANDOM_SET -> {
+                        val randomSet = (child.data as? RandomSetLayerContent)?.randomSet ?: return
+                        val newSlots = mixer.slots.toMutableList()
+                        
+                        // Only update if not already set to this RandomSet
+                        if (newSlots[slotIndex].randomSetId != randomSet.id) {
+                            newSlots[slotIndex] = newSlots[slotIndex].copy(
+                                randomSetId = randomSet.id,
+                                sourceType = VideoSourceType.RANDOM_SET
+                            )
+                            val updatedMixer = mixer.copy(slots = newSlots)
+                            updateLayerData(parentIndex, MixerLayerContent(updatedMixer), isDirty = true)
+                            saveLayer(_navStack.value[parentIndex])
+                        }
+                    }
                     else -> { /* Show can't be child of Mixer */ }
                 }
             }
@@ -428,6 +449,9 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             }
             LayerType.MANDALA -> {
                 // Mandala can't have children
+            }
+            LayerType.RANDOM_SET -> {
+                // RandomSet can't have children
             }
         }
     }
@@ -468,6 +492,9 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 }
                 is ShowLayerContent -> {
                     saveShowPatch(data.show.copy(name = layer.name))
+                }
+                is RandomSetLayerContent -> {
+                    saveRandomSet(data.randomSet.copy(name = layer.name))
                 }
             }
             // Clear dirty flag for this layer in the stack
@@ -518,6 +545,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 is SetLayerContent -> deleteSet(data.set.id)
                 is MixerLayerContent -> deleteMixerPatch(data.mixer.id)
                 is ShowLayerContent -> deleteShowPatch(data.show.id)
+                is RandomSetLayerContent -> deleteRandomSet(data.randomSet.id)
                 null -> { /* no data to delete */ }
             }
             
@@ -528,6 +556,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 is SetLayerContent -> SetLayerContent(data.set.copy(name = newName))
                 is MixerLayerContent -> MixerLayerContent(data.mixer.copy(name = newName))
                 is ShowLayerContent -> ShowLayerContent(data.show.copy(name = newName))
+                is RandomSetLayerContent -> RandomSetLayerContent(data.randomSet.copy(name = newName))
                 null -> null
             }
             
@@ -560,6 +589,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             is SetLayerContent -> SetLayerContent(data.set.copy(id = newId, name = newName))
             is MixerLayerContent -> MixerLayerContent(data.mixer.copy(id = newId, name = newName))
             is ShowLayerContent -> ShowLayerContent(data.show.copy(id = newId, name = newName))
+            is RandomSetLayerContent -> RandomSetLayerContent(data.randomSet.copy(id = newId, name = newName))
         }
         
         val newLayer = NavLayer(newId, newName, layer.type, isDirty = true, data = newData)
@@ -573,6 +603,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.SET -> allSets.value.map { it.name }
             LayerType.MANDALA -> allPatches.value.map { it.name }
             LayerType.SHOW -> allShowPatches.value.map { it.name }
+            LayerType.RANDOM_SET -> allRandomSets.value.map { it.name }
         }
     }
 
@@ -586,6 +617,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 is SetLayerContent -> deleteSet(data.set.id)
                 is MixerLayerContent -> deleteMixerPatch(data.mixer.id)
                 is ShowLayerContent -> deleteShowPatch(data.show.id)
+                is RandomSetLayerContent -> deleteRandomSet(data.randomSet.id)
                 null -> { /* no data to delete */ }
             }
             popToLayer(index - 1, save = false)
@@ -661,6 +693,17 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { showDao.deleteById(id) }
     }
 
+    fun saveRandomSet(randomSet: llm.slop.spirals.models.RandomSet) {
+        viewModelScope.launch {
+            val json = Json.encodeToString(randomSet)
+            randomSetDao.insertRandomSet(RandomSetEntity(randomSet.id, randomSet.name, json))
+        }
+    }
+
+    fun deleteRandomSet(id: String) {
+        viewModelScope.launch { randomSetDao.deleteById(id) }
+    }
+
     fun toggleTag(id: String, tag: String) {
         viewModelScope.launch {
             val allForId = tagDao.getAllTagsForId(id)
@@ -713,6 +756,12 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                         showDao.insertShowPatch(entity.copy(name = newName))
                     }
                 }
+                LayerType.RANDOM_SET -> {
+                    val entity = allRandomSets.value.find { it.name == oldName }
+                    if (entity != null) {
+                        randomSetDao.insertRandomSet(entity.copy(name = newName))
+                    }
+                }
             }
         }
     }
@@ -752,6 +801,15 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                         showDao.insertShowPatch(ShowPatchEntity(newId, newName, Json.encodeToString(newShow)))
                     }
                 }
+                LayerType.RANDOM_SET -> {
+                    val entity = allRandomSets.value.find { it.name == name }
+                    if (entity != null) {
+                        val newId = UUID.randomUUID().toString()
+                        val randomSet = Json.decodeFromString<llm.slop.spirals.models.RandomSet>(entity.jsonSettings)
+                        val newRandomSet = randomSet.copy(id = newId, name = newName)
+                        randomSetDao.insertRandomSet(RandomSetEntity(newId, newName, Json.encodeToString(newRandomSet)))
+                    }
+                }
             }
         }
     }
@@ -771,6 +829,10 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 LayerType.SHOW -> {
                     val entity = allShowPatches.value.find { it.name == name }
                     if (entity != null) showDao.deleteById(entity.id)
+                }
+                LayerType.RANDOM_SET -> {
+                    val entity = allRandomSets.value.find { it.name == name }
+                    if (entity != null) randomSetDao.deleteById(entity.id)
                 }
             }
         }

@@ -223,6 +223,7 @@ class MainActivity : ComponentActivity() {
                                             LayerType.SET -> "Set"
                                             LayerType.MANDALA -> "Mandala"
                                             LayerType.SHOW -> "Show"
+                                            LayerType.RANDOM_SET -> "RSet"
                                         }
 
                                         // --- TOP GROUP ---
@@ -288,6 +289,7 @@ class MainActivity : ComponentActivity() {
                                                 LayerType.SET -> "Set Editor"
                                                 LayerType.MANDALA -> "Mandala Editor"
                                                 LayerType.SHOW -> "Show Editor"
+                                                LayerType.RANDOM_SET -> "RSet Editor"
                                             }
                                             DropdownMenuItem(
                                                 text = { 
@@ -379,6 +381,15 @@ class MainActivity : ComponentActivity() {
                                         onShowCvLab = { showCvLab = true },
                                         previewContent = previewContent,
                                         showHeader = false,
+                                        showManager = showManager,
+                                        onHideManager = { showManager = false }
+                                    )
+                                }
+                                LayerType.RANDOM_SET -> {
+                                    RandomSetEditorScreen(
+                                        vm = vm,
+                                        onClose = { vm.popToLayer(navStack.size - 2) },
+                                        previewContent = previewContent,
                                         showManager = showManager,
                                         onHideManager = { showManager = false }
                                     )

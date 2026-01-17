@@ -41,6 +41,7 @@ fun MixerEditorScreen(
     val allMixerPatches by vm.allMixerPatches.collectAsState(initial = emptyList())
     val allSets by vm.allSets.collectAsState(initial = emptyList())
     val allPatches by vm.allPatches.collectAsState(initial = emptyList())
+    val allRandomSets by vm.allRandomSets.collectAsState(initial = emptyList())
 
     val navStack by vm.navStack.collectAsState()
     val layer = navStack.lastOrNull { it.type == LayerType.MIXER }
@@ -64,6 +65,7 @@ fun MixerEditorScreen(
     var showRenameDialog by remember { mutableStateOf(false) }
     var showSetPickerForSlot by remember { mutableStateOf<Int?>(null) }
     var showMandalaPickerForSlot by remember { mutableStateOf<Int?>(null) }
+    var showRandomSetPickerForSlot by remember { mutableStateOf<Int?>(null) }
 
     val mainRenderer = LocalSpiralRenderer.current
 
@@ -82,34 +84,54 @@ fun MixerEditorScreen(
         }
     }
 
-    LaunchedEffect(mainRenderer, currentPatch, monitorSource, allSets, allPatches) {
+    LaunchedEffect(mainRenderer, currentPatch, monitorSource, allSets, allPatches, allRandomSets) {
         if (mainRenderer == null) return@LaunchedEffect
         mainRenderer.mixerPatch = currentPatch
         mainRenderer.monitorSource = monitorSource
         
         currentPatch.slots.forEachIndexed { index, slot ->
-            val patchEntity = if (slot.sourceType == VideoSourceType.MANDALA_SET) {
-                val setEntity = allSets.find { it.id == slot.mandalaSetId }
-                setEntity?.let { se ->
-                    val orderedIds = try {
-                        Json.decodeFromString<List<String>>(se.jsonOrderedMandalaIds)
-                    } catch (e: Exception) {
-                        emptyList()
-                    }
-                    if (orderedIds.isNotEmpty()) {
-                        val safeIndex = slot.currentIndex.baseValue.toInt().coerceIn(0, orderedIds.size - 1)
-                        allPatches.find { it.name == orderedIds[safeIndex] }
-                    } else null
-                }
-            } else if (slot.sourceType == VideoSourceType.MANDALA) {
-                allPatches.find { it.name == slot.selectedMandalaId }
-            } else null
-
             val source = mainRenderer.getSlotSource(index)
-            if (patchEntity != null) {
-                val patchData = PatchMapper.fromJson(patchEntity.jsonSettings)
-                patchData?.let { pd ->
-                    PatchMapper.applyToVisualSource(pd, source)
+            
+            when (slot.sourceType) {
+                VideoSourceType.MANDALA_SET -> {
+                    val setEntity = allSets.find { it.id == slot.mandalaSetId }
+                    setEntity?.let { se ->
+                        val orderedIds = try {
+                            Json.decodeFromString<List<String>>(se.jsonOrderedMandalaIds)
+                        } catch (e: Exception) {
+                            emptyList()
+                        }
+                        if (orderedIds.isNotEmpty()) {
+                            val safeIndex = slot.currentIndex.baseValue.toInt().coerceIn(0, orderedIds.size - 1)
+                            val patchEntity = allPatches.find { it.name == orderedIds[safeIndex] }
+                            patchEntity?.let { pe ->
+                                val patchData = PatchMapper.fromJson(pe.jsonSettings)
+                                patchData?.let { pd ->
+                                    PatchMapper.applyToVisualSource(pd, source)
+                                }
+                            }
+                        }
+                    }
+                }
+                VideoSourceType.MANDALA -> {
+                    val patchEntity = allPatches.find { it.name == slot.selectedMandalaId }
+                    patchEntity?.let { pe ->
+                        val patchData = PatchMapper.fromJson(pe.jsonSettings)
+                        patchData?.let { pd ->
+                            PatchMapper.applyToVisualSource(pd, source)
+                        }
+                    }
+                }
+                VideoSourceType.RANDOM_SET -> {
+                    val rsetEntity = allRandomSets.find { it.id == slot.randomSetId }
+                    rsetEntity?.let { re ->
+                        val randomSet = Json.decodeFromString<llm.slop.spirals.models.RandomSet>(re.jsonSettings)
+                        val generator = RandomSetGenerator(vm.getApplication())
+                        generator.generateFromRSet(randomSet, source)
+                    }
+                }
+                VideoSourceType.COLOR -> {
+                    // Color source handled elsewhere
                 }
             }
         }
@@ -177,15 +199,15 @@ fun MixerEditorScreen(
             ) {
                 Column(modifier = Modifier.weight(3f)) {
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        SourceStrip(0, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 0 }, { showMandalaPickerForSlot = 0 }, allSets, "1", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                        SourceStrip(0, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 0 }, { showMandalaPickerForSlot = 0 }, { showRandomSetPickerForSlot = 0 }, allSets, allRandomSets, "1", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
                         MonitorStrip("A", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                        SourceStrip(1, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 1 }, { showMandalaPickerForSlot = 1 }, allSets, "2", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                        SourceStrip(1, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 1 }, { showMandalaPickerForSlot = 1 }, { showRandomSetPickerForSlot = 1 }, allSets, allRandomSets, "2", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
                     }
                     Spacer(modifier = Modifier.height(2.dp))
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        SourceStrip(2, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 2 }, { showMandalaPickerForSlot = 2 }, allSets, "3", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                        SourceStrip(2, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 2 }, { showMandalaPickerForSlot = 2 }, { showRandomSetPickerForSlot = 2 }, allSets, allRandomSets, "3", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
                         MonitorStrip("B", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                        SourceStrip(3, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 3 }, { showMandalaPickerForSlot = 3 }, allSets, "4", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                        SourceStrip(3, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 3 }, { showMandalaPickerForSlot = 3 }, { showRandomSetPickerForSlot = 3 }, allSets, allRandomSets, "4", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
                     }
                 }
                 MonitorStrip("F", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
@@ -281,6 +303,24 @@ fun MixerEditorScreen(
             onCreateNew = {
                 vm.createAndPushLayer(LayerType.MANDALA, parentSlotIndex = idx)
                 showMandalaPickerForSlot = null
+            }
+        )
+    }
+
+    showRandomSetPickerForSlot?.let { idx: Int ->
+        PickerDialog(
+            title = "Select Random Set",
+            items = allRandomSets.map { it.name to it.id },
+            onSelect = { id: String ->
+                val newSlots = currentPatch.slots.toMutableList()
+                newSlots[idx] = newSlots[idx].copy(randomSetId = id, sourceType = VideoSourceType.RANDOM_SET)
+                currentPatch = currentPatch.copy(slots = newSlots)
+                showRandomSetPickerForSlot = null
+            },
+            onDismiss = { showRandomSetPickerForSlot = null },
+            onCreateNew = {
+                vm.createAndPushLayer(LayerType.RANDOM_SET, parentSlotIndex = idx)
+                showRandomSetPickerForSlot = null
             }
         )
     }

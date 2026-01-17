@@ -182,7 +182,9 @@ fun SourceStrip(
     mainRenderer: SpiralRenderer?,
     onPickSet: () -> Unit,
     onPickMandala: () -> Unit,
+    onPickRandomSet: () -> Unit = {},
     allSets: List<MandalaSetEntity>,
+    allRandomSets: List<RandomSetEntity> = emptyList(),
     identity: String,
     onOffAlignment: Alignment,
     focusedId: String,
@@ -259,6 +261,7 @@ fun SourceStrip(
                 text = when(slot.sourceType) {
                     VideoSourceType.MANDALA -> "Mandala"
                     VideoSourceType.MANDALA_SET -> "Mandala Set"
+                    VideoSourceType.RANDOM_SET -> "Random Set"
                     VideoSourceType.COLOR -> "Color"
                 },
                 style = MaterialTheme.typography.labelSmall,
@@ -280,15 +283,23 @@ fun SourceStrip(
         }
         
         when(slot.sourceType) {
-            VideoSourceType.MANDALA, VideoSourceType.MANDALA_SET -> {
-                val displayName = if (slot.sourceType == VideoSourceType.MANDALA_SET) {
-                    allSets.find { it.id == slot.mandalaSetId }?.name ?: "Pick Set"
-                } else {
-                    slot.selectedMandalaId ?: "Pick Man"
+            VideoSourceType.MANDALA, VideoSourceType.MANDALA_SET, VideoSourceType.RANDOM_SET -> {
+                val displayName = when (slot.sourceType) {
+                    VideoSourceType.MANDALA_SET -> allSets.find { it.id == slot.mandalaSetId }?.name ?: "Pick Set"
+                    VideoSourceType.RANDOM_SET -> allRandomSets.find { it.id == slot.randomSetId }?.name ?: "Pick RSet"
+                    VideoSourceType.MANDALA -> slot.selectedMandalaId ?: "Pick Man"
+                    else -> "Pick"
                 }
                 
                 Button(
-                    onClick = { if (slot.sourceType == VideoSourceType.MANDALA_SET) onPickSet() else onPickMandala() },
+                    onClick = { 
+                        when (slot.sourceType) {
+                            VideoSourceType.MANDALA_SET -> onPickSet()
+                            VideoSourceType.RANDOM_SET -> onPickRandomSet()
+                            VideoSourceType.MANDALA -> onPickMandala()
+                            else -> {}
+                        }
+                    },
                     modifier = Modifier.fillMaxWidth().height(28.dp),
                     contentPadding = PaddingValues(horizontal = 2.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = AppText.copy(alpha = 0.1f)),

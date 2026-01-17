@@ -13,7 +13,7 @@ enum class MixerMode {
 }
 
 enum class VideoSourceType {
-    MANDALA, MANDALA_SET, COLOR
+    MANDALA, MANDALA_SET, RANDOM_SET, COLOR
 }
 
 @Serializable
@@ -47,6 +47,7 @@ data class MixerFXData(
 data class MixerSlotData(
     val mandalaSetId: String? = null,
     val selectedMandalaId: String? = null,
+    val randomSetId: String? = null,
     val currentIndex: ModulatableParameterData = ModulatableParameterData(0.0f),
     val enabled: Boolean = false,
     val advanceMode: AdvanceMode = AdvanceMode.MANUAL,
@@ -59,6 +60,7 @@ data class MixerSlotData(
     fun isPopulated(): Boolean = when(sourceType) {
         VideoSourceType.MANDALA_SET -> mandalaSetId != null
         VideoSourceType.MANDALA -> selectedMandalaId != null
+        VideoSourceType.RANDOM_SET -> randomSetId != null
         VideoSourceType.COLOR -> true
     }
 }

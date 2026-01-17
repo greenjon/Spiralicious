@@ -32,6 +32,7 @@ import llm.slop.spirals.models.STANDARD_BEAT_VALUES
 class RandomSetGenerator(private val context: Context) {
     
     private val tagManager = RecipeTagManager(context)
+    private val defaultsConfig = llm.slop.spirals.defaults.DefaultsConfig.getInstance(context)
     
     /**
      * Generates a mandala configuration from an RSet template.
@@ -81,8 +82,29 @@ class RandomSetGenerator(private val context: Context) {
         random: kotlin.random.Random
     ) {
         visualSource.parameters[paramName]?.let { param ->
-            // Use constraints if provided, otherwise use defaults
-            val c = constraints ?: llm.slop.spirals.models.ArmConstraints()
+            // Use constraints if provided, otherwise use defaults from settings
+            val c = if (constraints != null) {
+                // Use provided constraints
+                constraints
+            } else {
+                // Use defaults from settings
+                val defaults = defaultsConfig.getArmDefaults()
+                llm.slop.spirals.models.ArmConstraints(
+                    baseLengthMin = defaults.baseLengthMin,
+                    baseLengthMax = defaults.baseLengthMax,
+                    enableBeat = defaults.beatProbability > 0,
+                    enableLfo = defaults.lfoProbability > 0,
+                    allowSine = defaults.sineProbability > 0,
+                    allowTriangle = defaults.triangleProbability > 0,
+                    allowSquare = defaults.squareProbability > 0,
+                    beatDivMin = defaults.beatDivMin,
+                    beatDivMax = defaults.beatDivMax,
+                    weightMin = defaults.weightMin,
+                    weightMax = defaults.weightMax,
+                    lfoTimeMin = defaults.lfoTimeMin,
+                    lfoTimeMax = defaults.lfoTimeMax
+                )
+            }
             
             // Base value from range
             param.baseValue = (random.nextInt(c.baseLengthMin, c.baseLengthMax + 1) / 100f)
@@ -90,27 +112,41 @@ class RandomSetGenerator(private val context: Context) {
             
             // Add modulator if Beat or LFO is enabled
             if (c.enableBeat || c.enableLfo) {
-                // Select waveform from allowed options
-                val allowedWaveforms = mutableListOf<Waveform>()
-                if (c.allowSine) allowedWaveforms.add(Waveform.SINE)
-                if (c.allowTriangle) allowedWaveforms.add(Waveform.TRIANGLE)
-                if (c.allowSquare) allowedWaveforms.add(Waveform.SQUARE)
-                
-                // Fall back to SINE if no waveforms selected
-                val waveform = if (allowedWaveforms.isNotEmpty()) {
-                    allowedWaveforms.random(random)
+                // Select waveform based on probability or allowed options
+                val waveform = if (constraints == null) {
+                    // Using defaults - use probability-based selection
+                    val defaults = defaultsConfig.getArmDefaults()
+                    defaults.getRandomWaveform(random)
                 } else {
-                    Waveform.SINE
+                    // Using constraints - select from allowed waveforms
+                    val allowedWaveforms = mutableListOf<Waveform>()
+                    if (c.allowSine) allowedWaveforms.add(Waveform.SINE)
+                    if (c.allowTriangle) allowedWaveforms.add(Waveform.TRIANGLE)
+                    if (c.allowSquare) allowedWaveforms.add(Waveform.SQUARE)
+                    
+                    // Fall back to SINE if no waveforms selected
+                    if (allowedWaveforms.isNotEmpty()) {
+                        allowedWaveforms.random(random)
+                    } else {
+                        Waveform.SINE
+                    }
                 }
                 
                 // Weight from range (convert to 0-1 scale)
                 val weight = random.nextInt(c.weightMin, c.weightMax + 1) / 100f
                 
                 // Choose beat or LFO based on what's enabled
-                val useBeat = when {
-                    c.enableBeat && c.enableLfo -> random.nextBoolean()
-                    c.enableBeat -> true
-                    else -> false
+                val useBeat = if (constraints == null) {
+                    // Using defaults - use probability-based selection
+                    val defaults = defaultsConfig.getArmDefaults()
+                    random.nextFloat() < defaults.beatProbability
+                } else {
+                    // Using explicit constraints - use deterministic selection based on enabled flags
+                    when {
+                        c.enableBeat && c.enableLfo -> random.nextBoolean()
+                        c.enableBeat -> true
+                        else -> false
+                    }
                 }
                 
                 if (useBeat) {
@@ -164,23 +200,47 @@ class RandomSetGenerator(private val context: Context) {
         random: kotlin.random.Random
     ) {
         if (constraints == null) {
-            // Default: random rotation
+            // Use defaults from settings
+            val defaults = defaultsConfig.getRotationDefaults()
+            
             visualSource.parameters["Rotation"]?.let { param ->
                 param.baseValue = 0f
                 param.modulators.clear()
                 
-                // Select values 4 and above for default behavior (matching previous range)
-                val usableValues = STANDARD_BEAT_VALUES.filter { it >= 4f && it <= 128f }
+                // Select direction based on probability
+                val slope = defaults.getRandomDirection(random)
+                
+                // Select source based on probability
+                val sourceId = if (defaults.getRandomSpeedSource(random) == llm.slop.spirals.models.SpeedSource.BEAT) {
+                    "beatPhase"
+                } else {
+                    "lfo1"
+                }
+                
+                // Get appropriate time/division range
+                val subdivision = if (sourceId == "beatPhase") {
+                    // Get beat division from range
+                    val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
+                    if (validValues.isNotEmpty()) {
+                        validValues.random(random)
+                    } else {
+                        // Fallback
+                        4f
+                    }
+                } else {
+                    // Get LFO time
+                    random.nextInt(defaults.lfoTimeMin.toInt(), defaults.lfoTimeMax.toInt() + 1).toFloat()
+                }
                 
                 param.modulators.add(
                     CvModulator(
-                        sourceId = "beatPhase",
+                        sourceId = sourceId,
                         operator = ModulationOperator.ADD,
                         waveform = Waveform.TRIANGLE,
-                        slope = if (random.nextBoolean()) 0f else 1f,
+                        slope = slope,
                         weight = 1.0f,
                         phaseOffset = random.nextFloat(),
-                        subdivision = usableValues.random(random)
+                        subdivision = subdivision
                     )
                 )
             }
@@ -243,23 +303,47 @@ class RandomSetGenerator(private val context: Context) {
         random: kotlin.random.Random
     ) {
         if (constraints == null) {
-            // Default: random hue cycling
+            // Use defaults from settings
+            val defaults = defaultsConfig.getHueOffsetDefaults()
+            
             visualSource.parameters["Hue Offset"]?.let { param ->
                 param.baseValue = 0f
                 param.modulators.clear()
                 
-                // Select values 4 to 16 for default behavior (matching previous range)
-                val usableValues = STANDARD_BEAT_VALUES.filter { it >= 4f && it <= 16f }
+                // Select direction based on probability
+                val slope = defaults.getRandomDirection(random)
+                
+                // Select source based on probability
+                val sourceId = if (defaults.getRandomSpeedSource(random) == llm.slop.spirals.models.SpeedSource.BEAT) {
+                    "beatPhase"
+                } else {
+                    "lfo1"
+                }
+                
+                // Get appropriate time/division range
+                val subdivision = if (sourceId == "beatPhase") {
+                    // Get beat division from range
+                    val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
+                    if (validValues.isNotEmpty()) {
+                        validValues.random(random)
+                    } else {
+                        // Fallback
+                        4f
+                    }
+                } else {
+                    // Get LFO time
+                    random.nextInt(defaults.lfoTimeMin.toInt(), defaults.lfoTimeMax.toInt() + 1).toFloat()
+                }
                 
                 param.modulators.add(
                     CvModulator(
-                        sourceId = "beatPhase",
+                        sourceId = sourceId,
                         operator = ModulationOperator.ADD,
                         waveform = Waveform.TRIANGLE,
-                        slope = if (random.nextBoolean()) 0f else 1f,
+                        slope = slope,
                         weight = 1.0f,
                         phaseOffset = random.nextFloat(),
-                        subdivision = usableValues.random(random)
+                        subdivision = subdivision
                     )
                 )
             }

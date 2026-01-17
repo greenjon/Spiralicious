@@ -50,6 +50,7 @@ import llm.slop.spirals.ui.components.RecipePickerDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import llm.slop.spirals.cv.CvRegistry
+import llm.slop.spirals.defaults.DefaultsConfig
 import llm.slop.spirals.models.MixerPatch
 import llm.slop.spirals.models.ShowPatch
 import kotlinx.serialization.json.Json
@@ -492,58 +493,99 @@ class MainActivity : ComponentActivity() {
         onModeChange: (StartupMode) -> Unit,
         onClose: () -> Unit
     ) {
-        Dialog(onDismissRequest = onClose) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight(),
-                shape = MaterialTheme.shapes.medium,
-                color = AppBackground,
-                border = androidx.compose.foundation.BorderStroke(1.dp, AppText.copy(alpha = 0.1f))
+        val context = LocalContext.current
+        val defaultsConfig = remember { DefaultsConfig.getInstance(context) }
+        var showGlobalDefaults by remember { mutableStateOf(false) }
+        
+        if (showGlobalDefaults) {
+            Dialog(
+                onDismissRequest = { showGlobalDefaults = false },
+                properties = androidx.compose.ui.window.DialogProperties(
+                    dismissOnBackPress = true,
+                    dismissOnClickOutside = false,
+                    usePlatformDefaultWidth = false
+                )
             ) {
-                Column(modifier = Modifier.padding(24.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Settings", style = MaterialTheme.typography.headlineSmall, color = AppText)
-                        IconButton(onClick = onClose) {
-                            Icon(Icons.Default.Close, contentDescription = "Close", tint = AppText)
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
-                    Text("Start app with...", style = MaterialTheme.typography.titleMedium, color = AppText)
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    StartupMode.entries.forEach { mode ->
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    shape = MaterialTheme.shapes.medium,
+                    color = AppBackground,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, AppText.copy(alpha = 0.1f))
+                ) {
+                    llm.slop.spirals.ui.settings.GlobalDefaultsScreen(
+                        defaultsConfig = defaultsConfig,
+                        onClose = { showGlobalDefaults = false }
+                    )
+                }
+            }
+        } else {
+            Dialog(onDismissRequest = onClose) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
+                    shape = MaterialTheme.shapes.medium,
+                    color = AppBackground,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, AppText.copy(alpha = 0.1f))
+                ) {
+                    Column(modifier = Modifier.padding(24.dp)) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onModeChange(mode) }
-                                .padding(vertical = 12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            RadioButton(
-                                selected = currentMode == mode,
-                                onClick = { onModeChange(mode) },
-                                colors = RadioButtonDefaults.colors(selectedColor = AppAccent, unselectedColor = AppText.copy(alpha = 0.6f))
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = when(mode) {
-                                    StartupMode.LAST_WORKSPACE -> "Last Workspace"
-                                    StartupMode.MIXER -> "Mixer Editor"
-                                    StartupMode.SET -> "Set Editor"
-                                    StartupMode.MANDALA -> "Mandala Editor"
-                                    StartupMode.SHOW -> "Show Editor"
-                                },
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = AppText
-                            )
+                            Text("Settings", style = MaterialTheme.typography.headlineSmall, color = AppText)
+                            IconButton(onClick = onClose) {
+                                Icon(Icons.Default.Close, contentDescription = "Close", tint = AppText)
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        Text("Start app with...", style = MaterialTheme.typography.titleMedium, color = AppText)
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        StartupMode.entries.forEach { mode ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onModeChange(mode) }
+                                    .padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = currentMode == mode,
+                                    onClick = { onModeChange(mode) },
+                                    colors = RadioButtonDefaults.colors(selectedColor = AppAccent, unselectedColor = AppText.copy(alpha = 0.6f))
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = when(mode) {
+                                        StartupMode.LAST_WORKSPACE -> "Last Workspace"
+                                        StartupMode.MIXER -> "Mixer Editor"
+                                        StartupMode.SET -> "Set Editor"
+                                        StartupMode.MANDALA -> "Mandala Editor"
+                                        StartupMode.SHOW -> "Show Editor"
+                                    },
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = AppText
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        Button(
+                            onClick = { showGlobalDefaults = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = AppAccent),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Randomization Defaults")
                         }
                     }
                 }

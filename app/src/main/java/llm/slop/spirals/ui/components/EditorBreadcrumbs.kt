@@ -77,6 +77,7 @@ fun EditorBreadcrumbs(
                         is llm.slop.spirals.SetLayerContent -> data.set.name
                         is llm.slop.spirals.MixerLayerContent -> data.mixer.name
                         is llm.slop.spirals.ShowLayerContent -> data.show.name
+                        is llm.slop.spirals.RandomSetLayerContent -> data.randomSet.name
                         null -> layer.name
                     }
                     

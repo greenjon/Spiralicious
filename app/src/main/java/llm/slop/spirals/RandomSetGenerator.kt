@@ -55,64 +55,269 @@ class RandomSetGenerator(private val context: Context) {
         }
         
         // 3. Apply constraints to L1-L4
-        // Phase 1: Use default randomization (Phase 2 will use rset.l1Constraints, etc.)
-        listOf("L1", "L2", "L3", "L4").forEach { paramName ->
-            visualSource.parameters[paramName]?.let { param ->
-                param.baseValue = 0.2f // Base 20%
+        applyArmConstraints("L1", rset.l1Constraints, visualSource, random)
+        applyArmConstraints("L2", rset.l2Constraints, visualSource, random)
+        applyArmConstraints("L3", rset.l3Constraints, visualSource, random)
+        applyArmConstraints("L4", rset.l4Constraints, visualSource, random)
+        
+        // 4. Apply rotation constraints
+        applyRotationConstraints(rset.rotationConstraints, visualSource, random)
+        
+        // 5. Apply hue offset constraints
+        applyHueOffsetConstraints(rset.hueOffsetConstraints, visualSource, random)
+        
+        // 6. Apply feedback mode
+        applyFeedbackMode(rset.feedbackMode, visualSource)
+    }
+    
+    /**
+     * Applies arm parameter constraints with full Phase 2 support.
+     */
+    private fun applyArmConstraints(
+        paramName: String,
+        constraints: llm.slop.spirals.models.ArmConstraints?,
+        visualSource: MandalaVisualSource,
+        random: kotlin.random.Random
+    ) {
+        visualSource.parameters[paramName]?.let { param ->
+            // Use constraints if provided, otherwise use defaults
+            val c = constraints ?: llm.slop.spirals.models.ArmConstraints()
+            
+            // Base value from range
+            param.baseValue = (random.nextInt(c.baseLengthMin, c.baseLengthMax + 1) / 100f)
+            param.modulators.clear()
+            
+            // Add modulator if Beat or LFO is enabled
+            if (c.enableBeat || c.enableLfo) {
+                // Select waveform from allowed options
+                val allowedWaveforms = mutableListOf<Waveform>()
+                if (c.allowSine) allowedWaveforms.add(Waveform.SINE)
+                if (c.allowTriangle) allowedWaveforms.add(Waveform.TRIANGLE)
+                if (c.allowSquare) allowedWaveforms.add(Waveform.SQUARE)
+                
+                // Fall back to SINE if no waveforms selected
+                val waveform = if (allowedWaveforms.isNotEmpty()) {
+                    allowedWaveforms.random(random)
+                } else {
+                    Waveform.SINE
+                }
+                
+                // Weight from range (convert to 0-1 scale)
+                val weight = random.nextInt(c.weightMin, c.weightMax + 1) / 100f
+                
+                // Choose beat or LFO based on what's enabled
+                val useBeat = when {
+                    c.enableBeat && c.enableLfo -> random.nextBoolean()
+                    c.enableBeat -> true
+                    else -> false
+                }
+                
+                if (useBeat) {
+                    // Beat subdivision from range
+                    val subdivision = random.nextInt(c.beatDivMin.toInt(), c.beatDivMax.toInt() + 1).toFloat()
+                    
+                    param.modulators.add(
+                        CvModulator(
+                            sourceId = "beatPhase",
+                            operator = ModulationOperator.ADD,
+                            waveform = waveform,
+                            slope = 0.5f,
+                            weight = weight,
+                            phaseOffset = random.nextFloat(),
+                            subdivision = subdivision
+                        )
+                    )
+                } else {
+                    // LFO time from range (convert to frequency)
+                    val timeSeconds = random.nextInt(c.lfoTimeMin.toInt(), c.lfoTimeMax.toInt() + 1).toFloat()
+                    
+                    param.modulators.add(
+                        CvModulator(
+                            sourceId = "lfo1",
+                            operator = ModulationOperator.ADD,
+                            waveform = waveform,
+                            slope = 0.5f,
+                            weight = weight,
+                            phaseOffset = random.nextFloat(),
+                            subdivision = timeSeconds
+                        )
+                    )
+                }
+            }
+        }
+    }
+    
+    /**
+     * Applies rotation constraints with full Phase 2 support.
+     */
+    private fun applyRotationConstraints(
+        constraints: llm.slop.spirals.models.RotationConstraints?,
+        visualSource: MandalaVisualSource,
+        random: kotlin.random.Random
+    ) {
+        if (constraints == null) {
+            // Default: random rotation
+            visualSource.parameters["Rotation"]?.let { param ->
+                param.baseValue = 0f
                 param.modulators.clear()
                 param.modulators.add(
                     CvModulator(
                         sourceId = "beatPhase",
                         operator = ModulationOperator.ADD,
-                        waveform = if (random.nextBoolean()) Waveform.SINE else Waveform.TRIANGLE,
-                        slope = 0.5f,
-                        weight = random.nextFloat() * 0.5f + 0.1f, // 10-60%
+                        waveform = Waveform.TRIANGLE,
+                        slope = if (random.nextBoolean()) 0f else 1f,
+                        weight = 1.0f,
                         phaseOffset = random.nextFloat(),
-                        subdivision = random.nextInt(8, 33).toFloat() // 8-32
+                        subdivision = random.nextInt(4, 129).toFloat()
                     )
                 )
             }
+            return
         }
         
-        // 4. Apply rotation constraints
-        // Phase 1: Use default randomization (Phase 2 will use rset.rotationConstraints)
         visualSource.parameters["Rotation"]?.let { param ->
             param.baseValue = 0f
             param.modulators.clear()
+            
+            // Determine direction (slope: 0 = clockwise ramp down, 1 = counter-clockwise ramp up)
+            val directions = mutableListOf<Float>()
+            if (constraints.enableClockwise) directions.add(0f)
+            if (constraints.enableCounterClockwise) directions.add(1f)
+            
+            val slope = if (directions.isNotEmpty()) {
+                directions.random(random)
+            } else {
+                0f // Default to clockwise if nothing selected
+            }
+            
+            val sourceId: String
+            val subdivision: Float
+            
+            if (constraints.speedSource == llm.slop.spirals.models.SpeedSource.BEAT) {
+                sourceId = "beatPhase"
+                subdivision = random.nextInt(constraints.beatDivMin.toInt(), constraints.beatDivMax.toInt() + 1).toFloat()
+            } else {
+                sourceId = "lfo1"
+                subdivision = random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
+            }
+            
             param.modulators.add(
                 CvModulator(
-                    sourceId = "beatPhase",
+                    sourceId = sourceId,
                     operator = ModulationOperator.ADD,
                     waveform = Waveform.TRIANGLE,
-                    slope = if (random.nextBoolean()) 0f else 1f,
+                    slope = slope,
                     weight = 1.0f,
                     phaseOffset = random.nextFloat(),
-                    subdivision = random.nextInt(4, 129).toFloat() // 4-128
+                    subdivision = subdivision
                 )
             )
         }
+    }
+    
+    /**
+     * Applies hue offset constraints with full Phase 2 support.
+     */
+    private fun applyHueOffsetConstraints(
+        constraints: llm.slop.spirals.models.HueOffsetConstraints?,
+        visualSource: MandalaVisualSource,
+        random: kotlin.random.Random
+    ) {
+        if (constraints == null) {
+            // Default: random hue cycling
+            visualSource.parameters["Hue Offset"]?.let { param ->
+                param.baseValue = 0f
+                param.modulators.clear()
+                param.modulators.add(
+                    CvModulator(
+                        sourceId = "beatPhase",
+                        operator = ModulationOperator.ADD,
+                        waveform = Waveform.TRIANGLE,
+                        slope = if (random.nextBoolean()) 0f else 1f,
+                        weight = 1.0f,
+                        phaseOffset = random.nextFloat(),
+                        subdivision = random.nextInt(4, 17).toFloat()
+                    )
+                )
+            }
+            return
+        }
         
-        // 5. Apply hue offset constraints
-        // Phase 1: Use default randomization (Phase 2 will use rset.hueOffsetConstraints)
         visualSource.parameters["Hue Offset"]?.let { param ->
             param.baseValue = 0f
             param.modulators.clear()
+            
+            // Determine direction
+            val directions = mutableListOf<Float>()
+            if (constraints.enableForward) directions.add(1f)
+            if (constraints.enableReverse) directions.add(0f)
+            
+            val slope = if (directions.isNotEmpty()) {
+                directions.random(random)
+            } else {
+                1f // Default to forward
+            }
+            
+            val sourceId: String
+            val subdivision: Float
+            
+            if (constraints.speedSource == llm.slop.spirals.models.SpeedSource.BEAT) {
+                sourceId = "beatPhase"
+                subdivision = random.nextInt(constraints.beatDivMin.toInt(), constraints.beatDivMax.toInt() + 1).toFloat()
+            } else {
+                sourceId = "lfo1"
+                subdivision = random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
+            }
+            
             param.modulators.add(
                 CvModulator(
-                    sourceId = "beatPhase",
+                    sourceId = sourceId,
                     operator = ModulationOperator.ADD,
                     waveform = Waveform.TRIANGLE,
-                    slope = if (random.nextBoolean()) 0f else 1f,
+                    slope = slope,
                     weight = 1.0f,
                     phaseOffset = random.nextFloat(),
-                    subdivision = random.nextInt(4, 17).toFloat() // 4-16
+                    subdivision = subdivision
                 )
             )
         }
-        
-        // 6. Apply feedback mode
-        // Phase 1: Just set to none (Phase 2 will apply feedback presets)
-        // Feedback parameters are not currently exposed in visual source, so skip for now
+    }
+    
+    /**
+     * Applies feedback mode presets.
+     * Note: Feedback parameters may need to be added to MandalaVisualSource for full support.
+     */
+    private fun applyFeedbackMode(
+        mode: llm.slop.spirals.models.FeedbackMode,
+        visualSource: MandalaVisualSource
+    ) {
+        when (mode) {
+            llm.slop.spirals.models.FeedbackMode.NONE -> {
+                visualSource.parameters["FB Decay"]?.baseValue = 0f
+                visualSource.parameters["FB Gain"]?.baseValue = 1f
+            }
+            llm.slop.spirals.models.FeedbackMode.LIGHT -> {
+                visualSource.parameters["FB Decay"]?.baseValue = 0.05f
+                visualSource.parameters["FB Gain"]?.baseValue = 0.95f
+                visualSource.parameters["FB Zoom"]?.baseValue = 0.51f
+                visualSource.parameters["FB Rotate"]?.baseValue = 0.50f
+            }
+            llm.slop.spirals.models.FeedbackMode.MEDIUM -> {
+                visualSource.parameters["FB Decay"]?.baseValue = 0.15f
+                visualSource.parameters["FB Gain"]?.baseValue = 0.90f
+                visualSource.parameters["FB Zoom"]?.baseValue = 0.52f
+                visualSource.parameters["FB Rotate"]?.baseValue = 0.51f
+            }
+            llm.slop.spirals.models.FeedbackMode.HEAVY -> {
+                visualSource.parameters["FB Decay"]?.baseValue = 0.30f
+                visualSource.parameters["FB Gain"]?.baseValue = 0.85f
+                visualSource.parameters["FB Zoom"]?.baseValue = 0.54f
+                visualSource.parameters["FB Rotate"]?.baseValue = 0.52f
+            }
+            llm.slop.spirals.models.FeedbackMode.CUSTOM -> {
+                // For future: user-defined ranges
+            }
+        }
     }
     
     /**

@@ -394,40 +394,254 @@ fun ArmsTab(
             text = "Arm Constraints",
             style = MaterialTheme.typography.titleMedium,
             color = AppText,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 8.dp)
         )
         
         Text(
-            text = "Configure constraints for L1-L4 arm parameters. Null values use randomize defaults.",
+            text = "Configure L1-L4 (outer to inner arms). Leave unconfigured to use defaults.",
             style = MaterialTheme.typography.bodySmall,
             color = AppText.copy(alpha = 0.7f),
             modifier = Modifier.padding(bottom = 16.dp)
         )
         
-        // For Phase 1, show a simple placeholder
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            colors = CardDefaults.cardColors(containerColor = AppBackground.copy(alpha = 0.3f))
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+        ArmConstraintSection(
+            title = "L1 (Outer Arm)",
+            constraints = rset.l1Constraints,
+            onUpdate = { onUpdate(rset.copy(l1Constraints = it)) },
+            onClear = { onUpdate(rset.copy(l1Constraints = null)) }
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        ArmConstraintSection(
+            title = "L2",
+            constraints = rset.l2Constraints,
+            onUpdate = { onUpdate(rset.copy(l2Constraints = it)) },
+            onClear = { onUpdate(rset.copy(l2Constraints = null)) }
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        ArmConstraintSection(
+            title = "L3",
+            constraints = rset.l3Constraints,
+            onUpdate = { onUpdate(rset.copy(l3Constraints = it)) },
+            onClear = { onUpdate(rset.copy(l3Constraints = null)) }
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        ArmConstraintSection(
+            title = "L4 (Inner Arm)",
+            constraints = rset.l4Constraints,
+            onUpdate = { onUpdate(rset.copy(l4Constraints = it)) },
+            onClear = { onUpdate(rset.copy(l4Constraints = null)) }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ArmConstraintSection(
+    title: String,
+    constraints: ArmConstraints?,
+    onUpdate: (ArmConstraints) -> Unit,
+    onClear: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(constraints != null) }
+    
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (constraints != null) AppAccent.copy(alpha = 0.1f) else AppBackground.copy(alpha = 0.3f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = AppText,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Detailed arm controls coming soon",
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = AppText,
+                    modifier = Modifier.weight(1f)
+                )
+                if (constraints != null) {
+                    Text(
+                        text = "✓ configured",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppAccent,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                } else {
+                    Text(
+                        text = "using defaults",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = AppText.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                }
+            }
+            
+            if (expanded) {
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                val currentConstraints = constraints ?: ArmConstraints()
+                
+                // Base Length Range
+                Text(
+                    text = "Base Length: ${currentConstraints.baseLengthMin}-${currentConstraints.baseLengthMax}%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppText,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                RangeSlider(
+                    value = currentConstraints.baseLengthMin.toFloat()..currentConstraints.baseLengthMax.toFloat(),
+                    onValueChange = { range ->
+                        onUpdate(currentConstraints.copy(
+                            baseLengthMin = range.start.toInt(),
+                            baseLengthMax = range.endInclusive.toInt()
+                        ))
+                    },
+                    valueRange = 0f..100f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = AppAccent,
+                        activeTrackColor = AppAccent
+                    )
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Movement sources
+                Text(
+                    text = "Movement Sources:",
+                    style = MaterialTheme.typography.bodySmall,
                     color = AppText
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = currentConstraints.enableBeat,
+                            onCheckedChange = { onUpdate(currentConstraints.copy(enableBeat = it)) },
+                            colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                        )
+                        Text("Beat", color = AppText, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = currentConstraints.enableLfo,
+                            onCheckedChange = { onUpdate(currentConstraints.copy(enableLfo = it)) },
+                            colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                        )
+                        Text("LFO", color = AppText, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                
                 Spacer(modifier = Modifier.height(8.dp))
+                
+                // Waveforms
                 Text(
-                    text = "Phase 1: Uses default randomization logic\nPhase 2: Will add granular per-arm constraints",
+                    text = "Waveforms:",
                     style = MaterialTheme.typography.bodySmall,
-                    color = AppText.copy(alpha = 0.7f)
+                    color = AppText
                 )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = currentConstraints.allowSine,
+                            onCheckedChange = { onUpdate(currentConstraints.copy(allowSine = it)) },
+                            colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                        )
+                        Text("Sine", color = AppText, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = currentConstraints.allowTriangle,
+                            onCheckedChange = { onUpdate(currentConstraints.copy(allowTriangle = it)) },
+                            colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                        )
+                        Text("Triangle", color = AppText, style = MaterialTheme.typography.bodySmall)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = currentConstraints.allowSquare,
+                            onCheckedChange = { onUpdate(currentConstraints.copy(allowSquare = it)) },
+                            colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                        )
+                        Text("Square", color = AppText, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Weight Range
+                Text(
+                    text = "Weight: ${currentConstraints.weightMin} to ${currentConstraints.weightMax}%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppText,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                RangeSlider(
+                    value = currentConstraints.weightMin.toFloat()..currentConstraints.weightMax.toFloat(),
+                    onValueChange = { range ->
+                        onUpdate(currentConstraints.copy(
+                            weightMin = range.start.toInt(),
+                            weightMax = range.endInclusive.toInt()
+                        ))
+                    },
+                    valueRange = -100f..100f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = AppAccent,
+                        activeTrackColor = AppAccent
+                    )
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Action buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (constraints == null) {
+                        Button(
+                            onClick = { onUpdate(ArmConstraints()) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = AppAccent)
+                        ) {
+                            Text("Enable Constraints", style = MaterialTheme.typography.labelSmall)
+                        }
+                    } else {
+                        OutlinedButton(
+                            onClick = onClear,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Use Defaults", style = MaterialTheme.typography.labelSmall, color = AppText)
+                        }
+                    }
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MotionTab(
     rset: RandomSet,
@@ -444,40 +658,170 @@ fun MotionTab(
             text = "Rotation Constraints",
             style = MaterialTheme.typography.titleMedium,
             color = AppText,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 8.dp)
         )
         
         Text(
-            text = "Configure rotation direction and speed for generated mandalas.",
+            text = "Configure smooth rotation for generated mandalas.",
             style = MaterialTheme.typography.bodySmall,
             color = AppText.copy(alpha = 0.7f),
             modifier = Modifier.padding(bottom = 16.dp)
         )
         
-        // Placeholder for Phase 1
+        val currentConstraints = rset.rotationConstraints
+        val isEnabled = currentConstraints != null
+        
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            colors = CardDefaults.cardColors(containerColor = AppBackground.copy(alpha = 0.3f))
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isEnabled) AppAccent.copy(alpha = 0.1f) else AppBackground.copy(alpha = 0.3f)
+            )
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Motion controls coming soon",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AppText
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Phase 1: Uses default randomization logic\nPhase 2: Will add rotation and speed constraints",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AppText.copy(alpha = 0.7f)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isEnabled) "✓ Rotation Enabled" else "Rotation Disabled",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (isEnabled) AppAccent else AppText.copy(alpha = 0.7f),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        checked = isEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled) {
+                                onUpdate(rset.copy(rotationConstraints = RotationConstraints()))
+                            } else {
+                                onUpdate(rset.copy(rotationConstraints = null))
+                            }
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = AppAccent, checkedTrackColor = AppAccent.copy(alpha = 0.5f))
+                    )
+                }
+                
+                if (isEnabled) {
+                    val constraints = currentConstraints!!
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Direction
+                    Text(
+                        text = "Direction:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AppText,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = constraints.enableClockwise,
+                                onCheckedChange = { 
+                                    onUpdate(rset.copy(rotationConstraints = constraints.copy(enableClockwise = it)))
+                                },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                            )
+                            Text("Clockwise", color = AppText, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = constraints.enableCounterClockwise,
+                                onCheckedChange = { 
+                                    onUpdate(rset.copy(rotationConstraints = constraints.copy(enableCounterClockwise = it)))
+                                },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                            )
+                            Text("Counter-CW", color = AppText, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Speed Source
+                    Text(
+                        text = "Speed Control:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AppText,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = constraints.speedSource == SpeedSource.BEAT,
+                                onClick = { onUpdate(rset.copy(rotationConstraints = constraints.copy(speedSource = SpeedSource.BEAT))) },
+                                colors = RadioButtonDefaults.colors(selectedColor = AppAccent)
+                            )
+                            Text("Beat", color = AppText, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = constraints.speedSource == SpeedSource.LFO,
+                                onClick = { onUpdate(rset.copy(rotationConstraints = constraints.copy(speedSource = SpeedSource.LFO))) },
+                                colors = RadioButtonDefaults.colors(selectedColor = AppAccent)
+                            )
+                            Text("LFO", color = AppText, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    if (constraints.speedSource == SpeedSource.BEAT) {
+                        Text(
+                            text = "Beat Division: ${constraints.beatDivMin.toInt()}-${constraints.beatDivMax.toInt()}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppText,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        RangeSlider(
+                            value = constraints.beatDivMin..constraints.beatDivMax,
+                            onValueChange = { range ->
+                                onUpdate(rset.copy(rotationConstraints = constraints.copy(
+                                    beatDivMin = range.start,
+                                    beatDivMax = range.endInclusive
+                                )))
+                            },
+                            valueRange = 1f..256f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = AppAccent,
+                                activeTrackColor = AppAccent
+                            )
+                        )
+                    } else {
+                        Text(
+                            text = "LFO Time: ${constraints.lfoTimeMin.toInt()}s-${constraints.lfoTimeMax.toInt()}s",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppText,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        RangeSlider(
+                            value = constraints.lfoTimeMin..constraints.lfoTimeMax,
+                            onValueChange = { range ->
+                                onUpdate(rset.copy(rotationConstraints = constraints.copy(
+                                    lfoTimeMin = range.start,
+                                    lfoTimeMax = range.endInclusive
+                                )))
+                            },
+                            valueRange = 1f..900f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = AppAccent,
+                                activeTrackColor = AppAccent
+                            )
+                        )
+                    }
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ColorTab(
     rset: RandomSet,
@@ -494,35 +838,164 @@ fun ColorTab(
             text = "Hue Offset Constraints",
             style = MaterialTheme.typography.titleMedium,
             color = AppText,
-            modifier = Modifier.padding(bottom = 16.dp)
+            modifier = Modifier.padding(bottom = 8.dp)
         )
         
         Text(
-            text = "Configure color cycling behavior for generated mandalas.",
+            text = "Configure color cycling (rainbow shift) for generated mandalas.",
             style = MaterialTheme.typography.bodySmall,
             color = AppText.copy(alpha = 0.7f),
             modifier = Modifier.padding(bottom = 16.dp)
         )
         
-        // Placeholder for Phase 1
+        val currentConstraints = rset.hueOffsetConstraints
+        val isEnabled = currentConstraints != null
+        
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            colors = CardDefaults.cardColors(containerColor = AppBackground.copy(alpha = 0.3f))
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isEnabled) AppAccent.copy(alpha = 0.1f) else AppBackground.copy(alpha = 0.3f)
+            )
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Color controls coming soon",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AppText
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Phase 1: Uses default randomization logic\nPhase 2: Will add hue offset constraints",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AppText.copy(alpha = 0.7f)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (isEnabled) "✓ Color Cycling Enabled" else "Color Cycling Disabled",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (isEnabled) AppAccent else AppText.copy(alpha = 0.7f),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        checked = isEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled) {
+                                onUpdate(rset.copy(hueOffsetConstraints = HueOffsetConstraints()))
+                            } else {
+                                onUpdate(rset.copy(hueOffsetConstraints = null))
+                            }
+                        },
+                        colors = SwitchDefaults.colors(checkedThumbColor = AppAccent, checkedTrackColor = AppAccent.copy(alpha = 0.5f))
+                    )
+                }
+                
+                if (isEnabled) {
+                    val constraints = currentConstraints!!
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Direction
+                    Text(
+                        text = "Direction:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AppText,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = constraints.enableForward,
+                                onCheckedChange = { 
+                                    onUpdate(rset.copy(hueOffsetConstraints = constraints.copy(enableForward = it)))
+                                },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                            )
+                            Text("Forward", color = AppText, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = constraints.enableReverse,
+                                onCheckedChange = { 
+                                    onUpdate(rset.copy(hueOffsetConstraints = constraints.copy(enableReverse = it)))
+                                },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                            )
+                            Text("Reverse", color = AppText, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Speed Source
+                    Text(
+                        text = "Speed Control:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = AppText,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = constraints.speedSource == SpeedSource.BEAT,
+                                onClick = { onUpdate(rset.copy(hueOffsetConstraints = constraints.copy(speedSource = SpeedSource.BEAT))) },
+                                colors = RadioButtonDefaults.colors(selectedColor = AppAccent)
+                            )
+                            Text("Beat", color = AppText, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(
+                                selected = constraints.speedSource == SpeedSource.LFO,
+                                onClick = { onUpdate(rset.copy(hueOffsetConstraints = constraints.copy(speedSource = SpeedSource.LFO))) },
+                                colors = RadioButtonDefaults.colors(selectedColor = AppAccent)
+                            )
+                            Text("LFO", color = AppText, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    if (constraints.speedSource == SpeedSource.BEAT) {
+                        Text(
+                            text = "Beat Division: ${constraints.beatDivMin.toInt()}-${constraints.beatDivMax.toInt()}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppText,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        RangeSlider(
+                            value = constraints.beatDivMin..constraints.beatDivMax,
+                            onValueChange = { range ->
+                                onUpdate(rset.copy(hueOffsetConstraints = constraints.copy(
+                                    beatDivMin = range.start,
+                                    beatDivMax = range.endInclusive
+                                )))
+                            },
+                            valueRange = 1f..64f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = AppAccent,
+                                activeTrackColor = AppAccent
+                            )
+                        )
+                    } else {
+                        Text(
+                            text = "LFO Time: ${constraints.lfoTimeMin.toInt()}s-${constraints.lfoTimeMax.toInt()}s",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppText,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        RangeSlider(
+                            value = constraints.lfoTimeMin..constraints.lfoTimeMax,
+                            onValueChange = { range ->
+                                onUpdate(rset.copy(hueOffsetConstraints = constraints.copy(
+                                    lfoTimeMin = range.start,
+                                    lfoTimeMax = range.endInclusive
+                                )))
+                            },
+                            valueRange = 1f..600f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = AppAccent,
+                                activeTrackColor = AppAccent
+                            )
+                        )
+                    }
+                }
             }
         }
     }

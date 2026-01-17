@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import llm.slop.spirals.*
 import llm.slop.spirals.models.*
@@ -27,9 +28,11 @@ fun RandomSetEditorScreen(
     vm: MandalaViewModel,
     onClose: () -> Unit,
     previewContent: @Composable () -> Unit,
+    visualSource: MandalaVisualSource,
     showManager: Boolean = false,
     onHideManager: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val allRandomSets by vm.allRandomSets.collectAsState(initial = emptyList())
     
     // Initialize from layer data if available
@@ -38,6 +41,7 @@ fun RandomSetEditorScreen(
     
     var currentRSet by remember { mutableStateOf((layer?.data as? RandomSetLayerContent)?.randomSet) }
     var selectedTab by remember { mutableStateOf(0) }
+    var regenerateTrigger by remember { mutableIntStateOf(0) }
     
     // Update local state if nav data changes (e.g. from Manage overlay)
     LaunchedEffect(layer?.data) {
@@ -54,6 +58,17 @@ fun RandomSetEditorScreen(
         if (layerIndex != -1 && currentRSet != null) {
             vm.updateLayerData(layerIndex, RandomSetLayerContent(currentRSet!!), isDirty = true)
             vm.updateLayerName(layerIndex, currentRSet!!.name)
+        }
+    }
+    
+    // Generate preview when RSet or regenerate trigger changes
+    LaunchedEffect(currentRSet, regenerateTrigger) {
+        if (currentRSet != null) {
+            val generator = RandomSetGenerator(context)
+            generator.generateFromRSet(currentRSet!!, visualSource)
+            visualSource.globalAlpha.baseValue = 1f
+        } else {
+            visualSource.globalAlpha.baseValue = 0f
         }
     }
     
@@ -94,6 +109,21 @@ fun RandomSetEditorScreen(
                             text = currentRSet!!.name,
                             style = MaterialTheme.typography.titleMedium,
                             color = Color.White
+                        )
+                    }
+                    
+                    // Next/Regenerate button (center-left)
+                    IconButton(
+                        onClick = { regenerateTrigger++ },
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(16.dp)
+                            .background(AppAccent.copy(alpha = 0.3f), MaterialTheme.shapes.small)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Generate New",
+                            tint = AppAccent
                         )
                     }
                 }

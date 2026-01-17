@@ -66,6 +66,9 @@ fun MixerEditorScreen(
     var showSetPickerForSlot by remember { mutableStateOf<Int?>(null) }
     var showMandalaPickerForSlot by remember { mutableStateOf<Int?>(null) }
     var showRandomSetPickerForSlot by remember { mutableStateOf<Int?>(null) }
+    
+    // Generation triggers for random sets (one per slot)
+    var randomSetTriggers by remember { mutableStateOf(List(4) { 0 }) }
 
     val mainRenderer = LocalSpiralRenderer.current
 
@@ -84,7 +87,7 @@ fun MixerEditorScreen(
         }
     }
 
-    LaunchedEffect(mainRenderer, currentPatch, monitorSource, allSets, allPatches, allRandomSets) {
+    LaunchedEffect(mainRenderer, currentPatch, monitorSource, allSets, allPatches, allRandomSets, randomSetTriggers) {
         if (mainRenderer == null) return@LaunchedEffect
         mainRenderer.mixerPatch = currentPatch
         mainRenderer.monitorSource = monitorSource
@@ -127,6 +130,7 @@ fun MixerEditorScreen(
                     rsetEntity?.let { re ->
                         val randomSet = Json.decodeFromString<llm.slop.spirals.models.RandomSet>(re.jsonSettings)
                         val generator = RandomSetGenerator(vm.getApplication())
+                        // Only regenerate when trigger changes (randomSetTriggers[index] is in dependencies)
                         generator.generateFromRSet(randomSet, source)
                     }
                 }
@@ -199,15 +203,15 @@ fun MixerEditorScreen(
             ) {
                 Column(modifier = Modifier.weight(3f)) {
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        SourceStrip(0, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 0 }, { showMandalaPickerForSlot = 0 }, { showRandomSetPickerForSlot = 0 }, allSets, allRandomSets, "1", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                        SourceStrip(0, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 0 }, { showMandalaPickerForSlot = 0 }, { showRandomSetPickerForSlot = 0 }, { randomSetTriggers = randomSetTriggers.toMutableList().apply { this[0]++ } }, allSets, allRandomSets, "1", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
                         MonitorStrip("A", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                        SourceStrip(1, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 1 }, { showMandalaPickerForSlot = 1 }, { showRandomSetPickerForSlot = 1 }, allSets, allRandomSets, "2", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                        SourceStrip(1, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 1 }, { showMandalaPickerForSlot = 1 }, { showRandomSetPickerForSlot = 1 }, { randomSetTriggers = randomSetTriggers.toMutableList().apply { this[1]++ } }, allSets, allRandomSets, "2", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
                     }
                     Spacer(modifier = Modifier.height(2.dp))
                     Row(modifier = Modifier.fillMaxWidth()) {
-                        SourceStrip(2, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 2 }, { showMandalaPickerForSlot = 2 }, { showRandomSetPickerForSlot = 2 }, allSets, allRandomSets, "3", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                        SourceStrip(2, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 2 }, { showMandalaPickerForSlot = 2 }, { showRandomSetPickerForSlot = 2 }, { randomSetTriggers = randomSetTriggers.toMutableList().apply { this[2]++ } }, allSets, allRandomSets, "3", Alignment.TopEnd, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
                         MonitorStrip("B", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
-                        SourceStrip(3, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 3 }, { showMandalaPickerForSlot = 3 }, { showRandomSetPickerForSlot = 3 }, allSets, allRandomSets, "4", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
+                        SourceStrip(3, currentPatch, { currentPatch = it }, mainRenderer, { showSetPickerForSlot = 3 }, { showMandalaPickerForSlot = 3 }, { showRandomSetPickerForSlot = 3 }, { randomSetTriggers = randomSetTriggers.toMutableList().apply { this[3]++ } }, allSets, allRandomSets, "4", Alignment.TopStart, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))
                     }
                 }
                 MonitorStrip("F", currentPatch, { currentPatch = it }, mainRenderer, false, true, {}, focusedParameterId, { focusedParameterId = it }, Modifier.weight(1f))

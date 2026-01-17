@@ -123,7 +123,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.SET -> "Set" to allSets.value.map { it.name }
             LayerType.MANDALA -> "Man" to allPatches.value.map { it.name }
             LayerType.SHOW -> "Show" to allShowPatches.value.map { it.name }
-            LayerType.RANDOM_SET -> "RSet" to allRandomSets.value.map { it.name }
+            LayerType.RANDOM_SET -> "Rand" to allRandomSets.value.map { it.name }
         }
         
         val regex = Regex("${prefix}(\\d+)")

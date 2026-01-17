@@ -68,10 +68,15 @@ fun KnobView(
                 // Sweep from center (12 o'clock / 270°)
                 // modulatedValue is expected to be -1.0 to 1.0
                 val sweep = modulatedValue * 150f // 150 deg max each side
+                
+                // Fix: Always use positive sweep angle, adjust start angle for negative values
+                val actualStartAngle = if (modulatedValue < 0) 270f + sweep else 270f
+                val actualSweep = if (modulatedValue < 0) -sweep else sweep
+                
                 drawArc(
                     color = if (focused) AppAccent else AppText,
-                    startAngle = 270f,
-                    sweepAngle = sweep,
+                    startAngle = actualStartAngle,
+                    sweepAngle = actualSweep,
                     useCenter = false,
                     topLeft = arcTopLeft,
                     size = arcSize,

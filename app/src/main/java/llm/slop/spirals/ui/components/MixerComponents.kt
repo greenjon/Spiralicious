@@ -183,6 +183,7 @@ fun SourceStrip(
     onPickSet: () -> Unit,
     onPickMandala: () -> Unit,
     onPickRandomSet: () -> Unit = {},
+    onRandomSetNext: () -> Unit = {},
     allSets: List<MandalaSetEntity>,
     allRandomSets: List<RandomSetEntity> = emptyList(),
     identity: String,
@@ -319,44 +320,62 @@ fun SourceStrip(
                     IconButton(
                         onClick = {
                             onFocusChange(prevNextId)
-                            if (slot.sourceType == VideoSourceType.MANDALA_SET) {
-                                val set = allSets.find { it.id == slot.mandalaSetId }
-                                set?.let {
-                                    val ids = try { Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds) } catch(e: Exception) { emptyList() }
-                                    if (ids.isNotEmpty()) {
-                                        val nextIdx = if (slot.currentIndex.baseValue <= 0) ids.size - 1 else slot.currentIndex.baseValue.toInt() - 1
-                                        val newSlots = patch.slots.toMutableList()
-                                        newSlots[index] = slot.copy(currentIndex = slot.currentIndex.copy(baseValue = nextIdx.toFloat()))
-                                        onPatchChange(patch.copy(slots = newSlots))
+                            when (slot.sourceType) {
+                                VideoSourceType.MANDALA_SET -> {
+                                    val set = allSets.find { it.id == slot.mandalaSetId }
+                                    set?.let {
+                                        val ids = try { Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds) } catch(e: Exception) { emptyList() }
+                                        if (ids.isNotEmpty()) {
+                                            val nextIdx = if (slot.currentIndex.baseValue <= 0) ids.size - 1 else slot.currentIndex.baseValue.toInt() - 1
+                                            val newSlots = patch.slots.toMutableList()
+                                            newSlots[index] = slot.copy(currentIndex = slot.currentIndex.copy(baseValue = nextIdx.toFloat()))
+                                            onPatchChange(patch.copy(slots = newSlots))
+                                        }
                                     }
                                 }
+                                VideoSourceType.RANDOM_SET -> {
+                                    onRandomSetNext()
+                                }
+                                else -> {}
                             }
                         },
                         modifier = Modifier.size(36.dp),
-                        enabled = slot.sourceType == VideoSourceType.MANDALA_SET
-                    ) { Icon(Icons.Default.KeyboardArrowLeft, null, tint = if (slot.sourceType == VideoSourceType.MANDALA_SET) arrowColor else arrowColor.copy(alpha = 0.2f), modifier = Modifier.size(32.dp)) }
+                        enabled = slot.sourceType == VideoSourceType.MANDALA_SET || slot.sourceType == VideoSourceType.RANDOM_SET
+                    ) { 
+                        val enabled = slot.sourceType == VideoSourceType.MANDALA_SET || slot.sourceType == VideoSourceType.RANDOM_SET
+                        Icon(Icons.Default.KeyboardArrowLeft, null, tint = if (enabled) arrowColor else arrowColor.copy(alpha = 0.2f), modifier = Modifier.size(32.dp)) 
+                    }
                     
                     Spacer(modifier = Modifier.width(8.dp))
 
                     IconButton(
                         onClick = {
                             onFocusChange(prevNextId)
-                            if (slot.sourceType == VideoSourceType.MANDALA_SET) {
-                                val set = allSets.find { it.id == slot.mandalaSetId }
-                                set?.let {
-                                    val ids = try { Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds) } catch(e: Exception) { emptyList() }
-                                    if (ids.isNotEmpty()) {
-                                        val nextIdx = (slot.currentIndex.baseValue.toInt() + 1) % ids.size
-                                        val newSlots = patch.slots.toMutableList()
-                                        newSlots[index] = slot.copy(currentIndex = slot.currentIndex.copy(baseValue = nextIdx.toFloat()))
-                                        onPatchChange(patch.copy(slots = newSlots))
+                            when (slot.sourceType) {
+                                VideoSourceType.MANDALA_SET -> {
+                                    val set = allSets.find { it.id == slot.mandalaSetId }
+                                    set?.let {
+                                        val ids = try { Json.decodeFromString<List<String>>(it.jsonOrderedMandalaIds) } catch(e: Exception) { emptyList() }
+                                        if (ids.isNotEmpty()) {
+                                            val nextIdx = (slot.currentIndex.baseValue.toInt() + 1) % ids.size
+                                            val newSlots = patch.slots.toMutableList()
+                                            newSlots[index] = slot.copy(currentIndex = slot.currentIndex.copy(baseValue = nextIdx.toFloat()))
+                                            onPatchChange(patch.copy(slots = newSlots))
+                                        }
                                     }
                                 }
+                                VideoSourceType.RANDOM_SET -> {
+                                    onRandomSetNext()
+                                }
+                                else -> {}
                             }
                         },
                         modifier = Modifier.size(36.dp),
-                        enabled = slot.sourceType == VideoSourceType.MANDALA_SET
-                    ) { Icon(Icons.Default.KeyboardArrowRight, null, tint = if (slot.sourceType == VideoSourceType.MANDALA_SET) arrowColor else arrowColor.copy(alpha = 0.2f), modifier = Modifier.size(32.dp)) }
+                        enabled = slot.sourceType == VideoSourceType.MANDALA_SET || slot.sourceType == VideoSourceType.RANDOM_SET
+                    ) { 
+                        val enabled = slot.sourceType == VideoSourceType.MANDALA_SET || slot.sourceType == VideoSourceType.RANDOM_SET
+                        Icon(Icons.Default.KeyboardArrowRight, null, tint = if (enabled) arrowColor else arrowColor.copy(alpha = 0.2f), modifier = Modifier.size(32.dp)) 
+                    }
                 }
             }
             VideoSourceType.COLOR -> {
@@ -515,9 +534,10 @@ fun MonitorStrip(
                 focused = focusedId == balId,
                 displayTransform = { 
                     val v = (it * 100).roundToInt()
+                    val (leftLabel, rightLabel) = if (group == "F") "A" to "B" else "L" to "R"
                     when {
-                        v < 0 -> "L${abs(v)}"
-                        v > 0 -> "R$v"
+                        v < 0 -> "$leftLabel${abs(v)}"
+                        v > 0 -> "$rightLabel$v"
                         else -> "0"
                     }
                 }

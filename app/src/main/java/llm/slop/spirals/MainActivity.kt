@@ -390,6 +390,7 @@ class MainActivity : ComponentActivity() {
                                         vm = vm,
                                         onClose = { vm.popToLayer(navStack.size - 2) },
                                         previewContent = previewContent,
+                                        visualSource = manager,
                                         showManager = showManager,
                                         onHideManager = { showManager = false }
                                     )

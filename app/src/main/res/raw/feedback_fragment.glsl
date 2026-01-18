@@ -64,14 +64,17 @@ void main() {
     // This preserves hues and prevents additive white-out.
     // We apply uGain to allow compensating for Blur/Zoom energy loss.
     // Note: uDecay is preserved for historical reasons but not actively used
+    // 
+    // The uGain value is now mapped from raw 0-1 to a better scaled 0.5-2.0 range
+    // with enhanced precision in the useful band (previously 0.5-0.75)
     vec3 feedbackPart = history.rgb * uGain;
     
     // Use max blend for the cleanest feedback effect
     vec3 composite = max(live.rgb, feedbackPart);
     
-    // Persistence: Use max for alpha but multiply by gain to eventually fade
-    // This will ensure the feedback is visible when gain is > 0.01 (the threshold)
-    float alpha = max(live.a, history.a * uGain);
+    // Persistence: Use max for alpha but multiply by gain
+    // Clamp to avoid over-persistence with high gain values
+    float alpha = max(live.a, history.a * min(uGain, 1.0));
     
     fragColor = vec4(composite, alpha);
 }

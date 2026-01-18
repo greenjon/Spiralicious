@@ -97,9 +97,20 @@ data class ArmDefaults(
      * Randomly select a waveform based on the configured probabilities
      */
     fun getRandomWaveform(random: kotlin.random.Random): Waveform {
+        // Calculate total probability to normalize
+        val totalProb = sineProbability + triangleProbability + squareProbability
+        
+        // If all are zero, use default fallback
+        if (totalProb <= 0) {
+            return Waveform.SINE
+        }
+        
+        // Normalize probabilities
+        val normalizedSine = sineProbability / totalProb
+        val normalizedTriangle = triangleProbability / totalProb
+        
+        // Generate random value and select based on normalized probabilities
         val roll = random.nextFloat()
-        val normalizedSine = sineProbability
-        val normalizedTriangle = triangleProbability
         
         return when {
             roll < normalizedSine -> Waveform.SINE

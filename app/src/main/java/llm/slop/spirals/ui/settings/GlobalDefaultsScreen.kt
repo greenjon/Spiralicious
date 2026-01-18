@@ -250,7 +250,7 @@ fun GlobalDefaultsScreen(
                                     )
                                     defaultsConfig.saveArmDefaults(armDefaults)
                                 },
-                                valueRange = 0.01f..1f,
+                                valueRange = 0f..1f,
                                 colors = SliderDefaults.colors(
                                     thumbColor = AppAccent,
                                     activeTrackColor = AppAccent
@@ -279,7 +279,7 @@ fun GlobalDefaultsScreen(
                                     )
                                     defaultsConfig.saveArmDefaults(armDefaults)
                                 },
-                                valueRange = 0.01f..1f,
+                                valueRange = 0f..1f,
                                 colors = SliderDefaults.colors(
                                     thumbColor = AppAccent,
                                     activeTrackColor = AppAccent
@@ -308,7 +308,7 @@ fun GlobalDefaultsScreen(
                                     )
                                     defaultsConfig.saveArmDefaults(armDefaults)
                                 },
-                                valueRange = 0.01f..1f,
+                                valueRange = 0f..1f,
                                 colors = SliderDefaults.colors(
                                     thumbColor = AppAccent,
                                     activeTrackColor = AppAccent

@@ -525,7 +525,30 @@ fun ArmConstraintSection(
             if (expanded) {
                 Spacer(modifier = Modifier.height(12.dp))
                 
-                val currentConstraints = constraints ?: ArmConstraints()
+                // Get defaults from settings when no constraints are provided
+                val context = LocalContext.current
+                val defaultsConfig = remember { llm.slop.spirals.defaults.DefaultsConfig.getInstance(context) }
+                val currentConstraints = if (constraints != null) {
+                    constraints
+                } else {
+                    // Convert from defaults to ArmConstraints
+                    val defaults = defaultsConfig.getArmDefaults()
+                    ArmConstraints(
+                        baseLengthMin = defaults.baseLengthMin,
+                        baseLengthMax = defaults.baseLengthMax,
+                        enableBeat = defaults.beatProbability > 0,
+                        enableLfo = defaults.lfoProbability > 0,
+                        allowSine = defaults.sineProbability > 0,
+                        allowTriangle = defaults.triangleProbability > 0,
+                        allowSquare = defaults.squareProbability > 0,
+                        beatDivMin = defaults.beatDivMin,
+                        beatDivMax = defaults.beatDivMax,
+                        weightMin = defaults.weightMin,
+                        weightMax = defaults.weightMax,
+                        lfoTimeMin = defaults.lfoTimeMin,
+                        lfoTimeMax = defaults.lfoTimeMax
+                    )
+                }
                 
                 // Base Length Range
                 Text(
@@ -734,8 +757,32 @@ fun ArmConstraintSection(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (constraints == null) {
+                        // Get defaults outside of the onClick handler
+                        val context = LocalContext.current
+                        val defaultsConfig = llm.slop.spirals.defaults.DefaultsConfig.getInstance(context)
+                        val defaults = defaultsConfig.getArmDefaults()
+                        
                         Button(
-                            onClick = { onUpdate(ArmConstraints()) },
+                            onClick = {
+                                // Convert to ArmConstraints
+                                val armConstraints = ArmConstraints(
+                                    baseLengthMin = defaults.baseLengthMin,
+                                    baseLengthMax = defaults.baseLengthMax,
+                                    enableBeat = defaults.beatProbability > 0,
+                                    enableLfo = defaults.lfoProbability > 0,
+                                    allowSine = defaults.sineProbability > 0,
+                                    allowTriangle = defaults.triangleProbability > 0,
+                                    allowSquare = defaults.squareProbability > 0,
+                                    beatDivMin = defaults.beatDivMin,
+                                    beatDivMax = defaults.beatDivMax,
+                                    weightMin = defaults.weightMin,
+                                    weightMax = defaults.weightMax,
+                                    lfoTimeMin = defaults.lfoTimeMin,
+                                    lfoTimeMax = defaults.lfoTimeMax
+                                )
+                                
+                                onUpdate(armConstraints)
+                            },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = AppAccent)
                         ) {
@@ -802,11 +849,28 @@ fun MotionTab(
                         color = if (isEnabled) AppAccent else AppText.copy(alpha = 0.7f),
                         modifier = Modifier.weight(1f)
                     )
+                    // Get defaults outside of the onCheckedChange handler
+                    val context = LocalContext.current
+                    val defaultsConfig = llm.slop.spirals.defaults.DefaultsConfig.getInstance(context)
+                    val defaults = defaultsConfig.getRotationDefaults()
+                    
                     Switch(
                         checked = isEnabled,
                         onCheckedChange = { enabled ->
                             if (enabled) {
-                                onUpdate(rset.copy(rotationConstraints = RotationConstraints()))
+                                // Convert to RotationConstraints
+                                val rotationConstraints = RotationConstraints(
+                                    enableClockwise = defaults.clockwiseProbability > 0,
+                                    enableCounterClockwise = defaults.counterClockwiseProbability > 0,
+                                    speedSource = if (defaults.beatProbability >= defaults.lfoProbability) 
+                                        SpeedSource.BEAT else SpeedSource.LFO,
+                                    beatDivMin = defaults.beatDivMin,
+                                    beatDivMax = defaults.beatDivMax,
+                                    lfoTimeMin = defaults.lfoTimeMin,
+                                    lfoTimeMax = defaults.lfoTimeMax
+                                )
+                                
+                                onUpdate(rset.copy(rotationConstraints = rotationConstraints))
                             } else {
                                 onUpdate(rset.copy(rotationConstraints = null))
                             }
@@ -1015,11 +1079,28 @@ fun ColorTab(
                         color = if (isEnabled) AppAccent else AppText.copy(alpha = 0.7f),
                         modifier = Modifier.weight(1f)
                     )
+                    // Get defaults outside of the onCheckedChange handler
+                    val context = LocalContext.current
+                    val defaultsConfig = llm.slop.spirals.defaults.DefaultsConfig.getInstance(context)
+                    val defaults = defaultsConfig.getHueOffsetDefaults()
+                    
                     Switch(
                         checked = isEnabled,
                         onCheckedChange = { enabled ->
                             if (enabled) {
-                                onUpdate(rset.copy(hueOffsetConstraints = HueOffsetConstraints()))
+                                // Convert to HueOffsetConstraints
+                                val hueOffsetConstraints = HueOffsetConstraints(
+                                    enableForward = defaults.forwardProbability > 0,
+                                    enableReverse = defaults.reverseProbability > 0,
+                                    speedSource = if (defaults.beatProbability >= defaults.lfoProbability) 
+                                        SpeedSource.BEAT else SpeedSource.LFO,
+                                    beatDivMin = defaults.beatDivMin,
+                                    beatDivMax = defaults.beatDivMax,
+                                    lfoTimeMin = defaults.lfoTimeMin,
+                                    lfoTimeMax = defaults.lfoTimeMax
+                                )
+                                
+                                onUpdate(rset.copy(hueOffsetConstraints = hueOffsetConstraints))
                             } else {
                                 onUpdate(rset.copy(hueOffsetConstraints = null))
                             }

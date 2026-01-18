@@ -461,11 +461,21 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             
             // Apply feedback parameters
             GLES30.glUniform1f(uFBDecayLoc, 0.0f)
-            // Adjust gain scaling: Map 0.0-1.0 range to 0.0-2.0, but focus effective range
-            // We maintain the OFF behavior when gain ≈ 0.0
-            // Effective formula: rawGain is 0-1, we map it to an optimal 0-2 range with better precision in useful range
-            val scaledGain = if (gain <= 0.01f) 0.0f else 0.5f + gain * 1.5f
-            GLES30.glUniform1f(uFBGainLoc, scaledGain)
+            
+            // The shader uses uGain in two ways:
+            // 1. As a multiplier for the history RGB
+            // 2. As a blend factor between live and feedback
+            // For knob values:
+            // 0 = off
+            // 1-100 = mapped to 1.1-1.25 range for effective feedback
+            val mappedGain = if (gain <= 0.01f) {
+                // Special case for "off" position
+                0.0f
+            } else {
+                // Convert 0.01-1.0 range to 1.1-1.25 range
+                1.1f + (gain * 0.15f)
+            }
+            GLES30.glUniform1f(uFBGainLoc, mappedGain)
             GLES30.glUniform1f(uFBZoomLoc, ((fx["FB_ZOOM"] ?: 0.5f) - 0.5f) * 0.1f)
             GLES30.glUniform1f(uFBRotateLoc, ((fx["FB_ROTATE"] ?: 0.5f) - 0.5f) * 10f * (PI.toFloat() / 180f))
             GLES30.glUniform1f(uFBShiftLoc, fx["FB_SHIFT"] ?: 0f)

@@ -63,14 +63,18 @@ void main() {
     // 4. Max Lighten Blend
     // This preserves hues and prevents additive white-out.
     // We apply uGain to allow compensating for Blur/Zoom energy loss.
-    vec3 feedbackPart = history.rgb * uGain; // Removed uDecay here to preserve feedback energy
+    vec3 feedbackPart = history.rgb * uGain; // Gain is now in the 0.75-1.5 range for normal use
     
-    // Blend between live and feedback using gain as the factor
-    // This ensures we always see something, even with low gain
-    vec3 composite = mix(live.rgb, max(live.rgb, feedbackPart), clamp(uGain, 0.0, 1.0));
+    // Blend between live and feedback
+    // Use a blend factor that ensures we always see something with feedback
+    // But when uGain=0, we still see just the live image
+    float blendFactor = uGain > 0.01 ? 0.8 : 0.0;
+    vec3 composite = mix(live.rgb, max(live.rgb, feedbackPart), blendFactor);
     
     // Persistence: Use max for alpha but apply gain to preserve trails
-    float alpha = max(live.a, history.a * clamp(uGain, 0.1, 1.0));
+    // If gain is 0, no persistence
+    float alphaGain = uGain > 0.01 ? max(0.1, min(uGain, 1.0)) : 0.0;
+    float alpha = max(live.a, history.a * alphaGain);
     
     fragColor = vec4(composite, alpha);
 }

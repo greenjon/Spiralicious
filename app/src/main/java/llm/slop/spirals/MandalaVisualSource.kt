@@ -29,8 +29,7 @@ class MandalaVisualSource : VisualSource {
         "Hue Sweep" to ModulatableParameter(1.0f / 9.0f), 
         "Depth" to ModulatableParameter(0.35f),
         // Feedback Engine Parameters
-        "FB Decay" to ModulatableParameter(0.0f),
-        "FB Gain" to ModulatableParameter(1.0f),
+        "FB Gain" to ModulatableParameter(0.0f),
         "FB Zoom" to ModulatableParameter(0.5f),   // 0.5 = 0%
         "FB Rotate" to ModulatableParameter(0.5f), // 0.5 = 0 degrees
         "FB Shift" to ModulatableParameter(0.0f),

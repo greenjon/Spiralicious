@@ -11,6 +11,7 @@ This document outlines the key design principles, architecture, and implementati
 5. [Randomization System](#randomization-system)
 6. [Global Defaults](#global-defaults)
 7. [Beat Division System](#beat-division-system)
+8. [File Structure](#file-structure)
 
 ---
 
@@ -138,3 +139,9 @@ The beat division system manages rhythmic parameters throughout the application:
 - **Equal probability**: When randomizing, each value has equal weight within the selected range
 - **Consistent display**: Fractional values shown as fractions (e.g., "1/16" not "0.0625")
 - **Dual range control**: UI uses RangeSliders for setting min/max values
+
+---
+
+## File Structure
+
+For a comprehensive overview of the application's file structure and the purpose of each file, please refer to the dedicated [FILE_STRUCTURE.md](FILE_STRUCTURE.md) document.

@@ -236,6 +236,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         uMixTex2Loc = GLES30.glGetUniformLocation(mixerProgram, "uTex2"); uMixModeLoc = GLES30.glGetUniformLocation(mixerProgram, "uMode")
         uMixBalLoc = GLES30.glGetUniformLocation(mixerProgram, "uBalance"); uMixAlphaLoc = GLES30.glGetUniformLocation(mixerProgram, "uAlpha")
         uBlitTextureLoc = GLES30.glGetUniformLocation(blitProgram, "uTexture")
+        
         val vaoArr = IntArray(1); GLES30.glGenVertexArrays(1, vaoArr, 0); vao = vaoArr[0]
         val vboArr = IntArray(1); GLES30.glGenBuffers(1, vboArr, 0); vbo = vboArr[0]
         GLES30.glBindVertexArray(vao); GLES30.glBindBuffer(GLES30.GL_ARRAY_BUFFER, vbo)
@@ -326,7 +327,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                     val source = slotSources[i]
                     val fx = source.parameters
                     val fxMap = if (fx != null) mapOf(
-                        "FB_DECAY" to (fx["FB Decay"]?.value ?: 0f),
                         "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f),
                         "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f),
                         "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f),
@@ -359,7 +359,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             if (currentSource != null) {
                 val fx = currentSource.parameters
                 val fxMap = if (fx != null) mapOf(
-                    "FB_DECAY" to (fx["FB Decay"]?.value ?: 0f), 
                     "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f), 
                     "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f), 
                     "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f), 
@@ -404,7 +403,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private fun compositeFinalMixer(tA: Int, tB: Int) {
         // Null-safety guard: use safe access for mixer parameters
         val fx = mapOf(
-            "FB_DECAY" to (mixerParams["MF_FB_DECAY"]?.value ?: 0f), 
             "FB_GAIN" to (mixerParams["MF_FB_GAIN"]?.value ?: 1f), 
             "FB_ZOOM" to (mixerParams["MF_FB_ZOOM"]?.value ?: 0.5f), 
             "FB_ROTATE" to (mixerParams["MF_FB_ROTATE"]?.value ?: 0.5f), 
@@ -442,11 +440,10 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         render()
         
         // Apply feedback if enabled
-        val dec = fx["FB_DECAY"] ?: 0f
         val gain = fx["FB_GAIN"] ?: 1f
         val fbIdx = fbIndexRef()
         
-        if (dec > 0.01f || gain > 0.01f) {
+        if (gain > 0.01f) {
             val nextIdx = (fbIdx + 1) % 2
             GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, fbFramebuffers[nextIdx])
             GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
@@ -462,7 +459,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             GLES30.glUniform1i(uFBTextureHistoryLoc, 1)
             
             // Apply feedback parameters
-            GLES30.glUniform1f(uFBDecayLoc, 1.0f - (1.0f - dec).pow(6.0f))
+            GLES30.glUniform1f(uFBDecayLoc, 0.0f)
             GLES30.glUniform1f(uFBGainLoc, gain * 1.5f)
             GLES30.glUniform1f(uFBZoomLoc, ((fx["FB_ZOOM"] ?: 0.5f) - 0.5f) * 0.1f)
             GLES30.glUniform1f(uFBRotateLoc, ((fx["FB_ROTATE"] ?: 0.5f) - 0.5f) * 10f * (PI.toFloat() / 180f))
@@ -483,15 +480,41 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glBindVertexArray(trailVao)
         GLES30.glUniform1f(uTrailAlphaLocation, 1.0f)
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, if (dec > 0.01f || gain > 0.01f) fbTextures[fbIndexRef()] else currentFrameTexture)
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, if (gain > 0.01f) fbTextures[fbIndexRef()] else currentFrameTexture)
         GLES30.glUniform1i(uTrailTextureLocation, 0)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
     }
 
     private fun renderSource(s: MandalaVisualSource) {
-        val p = s.parameters; val hS = ((p["Hue Sweep"]?.value ?: (1f/9f)) * 9f).roundToInt().toFloat()
-        GLES30.glUniform1f(uFillModeLocation, 0f); GLES30.glUniform1f(uHueOffsetLocation, p["Hue Offset"]?.value ?: 0f); GLES30.glUniform1f(uHueSweepLocation, hS); GLES30.glUniform1f(uAlphaLocation, s.globalAlpha.value)
-        GLES30.glUniform1f(uGlobalScaleLocation, (p["Scale"]?.value ?: 0.125f) * s.globalScale.value * 8f); GLES30.glUniform1f(uGlobalRotationLocation, (p["Rotation"]?.value ?: 0f) * 2f * PI.toFloat()); GLES30.glUniform1f(uAspectRatioLocation, aspectRatio); GLES30.glUniform1f(uDepthLocation, p["Depth"]?.value ?: 0.35f); GLES30.glUniform1f(uMinRLocation, s.minR); GLES30.glUniform1f(uMaxRLocation, s.maxR); GLES30.glUniform1f(uThicknessLocation, p["Thickness"]?.value ?: 0.1f)
-        GLES30.glUniform1f(uLayerOffsetLocation, 0f); GLES30.glUniform1f(uLayerAlphaLocation, 1f); GLES30.glUniform1f(uLayerScaleLocation, 1f); GLES30.glUniform1f(uL1Loc, p["L1"]?.value ?: 0f); GLES30.glUniform1f(uL2Loc, p["L2"]?.value ?: 0f); GLES30.glUniform1f(uL3Loc, p["L3"]?.value ?: 0f); GLES30.glUniform1f(uL4Loc, p["L4"]?.value ?: 0f); GLES30.glUniform1f(uALoc, s.recipe.a.toFloat()); GLES30.glUniform1f(uBLoc, s.recipe.b.toFloat()); GLES30.glUniform1f(uCLoc, s.recipe.c.toFloat()); GLES30.glUniform1f(uDLoc, s.recipe.d.toFloat()); GLES30.glBindVertexArray(vao); GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, (resolution + 1) * 2)
+        val p = s.parameters
+        val hS = ((p["Hue Sweep"]?.value ?: (1f/9f)) * 9f).roundToInt().toFloat()
+        
+        // Always use line mode now
+        GLES30.glUniform1f(uFillModeLocation, 0.0f)
+        GLES30.glUniform1f(uHueOffsetLocation, p["Hue Offset"]?.value ?: 0f)
+        GLES30.glUniform1f(uHueSweepLocation, hS)
+        GLES30.glUniform1f(uAlphaLocation, s.globalAlpha.value)
+        GLES30.glUniform1f(uGlobalScaleLocation, (p["Scale"]?.value ?: 0.125f) * s.globalScale.value * 8f)
+        GLES30.glUniform1f(uGlobalRotationLocation, (p["Rotation"]?.value ?: 0f) * 2f * PI.toFloat())
+        GLES30.glUniform1f(uAspectRatioLocation, aspectRatio)
+        GLES30.glUniform1f(uDepthLocation, p["Depth"]?.value ?: 0.35f)
+        GLES30.glUniform1f(uMinRLocation, s.minR)
+        GLES30.glUniform1f(uMaxRLocation, s.maxR)
+        GLES30.glUniform1f(uThicknessLocation, p["Thickness"]?.value ?: 0.1f)
+        GLES30.glUniform1f(uLayerOffsetLocation, 0f)
+        GLES30.glUniform1f(uLayerAlphaLocation, 1f)
+        GLES30.glUniform1f(uLayerScaleLocation, 1f)
+        GLES30.glUniform1f(uL1Loc, p["L1"]?.value ?: 0f)
+        GLES30.glUniform1f(uL2Loc, p["L2"]?.value ?: 0f)
+        GLES30.glUniform1f(uL3Loc, p["L3"]?.value ?: 0f)
+        GLES30.glUniform1f(uL4Loc, p["L4"]?.value ?: 0f)
+        GLES30.glUniform1f(uALoc, s.recipe.a.toFloat())
+        GLES30.glUniform1f(uBLoc, s.recipe.b.toFloat())
+        GLES30.glUniform1f(uCLoc, s.recipe.c.toFloat())
+        GLES30.glUniform1f(uDLoc, s.recipe.d.toFloat())
+        
+        // Original line rendering mode - always use triangle strip now
+        GLES30.glBindVertexArray(vao)
+        GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, (resolution + 1) * 2)
     }
 }

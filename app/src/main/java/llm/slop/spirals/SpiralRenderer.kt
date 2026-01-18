@@ -443,9 +443,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         val gain = fx["FB_GAIN"] ?: 1f
         val fbIdx = fbIndexRef()
         
-        // Always apply feedback, even with zero gain (to maintain persistence)
-        // This ensures the feedback buffer is always updated even when gain is low
-        run {
+        // Only apply feedback when gain is above threshold (intentional OFF switch)
+        if (gain > 0.01f) {
             val nextIdx = (fbIdx + 1) % 2
             GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, fbFramebuffers[nextIdx])
             GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
@@ -482,8 +481,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glBindVertexArray(trailVao)
         GLES30.glUniform1f(uTrailAlphaLocation, 1.0f)
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
-        // Always use the feedback buffer, regardless of gain
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, fbTextures[fbIndexRef()])
+        // Restore the intended behavior - only use feedback buffer when gain > threshold
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, if (gain > 0.01f) fbTextures[fbIndexRef()] else currentFrameTexture)
         GLES30.glUniform1i(uTrailTextureLocation, 0)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
     }

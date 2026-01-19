@@ -24,7 +24,18 @@ This document provides a comprehensive overview of the file structure in the Spi
 These files represent the core functionality of the application:
 
 - **MainActivity.kt**: Entry point for the application, sets up navigation and the main UI container.
-- **MandalaViewModel.kt**: Primary view model that coordinates data flow between UI and model/database classes.
+- **MandalaViewModel.kt**: Primary view model that coordinates data flow between UI and model/database classes. (IN PROCESS OF BEING REFACTORED: Navigation logic has been extracted to `navigation/NavigationViewModel.kt` and editor-specific logic to dedicated ViewModels)
+- **navigation/NavigationViewModel.kt**: (NEW) Dedicated ViewModel that manages navigation stack and breadcrumb cascade logic. This was extracted from MandalaViewModel.kt as part of Phase 3 refactoring.
+
+### Editor-specific ViewModels (NEW)
+
+The following ViewModels were created as part of Phase 3 refactoring to separate domain-specific logic from the MandalaViewModel:
+
+- **viewmodels/MandalaEditorViewModel.kt**: ViewModel for the Mandala Editor screen.
+- **viewmodels/SetEditorViewModel.kt**: ViewModel for the Set Editor screen.
+- **viewmodels/MixerEditorViewModel.kt**: ViewModel for the Mixer Editor screen.
+- **viewmodels/ShowEditorViewModel.kt**: ViewModel for the Show Editor screen.
+- **viewmodels/RandomSetEditorViewModel.kt**: ViewModel for the Random Set Editor screen.
 - **SpiralSurfaceView.kt**: Custom view for rendering the mandala visualizations.
 - **SpiralRenderer.kt**: OpenGL renderer that handles the actual drawing of mandalas.
 - **SharedEGLContextFactory.kt**: Manages shared OpenGL contexts for efficient rendering across multiple surfaces.
@@ -62,6 +73,18 @@ Files related to data persistence:
 - **MixerPatchEntity.kt**: Database entity for storing mixer configurations.
 - **MandalaTag.kt**: Defines tags for organizing mandalas.
 - **MandalaTagDao.kt**: Data Access Object for mandala tags.
+
+### Repository Classes (NEW)
+
+The following repository classes were added as part of the Phase 3 refactoring to separate data access concerns from the MandalaViewModel:
+
+- **database/repositories/Repository.kt**: Base interface for all repositories.
+- **database/repositories/MandalaRepository.kt**: Repository for managing mandala patches.
+- **database/repositories/SetRepository.kt**: Repository for managing mandala sets.
+- **database/repositories/MixerRepository.kt**: Repository for managing mixer patches.
+- **database/repositories/ShowRepository.kt**: Repository for managing show patches.
+- **database/repositories/RandomSetRepository.kt**: Repository for managing random sets.
+- **database/repositories/TagRepository.kt**: Repository for managing mandala tags.
 
 ## UI Components
 

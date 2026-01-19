@@ -24,7 +24,16 @@ This document provides a comprehensive overview of the file structure in the Spi
 These files represent the core functionality of the application:
 
 - **MainActivity.kt**: Entry point for the application, sets up navigation and the main UI container.
-- **MandalaViewModel.kt**: Primary view model that coordinates data flow between UI and model/database classes.
+- **MandalaViewModel.kt**: Primary view model that coordinates data flow between UI and model/database classes. (Being refactored in Phase 3)
+- **navigation/NavigationViewModel.kt**: Dedicated ViewModel that manages navigation stack and breadcrumb cascade logic.
+
+### Editor-specific ViewModels
+
+- **viewmodels/MandalaEditorViewModel.kt**: ViewModel for the Mandala Editor screen.
+- **viewmodels/SetEditorViewModel.kt**: ViewModel for the Set Editor screen.
+- **viewmodels/MixerEditorViewModel.kt**: ViewModel for the Mixer Editor screen.
+- **viewmodels/ShowEditorViewModel.kt**: ViewModel for the Show Editor screen.
+- **viewmodels/RandomSetEditorViewModel.kt**: ViewModel for the Random Set Editor screen.
 - **SpiralSurfaceView.kt**: Custom view for rendering the mandala visualizations.
 - **SpiralRenderer.kt**: OpenGL renderer that handles the actual drawing of mandalas.
 - **SharedEGLContextFactory.kt**: Manages shared OpenGL contexts for efficient rendering across multiple surfaces.
@@ -59,6 +68,16 @@ Files related to data persistence:
 - **MixerPatchEntity.kt**: Database entity for storing mixer configurations.
 - **MandalaTag.kt**: Defines tags for organizing mandalas.
 - **MandalaTagDao.kt**: Data Access Object for mandala tags.
+
+### Repository Classes
+
+- **database/repositories/Repository.kt**: Base interface for all repositories.
+- **database/repositories/MandalaRepository.kt**: Repository for managing mandala patches.
+- **database/repositories/SetRepository.kt**: Repository for managing mandala sets.
+- **database/repositories/MixerRepository.kt**: Repository for managing mixer patches.
+- **database/repositories/ShowRepository.kt**: Repository for managing show patches.
+- **database/repositories/RandomSetRepository.kt**: Repository for managing random sets.
+- **database/repositories/TagRepository.kt**: Repository for managing mandala tags.
 
 ## UI Components
 
@@ -214,17 +233,15 @@ Below is a phased approach to improving the codebase organization. These changes
 ### Phase 3: Critical Deconstruction - Splitting God Objects
 
 1.  **Dismantle `MandalaViewModel.kt` (Highest Priority)**:
-    - [ ] Create a dedicated `NavigationViewModel.kt` to manage the `navStack` and breadcrumb cascade logic.
-    - [ ] Create domain-specific `Repository` classes (e.g., `MandalaRepository`, `SetRepository`) to abstract all database operations, using the existing DAOs.
-    - [ ] Create individual ViewModels for each editor screen (e.g., `MandalaEditorViewModel`, `MixerEditorViewModel`). These will handle screen-specific state and logic, interacting with the repositories and the `NavigationViewModel`.
+    - [x] Create a dedicated `NavigationViewModel.kt` to manage the `navStack` and breadcrumb cascade logic.
+    - [x] Create domain-specific `Repository` classes (e.g., `MandalaRepository`, `SetRepository`) to abstract all database operations, using the existing DAOs.
+    - [x] Create individual ViewModels for each editor screen (e.g., `MandalaEditorViewModel`, `MixerEditorViewModel`). These will handle screen-specific state and logic, interacting with the repositories and the `NavigationViewModel`.
 
 2.  **Extract Editor Composables from `MainActivity.kt`**:
     - [ ] Move each primary screen composable (`ShowEditorScreen`, `MixerEditorScreen`, `MandalaSetEditorScreen`, `MandalaEditorScreen`, `RandomSetEditorScreen`, `CvLabScreen`) into its own file within a new `ui/screens` package.
     - [ ] Move dialogs and overlays (`SettingsOverlay`, `RenamePatchDialog`) into their own files within a `ui/components` package.
     - [ ] Reduce `MainActivity.kt` to its core responsibility: setting up the theme, navigation host, and top-level state management.
 
-3.  **Optimize Configuration**:
-    - [ ] Evaluate and potentially consolidate `AppConfig.kt` and `DefaultsConfig.kt`.
 
 ### Phase 4: Directory Structure Improvements
 
@@ -238,9 +255,9 @@ Below is a phased approach to improving the codebase organization. These changes
      - Create `models/mandala`, `models/mixer`, `models/set`, `models/show` subpackages
 
 3.  **Properly Organize Database Components**:
-   - [ ] Create a dedicated `database` package.
+   - [x] Create a dedicated `database` package.
    - [ ] Separate into `database/entities` and `database/daos` subpackages.
-   - [ ] Place the newly created `Repository` classes from Phase 3 into a `database/repositories` subpackage.
+   - [x] Place the newly created `Repository` classes from Phase 3 into a `database/repositories` subpackage.
 
 4.  **Restructure CV System**:
    - [ ] Reorganize into `cv/sources`, `cv/processors`, `cv/visualizers`

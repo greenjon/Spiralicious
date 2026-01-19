@@ -78,7 +78,7 @@ fun CvLabScreen(
     // Secondary buffer for the synthesized beat visualization
     val beatVisualBuffer = remember { CvHistoryBuffer(200) }
     LaunchedEffect(frameTick) {
-        val beats = CvRegistry.getSynchronizedTotalBeats()
+        val beats = ModulationRegistry.getSynchronizedTotalBeats()
         // Synthesize a sine wave synced to the beat phase
         val value = (sin(beats * 2.0 * Math.PI).toFloat() + 1.0f) * 0.5f
         beatVisualBuffer.add(value)
@@ -141,13 +141,13 @@ fun CvLabScreen(
             
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = AppText.copy(alpha = 0.1f))
 
-            CvRegistry.history["accent"]?.let { DiagnosticScope("ACCENT (Weighted Flux + Decay)", it) }
-            CvRegistry.history["onset"]?.let { DiagnosticScope("ONSET (Raw Spikes)", it) }
+            ModulationRegistry.history["accent"]?.let { DiagnosticScope("ACCENT (Weighted Flux + Decay)", it) }
+            ModulationRegistry.history["onset"]?.let { DiagnosticScope("ONSET (Raw Spikes)", it) }
             
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = AppText.copy(alpha = 0.1f))
             
-            CvRegistry.history["amp"]?.let { DiagnosticScope("AMP (Master Envelope)", it) }
-            CvRegistry.history["bassFlux"]?.let { DiagnosticScope("BASS FLUX", it) }
+            ModulationRegistry.history["amp"]?.let { DiagnosticScope("AMP (Master Envelope)", it) }
+            ModulationRegistry.history["bassFlux"]?.let { DiagnosticScope("BASS FLUX", it) }
         }
 
         Spacer(modifier = Modifier.height(100.dp))

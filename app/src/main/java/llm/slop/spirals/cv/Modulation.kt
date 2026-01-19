@@ -57,13 +57,13 @@ class ModulatableParameter(
             
             val finalCv = when (mod.sourceId) {
                 "beatPhase" -> {
-                    val beats = CvRegistry.getSynchronizedTotalBeats()
+                    val beats = ModulationRegistry.getSynchronizedTotalBeats()
                     val localPhase = ((beats / mod.subdivision) + mod.phaseOffset) % 1.0
                     val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
                     calculateWaveform(mod.waveform, positivePhase, mod.slope)
                 }
                 "lfo" -> {
-                    val seconds = CvRegistry.getElapsedRealtimeSec()
+                    val seconds = ModulationRegistry.getElapsedRealtimeSec()
                     val period = when (mod.lfoSpeedMode) {
                         LfoSpeedMode.FAST -> mod.subdivision * 10.0 // 0 to 10s
                         LfoSpeedMode.MEDIUM -> mod.subdivision * 900.0 // 0 to 15m
@@ -74,7 +74,7 @@ class ModulatableParameter(
                     val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
                     calculateWaveform(mod.waveform, positivePhase, mod.slope)
                 }
-                else -> CvRegistry.get(mod.sourceId)
+                else -> ModulationRegistry.get(mod.sourceId)
             }
             
             val modAmount = finalCv * mod.weight

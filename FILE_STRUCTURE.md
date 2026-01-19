@@ -40,7 +40,7 @@ Files that define the data models and entities for the app:
 
 - **MandalaParams.kt**: Parameters that define the appearance and behavior of a mandala.
 - **MandalaRatio.kt**: Defines ratio settings for mandala symmetry and proportions.
-- **RandomSetModels.kt**: Data models related to randomized mandala sets.
+- **RandomizationModels.kt**: Data models related to randomized mandala sets.
 - **MixerModels.kt**: Models for the mixer functionality that combines visual sources.
 - **ShowModels.kt**: Data structures for organizing shows/performances.
 - **LayerContent.kt**: Defines content types for different layers in the app.
@@ -98,7 +98,7 @@ User interface screens and components:
 Files related to the modulation and control voltage system:
 
 - **cv/Modulation.kt**: Base class for modulation sources.
-- **cv/CvRegistry.kt**: Registry for available CV sources in the app.
+- **cv/ModulationRegistry.kt**: Registry for available modulation sources in the app.
 - **cv/CvSignal.kt**: Interface for CV signal generators.
 - **cv/CvClock.kt**: Clock signal generator for rhythmic modulation.
 - **cv/BeatClock.kt**: Beat-synchronized clock for rhythmic parameters.
@@ -201,11 +201,11 @@ Below is a phased approach to improving the codebase organization. These changes
 ### Phase 1: Foundational Cleanup (Low-hanging Fruit)
 
 1.  **Align Core Component Names**:
-   - [ ] Rename `cv/CvRegistry.kt` → `cv/ModulationRegistry.kt` (align with terminology in `Modulation.kt`)
-   - [ ] Rename `RandomSetModels.kt` → `RandomizationModels.kt` (more descriptive of functionality)
+   - [x] Rename `cv/CvRegistry.kt` → `cv/ModulationRegistry.kt` (align with terminology in `Modulation.kt`)
+   - [x] Rename `RandomSetModels.kt` → `RandomizationModels.kt` (more descriptive of functionality)
 
 2.  **Clean Up Test Files**:
-    - [ ] Remove template test files (`ExampleInstrumentedTest.kt`, `ExampleUnitTest.kt`) if unused.
+    - [x] Remove template test files (`ExampleInstrumentedTest.kt`, `ExampleUnitTest.kt`) if unused.
     - [ ] Create a proper test plan and structure for actual testing.
 
 ### Phase 2: File Consolidation

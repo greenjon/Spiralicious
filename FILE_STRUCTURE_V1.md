@@ -40,7 +40,7 @@ Files that define the data models and entities for the app:
 
 - **MandalaParams.kt**: Parameters that define the appearance and behavior of a mandala.
 - **MandalaRatio.kt**: Defines ratio settings for mandala symmetry and proportions.
-- **RandomSetModels.kt**: Data models related to randomized mandala sets.
+- **RandomSetModels.kt**: Data models related to randomized mandala sets. (RENAMED to RandomizationModels.kt for more descriptive functionality)
 - **MixerModels.kt**: Models for the mixer functionality that combines visual sources.
 - **ShowModels.kt**: Data structures for organizing shows/performances.
 - **LayerContent.kt**: Defines content types for different layers in the app.
@@ -98,7 +98,7 @@ User interface screens and components:
 Files related to the modulation and control voltage system:
 
 - **cv/Modulation.kt**: Base class for modulation sources.
-- **cv/CvRegistry.kt**: Registry for available CV sources in the app.
+- **cv/CvRegistry.kt**: Registry for available CV sources in the app. (RENAMED to ModulationRegistry.kt to align with terminology in Modulation.kt)
 - **cv/CvSignal.kt**: Interface for CV signal generators.
 - **cv/CvClock.kt**: Clock signal generator for rhythmic modulation.
 - **cv/BeatClock.kt**: Beat-synchronized clock for rhythmic parameters.
@@ -160,6 +160,11 @@ Resource files for the application:
 Build and configuration files:
 
 - **build.gradle.kts**: Gradle build configuration for the app.
+
+## Test Files
+
+- **ExampleUnitTest.kt**: Template unit test file. (DELETED as part of cleanup)
+- **ExampleInstrumentedTest.kt**: Template instrumented test file. (DELETED as part of cleanup)
 
 ---
 

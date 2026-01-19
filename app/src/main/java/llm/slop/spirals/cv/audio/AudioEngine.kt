@@ -5,7 +5,7 @@ import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.util.Log
-import llm.slop.spirals.cv.CvRegistry
+import llm.slop.spirals.cv.ModulationRegistry
 import kotlinx.coroutines.*
 import kotlin.math.max
 
@@ -137,16 +137,16 @@ class AudioEngine(context: Context) {
 
                         // Update Registry with the Anchor point
                         // This provides the source of truth for high-precision interpolation in the renderer
-                        CvRegistry.updateBeatAnchor(totalBeats, estimatedBpm, currentTime)
+                        ModulationRegistry.updateBeatAnchor(totalBeats, estimatedBpm, currentTime)
 
                         val ref = 0.1f
-                        CvRegistry.update("amp", (amp / ref).coerceIn(0f, 2f))
-                        CvRegistry.update("bass", (bass / ref).coerceIn(0f, 2f))
-                        CvRegistry.update("mid", (mid / ref).coerceIn(0f, 2f))
-                        CvRegistry.update("high", (high / ref).coerceIn(0f, 2f))
-                        CvRegistry.update("bassFlux", (bassFlux / 0.05f).coerceIn(0f, 2f))
-                        CvRegistry.update("onset", onsetNormalized)
-                        CvRegistry.update("accent", accentLevel)
+                        ModulationRegistry.update("amp", (amp / ref).coerceIn(0f, 2f))
+                        ModulationRegistry.update("bass", (bass / ref).coerceIn(0f, 2f))
+                        ModulationRegistry.update("mid", (mid / ref).coerceIn(0f, 2f))
+                        ModulationRegistry.update("high", (high / ref).coerceIn(0f, 2f))
+                        ModulationRegistry.update("bassFlux", (bassFlux / 0.05f).coerceIn(0f, 2f))
+                        ModulationRegistry.update("onset", onsetNormalized)
+                        ModulationRegistry.update("accent", accentLevel)
                         // Note: beatPhase is no longer updated here to prevent conflicts with the precision clock
                     }
                 }

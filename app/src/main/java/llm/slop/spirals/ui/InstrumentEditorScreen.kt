@@ -113,13 +113,13 @@ fun ModulatorRow(
             while(true) {
                 val rawCv = when (sourceId) {
                     "beatPhase" -> {
-                        val beats = CvRegistry.getSynchronizedTotalBeats()
+                        val beats = ModulationRegistry.getSynchronizedTotalBeats()
                         val localPhase = ((beats / subdivision.toDouble()) + phaseOffset.toDouble()) % 1.0
                         val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
                         calculatePreviewWave(waveform, positivePhase, slope)
                     }
                     "lfo" -> {
-                        val seconds = CvRegistry.getElapsedRealtimeSec()
+                        val seconds = ModulationRegistry.getElapsedRealtimeSec()
                         val period = when (lfoSpeedMode) {
                             LfoSpeedMode.FAST -> subdivision * 10.0
                             LfoSpeedMode.MEDIUM -> subdivision * 900.0
@@ -129,7 +129,7 @@ fun ModulatorRow(
                         val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
                         calculatePreviewWave(waveform, positivePhase, slope)
                     }
-                    else -> CvRegistry.get(sourceId)
+                    else -> ModulationRegistry.get(sourceId)
                 }
                 pulseValue = rawCv * weight
                 delay(16)

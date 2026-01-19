@@ -49,7 +49,7 @@ import llm.slop.spirals.ui.theme.SpiralsTheme
 import llm.slop.spirals.ui.components.RecipePickerDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import llm.slop.spirals.cv.CvRegistry
+import llm.slop.spirals.cv.ModulationRegistry
 import llm.slop.spirals.defaults.DefaultsConfig
 import llm.slop.spirals.models.MixerPatch
 import llm.slop.spirals.models.ShowPatch
@@ -155,7 +155,7 @@ class MainActivity : ComponentActivity() {
 
                 // 1. Start the CV Sync Registry immediately
                 LaunchedEffect(Unit) {
-                    CvRegistry.startSync(this)
+                    ModulationRegistry.startSync(this)
                 }
 
                 // 2. Automatically start/stop Audio Engine based on source selection

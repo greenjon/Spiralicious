@@ -533,7 +533,8 @@ fun MonitorStrip(
                 showValue = true,
                 focused = focusedId == balId,
                 displayTransform = { 
-                    val v = (it * 100).roundToInt()
+                    // Map 0-1 to -100 to 100 for display
+                    val v = ((it - 0.5f) * 200).roundToInt()
                     val (leftLabel, rightLabel) = if (group == "F") "A" to "B" else "L" to "R"
                     when {
                         v < 0 -> "$leftLabel${abs(v)}"

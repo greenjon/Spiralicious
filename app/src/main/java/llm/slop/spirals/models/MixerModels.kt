@@ -25,7 +25,7 @@ data class ModulatableParameterData(
 @Serializable
 data class MixerGroupData(
     val mode: ModulatableParameterData = ModulatableParameterData(0.0f), // baseValue is index of MixerMode
-    val balance: ModulatableParameterData = ModulatableParameterData(0.5f)
+    val balance: ModulatableParameterData = ModulatableParameterData(0.5f) // Represents center in a 0-1 range
 )
 
 @Serializable

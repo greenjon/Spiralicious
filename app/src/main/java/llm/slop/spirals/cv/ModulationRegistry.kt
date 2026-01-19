@@ -9,6 +9,8 @@ import kotlinx.coroutines.*
  * Central registry for all Control Voltage signals.
  */
 object ModulationRegistry {
+    val sampleAndHold = SampleAndHoldCv()
+
     private val rawSignalData = ConcurrentHashMap<String, Float>().apply {
         put("amp", 0f)
         put("bass", 0f)

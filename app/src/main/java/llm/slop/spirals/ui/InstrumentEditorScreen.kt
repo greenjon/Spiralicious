@@ -104,7 +104,8 @@ fun ModulatorRow(
 
     val isBeat = sourceId == "beatPhase"
     val isLfo = sourceId == "lfo"
-    val hasAdvancedControls = isBeat || isLfo
+    val isSampleAndHold = sourceId == "sampleAndHold"
+    val hasAdvancedControls = isBeat || isLfo || isSampleAndHold
     var showDeleteConfirm by remember { mutableStateOf(false) }
     
     var pulseValue by remember { mutableFloatStateOf(0f) }
@@ -128,6 +129,15 @@ fun ModulatorRow(
                         val localPhase = ((seconds / period) + phaseOffset.toDouble()) % 1.0
                         val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
                         calculatePreviewWave(waveform, positivePhase, slope)
+                    }
+                    "sampleAndHold" -> {
+                        val beats = ModulationRegistry.getSynchronizedTotalBeats()
+                        val bpm = ModulationRegistry.get("bpm")
+                        val interval = subdivision * 60.0 / bpm
+                        val localPhase = (beats / subdivision) % 1.0
+                        val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
+                        
+                        ModulationRegistry.sampleAndHold.getValue(positivePhase, slope, interval)
                     }
                     else -> ModulationRegistry.get(sourceId)
                 }
@@ -179,17 +189,33 @@ fun ModulatorRow(
                         var sourceExpanded by remember { mutableStateOf(false) }
                         Box(modifier = Modifier.width(64.dp)) {
                             Text(
-                                text = if (isBeat) "BEAT" else sourceId.uppercase(),
+                                text = when(sourceId) {
+                                    "beatPhase" -> "BEAT"
+                                    "sampleAndHold" -> "RANDOM"
+                                    else -> sourceId.uppercase()
+                                },
                                 modifier = Modifier.clickable { sourceExpanded = true }.padding(vertical = 4.dp, horizontal = 2.dp),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = AppText,
                                 maxLines = 1
                             )
                             DropdownMenu(expanded = sourceExpanded, onDismissRequest = { sourceExpanded = false }) {
-                                listOf("none", "amp", "bass", "mid", "high", "accent", "beatPhase", "lfo").forEach { s ->
-                                    DropdownMenuItem(text = { Text(if (s == "beatPhase") "BEAT" else s.uppercase()) }, onClick = { 
+                                listOf("none", "amp", "bass", "mid", "high", "accent", "beatPhase", "lfo", "sampleAndHold").forEach { s ->
+                                    DropdownMenuItem(text = { Text(
+                                        when(s) {
+                                            "beatPhase" -> "BEAT"
+                                            "sampleAndHold" -> "RANDOM"
+                                            else -> s.uppercase()
+                                        }) 
+                                    }, onClick = {  
                                         sourceId = s
-                                        if (s != "none") { onUpdate(CvModulator(s, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope, lfoSpeedMode)); onInteractionFinished() }
+                                        // Force Square wave for Sample & Hold
+                                        val wave = if (s == "sampleAndHold") Waveform.SQUARE else waveform
+                                        // Always update waveform variable for UI consistency
+                                        if (s == "sampleAndHold") {
+                                            waveform = Waveform.SQUARE
+                                        }
+                                        if (s != "none") { onUpdate(CvModulator(s, operator, weight, bypassed, wave, subdivision, phaseOffset, slope, lfoSpeedMode)); onInteractionFinished() }
                                         sourceExpanded = false
                                     })
                                 }
@@ -245,12 +271,19 @@ fun ModulatorRow(
                         if (hasAdvancedControls) {
                             Spacer(modifier = Modifier.width(4.dp))
                             
-                            IconButton(onClick = {
-                                val nextWave = Waveform.entries[(waveform.ordinal + 1) % Waveform.entries.size]
-                                waveform = nextWave
-                                onUpdate(CvModulator(sourceId, operator, weight, bypassed, nextWave, subdivision, phaseOffset, slope, lfoSpeedMode))
-                                onInteractionFinished()
-                            }, modifier = Modifier.size(28.dp)) {
+                            IconButton(
+                                onClick = {
+                                    // Only allow changing waveform if not sampleAndHold
+                                    if (!isSampleAndHold) {
+                                        val nextWave = Waveform.entries[(waveform.ordinal + 1) % Waveform.entries.size]
+                                        waveform = nextWave
+                                        onUpdate(CvModulator(sourceId, operator, weight, bypassed, nextWave, subdivision, phaseOffset, slope, lfoSpeedMode))
+                                        onInteractionFinished()
+                                    }
+                                }, 
+                                modifier = Modifier.size(28.dp),
+                                enabled = !isSampleAndHold
+                            ) {
                                 Icon(
                                     painter = painterResource(id = when(waveform) {
                                         Waveform.SINE -> R.drawable.ic_wave_sine
@@ -258,12 +291,12 @@ fun ModulatorRow(
                                         Waveform.SQUARE -> R.drawable.ic_wave_square
                                     }),
                                     contentDescription = "Waveform",
-                                    tint = AppAccent,
+                                    tint = if (isSampleAndHold) AppAccent.copy(alpha = 0.5f) else AppAccent,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
 
-                            if (isBeat) {
+                            if (isBeat || isSampleAndHold) {
                                 var subExpanded by remember { mutableStateOf(false) }
                                 Box(contentAlignment = Alignment.Center, modifier = Modifier.widthIn(min = 36.dp)) {
                                     val subText = when(subdivision) {
@@ -379,25 +412,30 @@ fun ModulatorRow(
                             }
                         }
 
-                        // Phase Knob
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                            KnobView(
-                                baseValue = phaseOffset,
-                                onValueChange = { newValue ->
-                                    phaseOffset = newValue
-                                    if (!isNew) onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope, lfoSpeedMode))
-                                },
-                                onInteractionFinished = onInteractionFinished,
-                                isBipolar = false,
-                                focused = true,
-                                knobSize = 44.dp,
-                                showValue = true
-                            )
-                            Text("Phase", style = MaterialTheme.typography.labelSmall, color = AppText)
+                        // Phase Knob - not needed for SampleAndHold
+                        if (!isSampleAndHold) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                                KnobView(
+                                    baseValue = phaseOffset,
+                                    onValueChange = { newValue ->
+                                        phaseOffset = newValue
+                                        if (!isNew) onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope, lfoSpeedMode))
+                                    },
+                                    onInteractionFinished = onInteractionFinished,
+                                    isBipolar = false,
+                                    focused = true,
+                                    knobSize = 44.dp,
+                                    showValue = true
+                                )
+                                Text("Phase", style = MaterialTheme.typography.labelSmall, color = AppText)
+                            }
+                        } else {
+                            // Spacer for SampleAndHold in place of Phase knob
+                            Spacer(modifier = Modifier.weight(1f))
                         }
 
                         // Slope/Duty Knob
-                        val hasSecondSlider = waveform == Waveform.TRIANGLE || waveform == Waveform.SQUARE
+                        val hasSecondSlider = waveform == Waveform.TRIANGLE || waveform == Waveform.SQUARE || isSampleAndHold
                         if (hasSecondSlider) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                                 KnobView(
@@ -413,7 +451,11 @@ fun ModulatorRow(
                                     showValue = true
                                 )
                                 Text(
-                                    text = if (waveform == Waveform.TRIANGLE) "Slope" else "Duty",
+                                    text = when {
+                                        isSampleAndHold -> "Glide"
+                                        waveform == Waveform.TRIANGLE -> "Slope"
+                                        else -> "Duty"
+                                    },
                                     style = MaterialTheme.typography.labelSmall, 
                                     color = AppText
                                 )

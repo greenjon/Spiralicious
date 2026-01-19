@@ -40,19 +40,17 @@ object RotaryKnobMath {
         // 3. Primary Movement
         var value = currentValue + (-deltaY * resolution)
         
-        // 4. Bipolar Soft Detent (Magnet effect at zero)
+        // 4. Bipolar Soft Detent (Magnet effect at center 0.5)
         if (config.isBipolar) {
             val detentWidth = 0.05f
             val detentStrength = 0.4f * (1.0f - vs) // Weaken detent as user moves faster
-            val falloff = exp(-(value * value) / (detentWidth * detentWidth))
-            value += -value * falloff * detentStrength
+            val centeredValue = value - 0.5f // Adjust to put detent at 0.5
+            val falloff = exp(-(centeredValue * centeredValue) / (detentWidth * detentWidth))
+            value += -centeredValue * falloff * detentStrength // Pull toward center (0.5)
         }
         
-        val finalValue = if (config.isBipolar) {
-            value.coerceIn(-1f, 1f)
-        } else {
-            value.coerceIn(0f, 1f)
-        }
+        // For bipolar knobs, keep the value in 0-1 range, but with special detent at 0.5f (center)
+        val finalValue = value.coerceIn(0f, 1f)
         
         return Pair(finalValue, smoothedVelocity)
     }

@@ -20,21 +20,46 @@ val LocalSpiralRenderer = staticCompositionLocalOf<SpiralRenderer?> { null }
 
 /**
  * Main OpenGL renderer for Spirals app.
- * 
- * Architecture:
- * - Renders mandalas and mixer output using OpenGL ES 3.0
- * - Manages texture pool shared across multiple GL contexts (via SharedEGLContextFactory)
- * - Implements per-slot persistent feedback system (8 textures = 2 per slot for ping-pong)
- * - No ghost/trail system (removed to save 86MB VRAM)
- * 
- * Key Texture Layout:
- * - masterTextures[0-3]: Mixer slot outputs (sources 1-4)
- * - masterTextures[4-5]: Mixer A/B stage outputs  
- * - masterTextures[6]: Final mixer output (F)
- * - slotFeedback[0-7]: Per-slot feedback buffers (2 per slot, ping-pong)
- * 
- * Important: Shader programs and VAOs are NOT shared between contexts!
- * Only textures/buffers are shared. See SimpleBlitHelper for secondary context rendering.
+ *
+ * ## Architecture Overview:
+ * This renderer manages a complex pipeline involving multiple shaders, Framebuffer Objects (FBOs),
+ * and a shared OpenGL context strategy to support UI previews.
+ *
+ * ## Rendering Pipeline (Mixer Mode):
+ * 1.  **Slot Rendering**: Each of the 4 mixer slots is rendered independently into its own texture.
+ *     - Each slot has its own persistent feedback system, using a pair of ping-pong FBOs.
+ *     - The final output of each slot is stored in `masterTextures[0-3]`.
+ * 2.  **Mixer Stage A/B**:
+ *     - Mixer A combines the textures from slots 1 and 2 (`masterTextures[0]`, `masterTextures[1]`)
+ *       and writes the result to `masterTextures[4]`.
+ *     - Mixer B combines the textures from slots 3 and 4 (`masterTextures[2]`, `masterTextures[3]`)
+ *       and writes the result to `masterTextures[5]`.
+ * 3.  **Final Mixer (F) Stage**:
+ *     - The final mixer combines the output of Mixer A and Mixer B (`masterTextures[4]`, `masterTextures[5]`).
+ *     - This stage has its *own* feedback system, which was the source of the "white blob" issue.
+ *     - The final composited image is written to `masterTextures[6]`.
+ * 4.  **UI Display**:
+ *     - The main `GLSurfaceView` displays a single source, determined by `monitorSource`. It reads
+ *       the appropriate texture from the `masterTextures` array (e.g., "1", "A", "F").
+ *     - The mini-monitor previews (`StripPreview`) are separate `GLSurfaceView` instances that run
+ *       in a shared EGL context. They use a `SimpleBlitHelper` to draw the same textures from
+ *       `masterTextures` into their own views.
+ *
+ * ## Key Texture and FBO Layout:
+ * - `masterTextures[0-6]`: The primary output textures for each stage.
+ *   - `[0-3]`: Outputs for mixer slots 1-4.
+ *   - `[4]`: Output for Mixer A.
+ *   - `[5]`: Output for Mixer B.
+ *   - `[6]`: Final output for Mixer F.
+ * - `slotFBTextures[4][2]`: Ping-pong feedback textures for each of the 4 slots.
+ * - `finalFBTextures[2]`: Ping-pong feedback textures for the final mixer stage.
+ * - `currentFrameTexture`: A temporary FBO used as an intermediate target during the feedback process.
+ *
+ * ## Important Note on GL Contexts:
+ * Shader programs (`program`, `feedbackProgram`, etc.) and Vertex Array Objects (VAOs) are *not*
+ * shared between OpenGL contexts. However, textures and buffer objects *are* shared. This is why
+ * the UI previews (`StripPreview`) need their own `SimpleBlitHelper` class to create their own
+ * shaders and VAOs to render the shared textures.
  */
 class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
@@ -292,9 +317,13 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        // Null-safety guard: verify GL resources are initialized
+        // This is the main rendering loop, executed for every frame.
+
+        // 1. Check if GL resources are ready. If not, abort the frame.
         if (program == 0 || screenWidth == 0) return
-        
+
+        // 2. Clear all feedback buffers if a new patch/source was selected.
+        // This prevents visual artifacts from a previous state from bleeding into the new one.
         if (clearFeedbackNextFrame) {
             // Clear per-slot feedback buffers
             for (slot in 0..3) {
@@ -312,20 +341,27 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             }
             clearFeedbackNextFrame = false
         }
-        
-        // Null-safety guard: check visualSource before updating
-        visualSource?.update()
-        for (i in 0..3) slotSources[i].update()
+
+        // 3. Update all modulatable parameters for the current frame.
+        // This evaluates LFOs, beat clocks, and other modulators.
+        visualSource?.update() // For single-mandala mode
+        for (i in 0..3) slotSources[i].update() // For the 4 mixer slots
         mixerParams.values.forEach { it.evaluate() }
-        
+
         val p = mixerPatch
         GLES30.glViewport(0, 0, TARGET_WIDTH, TARGET_HEIGHT)
+
+        // 4. Determine rendering path: Mixer mode or Single Mandala mode.
         if (p != null) {
-            // Render each slot with its own persistent feedback
+            // --- MIXER MODE ---
+
+            // 4a. Render each of the 4 slots into its master texture (`masterTextures[0-3]`).
+            // Each slot has its own independent feedback loop.
             for (i in 0..3) {
                 if (p.slots[i].enabled && p.slots[i].isPopulated()) {
                     val source = slotSources[i]
                     val fx = source.parameters
+                    // Map UI-friendly parameter names to shader uniform names for feedback.
                     val fxMap = if (fx != null) mapOf(
                         "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f),
                         "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f),
@@ -333,7 +369,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                         "FB_SHIFT" to (fx["FB Shift"]?.value ?: 0f),
                         "FB_BLUR" to (fx["FB Blur"]?.value ?: 0f)
                     ) else emptyMap()
-                    
+
                     compositeWithFeedback(
                         render = { GLES30.glUseProgram(program); renderSource(source) },
                         fx = fxMap,
@@ -341,31 +377,38 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                         fbFramebuffers = slotFBFramebuffers[i],
                         fbIndexRef = { slotFBIndex[i] },
                         fbIndexSet = { slotFBIndex[i] = it },
-                        targetFboIdx = i
+                        targetFboIdx = i // The output is written to masterFramebuffers[i]
                     )
                 } else {
-                    // Clear empty slots
+                    // If a slot is disabled or empty, just clear its texture to black.
                     GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, masterFramebuffers[i])
                     GLES30.glClearColor(0f, 0f, 0f, 0f)
                     GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
                 }
             }
+            // 4b. Composite the slots into mixer groups A and B.
+            // Mix slots 1 & 2 -> Mixer A (output to masterTextures[4])
             renderMixerGroup(4, masterTextures[0], masterTextures[1], "A")
+            // Mix slots 3 & 4 -> Mixer B (output to masterTextures[5])
             renderMixerGroup(5, masterTextures[2], masterTextures[3], "B")
+
+            // 4c. Composite the final output.
+            // This is where the "white blob" issue originates. It mixes Mixer A & B.
             compositeFinalMixer(masterTextures[4], masterTextures[5])
         } else {
-            // Single mandala mode - use final feedback buffers
+            // --- SINGLE MANDALA MODE ---
+            // This mode is simpler, rendering one mandala with one feedback system.
             val currentSource = visualSource
             if (currentSource != null) {
                 val fx = currentSource.parameters
                 val fxMap = if (fx != null) mapOf(
-                    "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f), 
-                    "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f), 
-                    "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f), 
-                    "FB_SHIFT" to (fx["FB Shift"]?.value ?: 0f), 
+                    "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f),
+                    "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f),
+                    "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f),
+                    "FB_SHIFT" to (fx["FB Shift"]?.value ?: 0f),
                     "FB_BLUR" to (fx["FB Blur"]?.value ?: 0f)
                 ) else emptyMap()
-                
+
                 compositeWithFeedback(
                     render = { GLES30.glUseProgram(program); renderSource(currentSource) },
                     fx = fxMap,
@@ -373,14 +416,17 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                     fbFramebuffers = finalFBFramebuffers,
                     fbIndexRef = { finalFBIndex },
                     fbIndexSet = { finalFBIndex = it },
-                    targetFboIdx = 6
+                    targetFboIdx = 6 // Final output always goes to masterFramebuffers[6]
                 )
             }
         }
 
-        // Ensure all rendering is complete before other contexts can read the textures
+        // 5. Ensure all rendering commands are submitted before the UI thread tries to read them.
+        // This is critical for multi-context rendering to work correctly.
         GLES30.glFlush()
-        
+
+        // 6. Blit the selected monitor source texture to the screen.
+        // This draws the final image visible to the user in the large preview window.
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0); GLES30.glViewport(0, 0, screenWidth, screenHeight); GLES30.glClearColor(0f,0f,0f,1f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
         val dTex = getTextureForSource(monitorSource); if (dTex != 0) drawTextureToCurrentBuffer(dTex)
     }
@@ -403,14 +449,28 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private fun compositeFinalMixer(tA: Int, tB: Int) {
         // Null-safety guard: use safe access for mixer parameters
         val fx = mapOf(
-            "FB_GAIN" to (mixerParams["MF_FB_GAIN"]?.value ?: 1f), 
+            "FB_GAIN" to 0.0f, 
             "FB_ZOOM" to (mixerParams["MF_FB_ZOOM"]?.value ?: 0.5f), 
             "FB_ROTATE" to (mixerParams["MF_FB_ROTATE"]?.value ?: 0.5f), 
             "FB_SHIFT" to (mixerParams["MF_FB_SHIFT"]?.value ?: 0f), 
             "FB_BLUR" to (mixerParams["MF_FB_BLUR"]?.value ?: 0f)
         )
         compositeWithFeedback(
-            render = { GLES30.glUseProgram(mixerProgram); GLES30.glActiveTexture(GLES30.GL_TEXTURE0); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, tA); GLES30.glUniform1i(uMixTex1Loc, 0); GLES30.glActiveTexture(GLES30.GL_TEXTURE1); GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, tB); GLES30.glUniform1i(uMixTex2Loc, 1); GLES30.glUniform1i(uMixModeLoc, ((mixerParams["MF_MODE"]?.value ?: 0f) * (MixerMode.entries.size - 1)).roundToInt()); GLES30.glUniform1f(uMixBalLoc, mixerParams["MF_BAL"]?.value ?: 0.5f); GLES30.glUniform1f(uMixAlphaLoc, mixerParams["MF_GAIN"]?.value ?: 1f); GLES30.glDisable(GLES30.GL_BLEND); GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4); GLES30.glEnable(GLES30.GL_BLEND) },
+            render = { 
+                GLES30.glUseProgram(mixerProgram); 
+                GLES30.glActiveTexture(GLES30.GL_TEXTURE0); 
+                GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, tA); 
+                GLES30.glUniform1i(uMixTex1Loc, 0); 
+                GLES30.glActiveTexture(GLES30.GL_TEXTURE1); 
+                GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, tB); 
+                GLES30.glUniform1i(uMixTex2Loc, 1); 
+                GLES30.glUniform1i(uMixModeLoc, ((mixerParams["MF_MODE"]?.value ?: 0f) * (MixerMode.entries.size - 1)).roundToInt()); 
+                GLES30.glUniform1f(uMixBalLoc, mixerParams["MF_BAL"]?.value ?: 0.5f); 
+                GLES30.glUniform1f(uMixAlphaLoc, mixerParams["MF_GAIN"]?.value ?: 1f); 
+                GLES30.glDisable(GLES30.GL_BLEND); 
+                GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4); 
+                GLES30.glEnable(GLES30.GL_BLEND) 
+            },
             fx = fx,
             fbTextures = finalFBTextures,
             fbFramebuffers = finalFBFramebuffers,

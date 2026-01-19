@@ -62,6 +62,17 @@ class ModulatableParameter(
                     val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
                     calculateWaveform(mod.waveform, positivePhase, mod.slope)
                 }
+                "sampleAndHold" -> {
+                    val beats = ModulationRegistry.getSynchronizedTotalBeats()
+                    val bpm = ModulationRegistry.get("bpm")
+                    val subdivision = mod.subdivision.coerceAtLeast(0.01f)
+
+                    val interval = subdivision * 60.0 / bpm
+                    val localPhase = (beats / subdivision) % 1.0
+                    val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
+
+                    ModulationRegistry.sampleAndHold.getValue(positivePhase, mod.slope, interval)
+                }
                 "lfo" -> {
                     val seconds = ModulationRegistry.getElapsedRealtimeSec()
                     val period = when (mod.lfoSpeedMode) {

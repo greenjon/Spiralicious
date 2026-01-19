@@ -65,18 +65,13 @@ fun KnobView(
             val arcSize = Size(radius * 2f, radius * 2f)
 
             if (isBipolar) {
-                // Sweep from center (12 o'clock / 270°)
-                // modulatedValue is expected to be -1.0 to 1.0
-                val sweep = modulatedValue * 150f // 150 deg max each side
-                
-                // Fix: Always use positive sweep angle, adjust start angle for negative values
-                val actualStartAngle = if (modulatedValue < 0) 270f + sweep else 270f
-                val actualSweep = if (modulatedValue < 0) -sweep else sweep
-                
+                // For a bipolar knob, first map the 0-1 value to -1 to 1 range
+                // then use the mapped value to determine the sweep angle from the 12 o'clock position
+                val mappedValue = (modulatedValue - 0.5f) * 2f  // Transform unipolar (0-1) to bipolar (-1 to 1)
                 drawArc(
                     color = if (focused) AppAccent else AppText,
-                    startAngle = actualStartAngle,
-                    sweepAngle = actualSweep,
+                    startAngle = 270f, // 12 o'clock (North)
+                    sweepAngle = mappedValue * 150f, // Sweep based on mapped value (-150 to +150 degrees)
                     useCenter = false,
                     topLeft = arcTopLeft,
                     size = arcSize,

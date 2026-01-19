@@ -29,8 +29,7 @@ These files represent the core functionality of the application:
 - **SpiralRenderer.kt**: OpenGL renderer that handles the actual drawing of mandalas.
 - **SharedEGLContextFactory.kt**: Manages shared OpenGL contexts for efficient rendering across multiple surfaces.
 - **ShaderHelper.kt**: Utility for compiling and managing shaders used in visualization.
-- **MandalaVisualSource.kt**: Defines the source of mandala visuals and how they're generated.
-- **VisualSource.kt**: Abstract interface for different types of visual sources.
+- **MandalaVisualSource.kt**: Defines the source of mandala visuals and how they're generated, including the VisualSource interface.
 - **MandalaLibrary.kt**: Contains predefined mandala ratios and templates used throughout the app.
 - **Mandala4Arm.kt**: Implementation of a specific mandala type with 4 symmetrical arms.
 
@@ -43,8 +42,7 @@ Files that define the data models and entities for the app:
 - **RandomizationModels.kt**: Data models related to randomized mandala sets.
 - **MixerModels.kt**: Models for the mixer functionality that combines visual sources.
 - **ShowModels.kt**: Data structures for organizing shows/performances.
-- **LayerContent.kt**: Defines content types for different layers in the app.
-- **LayerType.kt**: Enum of available layer types in the application.
+- **Layers.kt**: Defines layer types and content types for the application's hierarchical navigation system.
 - **MandalaSet.kt**: Represents a collection of mandalas that can be sequenced.
 - **NavLayer.kt**: Model representing a navigation layer in the app's hierarchy.
 
@@ -89,9 +87,7 @@ User interface screens and components:
 
 ### Theme
 
-- **theme/Color.kt**: Color definitions for the app theme.
-- **theme/Theme.kt**: Theme configuration for Compose UI.
-- **theme/Type.kt**: Typography definitions for the app theme.
+- **theme/AppTheme.kt**: Consolidated theme configuration including colors, typography, and theme composable.
 
 ## Control Voltage (CV) System
 
@@ -114,11 +110,7 @@ Files related to the modulation and control voltage system:
 
 ### CV Modifiers
 
-- **cv/modifiers/ModifiedCv.kt**: Base class for CV signal modifiers.
-- **cv/modifiers/ClipCv.kt**: Limits CV signal to a specific range.
-- **cv/modifiers/GainCv.kt**: Amplifies CV signal by a factor.
-- **cv/modifiers/OffsetCv.kt**: Adds offset to CV signal.
-- **cv/modifiers/PowerCv.kt**: Applies power function to CV signal.
+- **cv/modifiers/CvModifiers.kt**: Consolidated CV signal modifiers including ModifiedCv, ClipCv, GainCv, OffsetCv, and PowerCv.
 
 ### CV UI Components
 
@@ -209,15 +201,15 @@ Below is a phased approach to improving the codebase organization. These changes
     - [ ] Create a proper test plan and structure for actual testing.
 
 ### Phase 2: File Consolidation
-   - [ ] Consolidate `LayerContent.kt` and `LayerType.kt` into `Layers.kt`
-   - [ ] Merge `VisualSource.kt` and `MandalaVisualSource.kt` (interface and primary implementation)
+   - [x] Consolidate `LayerContent.kt` and `LayerType.kt` into `Layers.kt`
+   - [x] Merge `VisualSource.kt` and `MandalaVisualSource.kt` (interface and primary implementation)
 
 2.  **Simplify Theme Structure**:
-   - [ ] Consolidate theme files (`Color.kt`, `Theme.kt`, `Type.kt`) into a single `AppTheme.kt`
+   - [x] Consolidate theme files (`Color.kt`, `Theme.kt`, `Type.kt`) into a single `AppTheme.kt`
 
 3.  **Optimize CV Modifier Structure**:
-   - [ ] Group related CV modifiers into logical files (e.g., `AmplitudeModifiers.kt`, `TimeModifiers.kt`)
-   - [ ] Consider consolidating smaller modifier classes into a unified structure
+   - [x] Group related CV modifiers into logical files (e.g., `AmplitudeModifiers.kt`, `TimeModifiers.kt`)
+   - [x] Consider consolidating smaller modifier classes into a unified structure
 
 ### Phase 3: Critical Deconstruction - Splitting God Objects
 

@@ -29,8 +29,8 @@ These files represent the core functionality of the application:
 - **SpiralRenderer.kt**: OpenGL renderer that handles the actual drawing of mandalas.
 - **SharedEGLContextFactory.kt**: Manages shared OpenGL contexts for efficient rendering across multiple surfaces.
 - **ShaderHelper.kt**: Utility for compiling and managing shaders used in visualization.
-- **MandalaVisualSource.kt**: Defines the source of mandala visuals and how they're generated.
-- **VisualSource.kt**: Abstract interface for different types of visual sources.
+- **MandalaVisualSource.kt**: Defines the source of mandala visuals and how they're generated. (MERGED with VisualSource.kt to include the VisualSource interface)
+- **VisualSource.kt**: Abstract interface for different types of visual sources. (MERGED into MandalaVisualSource.kt)
 - **MandalaLibrary.kt**: Contains predefined mandala ratios and templates used throughout the app.
 - **Mandala4Arm.kt**: Implementation of a specific mandala type with 4 symmetrical arms.
 
@@ -43,8 +43,9 @@ Files that define the data models and entities for the app:
 - **RandomSetModels.kt**: Data models related to randomized mandala sets. (RENAMED to RandomizationModels.kt for more descriptive functionality)
 - **MixerModels.kt**: Models for the mixer functionality that combines visual sources.
 - **ShowModels.kt**: Data structures for organizing shows/performances.
-- **LayerContent.kt**: Defines content types for different layers in the app.
-- **LayerType.kt**: Enum of available layer types in the application.
+- **LayerContent.kt**: Defines content types for different layers in the app. (CONSOLIDATED into Layers.kt)
+- **LayerType.kt**: Enum of available layer types in the application. (CONSOLIDATED into Layers.kt)
+- **Layers.kt**: (NEW) Consolidated file containing both LayerContent and LayerType definitions.
 - **MandalaSet.kt**: Represents a collection of mandalas that can be sequenced.
 - **NavLayer.kt**: Model representing a navigation layer in the app's hierarchy.
 
@@ -89,9 +90,10 @@ User interface screens and components:
 
 ### Theme
 
-- **theme/Color.kt**: Color definitions for the app theme.
-- **theme/Theme.kt**: Theme configuration for Compose UI.
-- **theme/Type.kt**: Typography definitions for the app theme.
+- **theme/Color.kt**: Color definitions for the app theme. (CONSOLIDATED into AppTheme.kt)
+- **theme/Theme.kt**: Theme configuration for Compose UI. (CONSOLIDATED into AppTheme.kt)
+- **theme/Type.kt**: Typography definitions for the app theme. (CONSOLIDATED into AppTheme.kt)
+- **theme/AppTheme.kt**: (NEW) Consolidated theme configuration including colors, typography, and theme composable.
 
 ## Control Voltage (CV) System
 
@@ -114,11 +116,12 @@ Files related to the modulation and control voltage system:
 
 ### CV Modifiers
 
-- **cv/modifiers/ModifiedCv.kt**: Base class for CV signal modifiers.
-- **cv/modifiers/ClipCv.kt**: Limits CV signal to a specific range.
-- **cv/modifiers/GainCv.kt**: Amplifies CV signal by a factor.
-- **cv/modifiers/OffsetCv.kt**: Adds offset to CV signal.
-- **cv/modifiers/PowerCv.kt**: Applies power function to CV signal.
+- **cv/modifiers/ModifiedCv.kt**: Base class for CV signal modifiers. (CONSOLIDATED into CvModifiers.kt)
+- **cv/modifiers/ClipCv.kt**: Limits CV signal to a specific range. (CONSOLIDATED into CvModifiers.kt)
+- **cv/modifiers/GainCv.kt**: Amplifies CV signal by a factor. (CONSOLIDATED into CvModifiers.kt)
+- **cv/modifiers/OffsetCv.kt**: Adds offset to CV signal. (CONSOLIDATED into CvModifiers.kt)
+- **cv/modifiers/PowerCv.kt**: Applies power function to CV signal. (CONSOLIDATED into CvModifiers.kt)
+- **cv/modifiers/CvModifiers.kt**: (NEW) Consolidated file containing all CV modifier classes.
 
 ### CV UI Components
 

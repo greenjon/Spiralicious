@@ -1,59 +1,75 @@
 package llm.slop.spirals.cv
 
+import kotlin.math.floor
 import kotlin.random.Random
 
 /**
  * A CV signal that generates a new random value on a clock trigger and glides to it.
  * This simulates a classic "Sample and Hold" synthesizer module.
+ * 
+ * This implementation is "stateless" - it calculates current and previous values
+ * based solely on the beat count, ensuring that multiple parameters using the
+ * same SampleAndHold instance with different subdivisions all get independent
+ * random sequences.
  */
 class SampleAndHoldCv : CvSignal {
+    
+    /**
+     * Gets a deterministic random value for a specific beat cycle.
+     * This ensures consistent values within the same cycle, even across
+     * different parameters/controls.
+     */
+    private fun getRandomValueForCycle(cycleIndex: Int, seed: Int = 0): Float {
+        // Create a deterministic random generator seeded by the cycle index
+        val rng = Random(cycleIndex + seed)
+        return rng.nextFloat()
+    }
 
-    private var previousValue = 0f
-    private var currentValue = 0.5f
-    private var lastTriggerTime = -1.0
-    private val rng = Random.Default
+    /**
+     * Gets the current and previous values based on the total beats and subdivision.
+     * This ensures that each parameter with a unique subdivision gets its own
+     * independent random sequence.
+     */
+    private fun getValuesForPosition(totalBeats: Double, subdivision: Double): Pair<Float, Float> {
+        // Determine which cycle we're in based on beats and subdivision
+        val currentCycle = floor(totalBeats / subdivision).toInt()
+        val previousCycle = currentCycle - 1
+        
+        // The unique seed ensures different parameters get different sequences
+        val seed = subdivision.hashCode()
+        
+        // Get the values deterministically based on cycle index
+        val currentValue = getRandomValueForCycle(currentCycle, seed)
+        val previousValue = getRandomValueForCycle(previousCycle, seed)
+        
+        return Pair(currentValue, previousValue)
+    }
 
     /**
      * This getValue method will be called from within ModulatableParameter.evaluate()
      * It relies on the phase and slope being calculated and passed in from the modulator.
+     * 
+     * @param phase Current position in the cycle (0.0-1.0)
+     * @param slope Amount of time to spend gliding (0.0-1.0)
+     * @param totalBeats Total beats elapsed (used for deterministic randomness)
+     * @param subdivision How many beats per cycle
      */
-    fun getValue(phase: Double, slope: Float, interval: Double): Float {
-        val currentTime = System.currentTimeMillis() / 1000.0
-
-        // Detect the rising edge of the trigger (phase resets)
-        if (isNewCycle(phase, interval)) {
-            lastTriggerTime = currentTime
-            previousValue = currentValue
-            currentValue = rng.nextFloat()
-        }
-
-        val glideTime = interval * slope
-        val timeSinceTrigger = currentTime - lastTriggerTime
-
-        return if (timeSinceTrigger < glideTime && glideTime > 0) {
-            // Glide phase
-            val glideProgress = (timeSinceTrigger / glideTime).toFloat()
-            // Linear interpolation
-            previousValue + (currentValue - previousValue) * glideProgress
+    fun getValue(phase: Double, slope: Float, totalBeats: Double, subdivision: Double): Float {
+        // Get the current and previous random values for this position
+        val (currentValue, previousValue) = getValuesForPosition(totalBeats, subdivision)
+        
+        // Calculate how far we should be in the glide
+        val glideAmount = if (phase < slope) {
+            // During glide phase - linear interpolation from previous to current
+            (phase / slope).toFloat()
         } else {
-            // Hold phase
-            currentValue
+            // Hold phase - at the current value
+            1.0f
         }
+        
+        // Interpolate between previous and current values based on glide position
+        return previousValue + (currentValue - previousValue) * glideAmount
     }
-
-    private var lastPhase = -1.0
-    private fun isNewCycle(phase: Double, interval: Double): Boolean {
-        // A new cycle starts when the phase resets (e.g., goes from ~0.99 to 0.0)
-        // We also check if enough time has passed to prevent spurious triggers.
-        val phaseWentBackwards = phase < lastPhase
-        val timeSinceLastTrigger = (System.currentTimeMillis() / 1000.0) - lastTriggerTime
-        val readyForNextTrigger = timeSinceLastTrigger > (interval * 0.5) // Debounce
-
-        val isNew = lastTriggerTime < 0.0 || (phaseWentBackwards && readyForNextTrigger)
-        lastPhase = phase
-        return isNew
-    }
-
 
     /**
      * This is the interface method from CvSignal.

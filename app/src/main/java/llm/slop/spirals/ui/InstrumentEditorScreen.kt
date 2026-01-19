@@ -132,12 +132,10 @@ fun ModulatorRow(
                     }
                     "sampleAndHold" -> {
                         val beats = ModulationRegistry.getSynchronizedTotalBeats()
-                        val bpm = ModulationRegistry.get("bpm")
-                        val interval = subdivision * 60.0 / bpm
                         val localPhase = (beats / subdivision) % 1.0
                         val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
                         
-                        ModulationRegistry.sampleAndHold.getValue(positivePhase, slope, interval)
+                        ModulationRegistry.sampleAndHold.getValue(positivePhase, slope, beats, subdivision.toDouble())
                     }
                     else -> ModulationRegistry.get(sourceId)
                 }

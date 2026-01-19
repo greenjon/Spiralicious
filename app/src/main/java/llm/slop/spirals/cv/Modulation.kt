@@ -64,14 +64,14 @@ class ModulatableParameter(
                 }
                 "sampleAndHold" -> {
                     val beats = ModulationRegistry.getSynchronizedTotalBeats()
-                    val bpm = ModulationRegistry.get("bpm")
                     val subdivision = mod.subdivision.coerceAtLeast(0.01f)
 
-                    val interval = subdivision * 60.0 / bpm
+                    // Calculate phase within the current cycle
                     val localPhase = (beats / subdivision) % 1.0
                     val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
 
-                    ModulationRegistry.sampleAndHold.getValue(positivePhase, mod.slope, interval)
+                    // Pass both the totalBeats and subdivision for deterministic randomness
+                    ModulationRegistry.sampleAndHold.getValue(positivePhase, mod.slope, beats, subdivision.toDouble())
                 }
                 "lfo" -> {
                     val seconds = ModulationRegistry.getElapsedRealtimeSec()

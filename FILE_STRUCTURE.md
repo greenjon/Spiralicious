@@ -186,80 +186,101 @@ This file structure documentation should be kept up to date as the codebase evol
 
 ## Refactoring Roadmap
 
+**Executive Summary:** A thorough analysis of the codebase, particularly `MainActivity.kt` (1000+ lines) and `MandalaViewModel.kt` (850+ lines), confirms the critical need for the refactoring outlined below. These two files have become "God Objects," concentrating too much responsibility in one place.
+
+The highest-priority tasks are:
+1.  **Dismantling `MandalaViewModel.kt`** into a dedicated `NavigationViewModel`, domain-specific `Repository` classes, and editor-specific ViewModels.
+2.  **Extracting all screen composables** from `MainActivity.kt` into their own files to improve modularity and enable Compose previews.
+
+The following roadmap has been updated to reflect a more detailed, phased approach. It now includes new phases for architectural improvements like dependency injection and a more organized project structure. Following this roadmap will lead to a more scalable, maintainable, and testable codebase.
+
+---
+
 Below is a phased approach to improving the codebase organization. These changes should be implemented gradually to minimize disruption and ensure everything continues to work between phases.
 
-### Phase 1: File Renaming
+### Phase 1: Foundational Cleanup (Low-hanging Fruit)
 
-1. **Align Core Component Names**:
-   - [ ] Rename `MandalaLibrary.kt` → `MandalaTemplates.kt` (clearer purpose as template repository)
-   - [ ] Rename `SpiralSurfaceView.kt` → `MandalaSurfaceView.kt` (consistency with "Mandala" naming convention)
-   - [ ] Rename `SpiralRenderer.kt` → `MandalaRenderer.kt` (consistency with "Mandala" naming convention)
-   - [ ] Update all references to these files in the codebase
-
-2. **Clarify CV System Names**:
-   - [ ] Rename `cv/CvRegistry.kt` → `cv/ModulationRegistry.kt` (align with terminology in Modulation.kt)
+1.  **Align Core Component Names**:
+   - [ ] Rename `cv/CvRegistry.kt` → `cv/ModulationRegistry.kt` (align with terminology in `Modulation.kt`)
    - [ ] Rename `RandomSetModels.kt` → `RandomizationModels.kt` (more descriptive of functionality)
 
-### Phase 2: File Consolidation
+2.  **Clean Up Test Files**:
+    - [ ] Remove template test files (`ExampleInstrumentedTest.kt`, `ExampleUnitTest.kt`) if unused.
+    - [ ] Create a proper test plan and structure for actual testing.
 
-1. **Combine Related Model Files**:
-   - [ ] Consolidate `MandalaParams.kt` and `MandalaRatio.kt` into `MandalaDefinition.kt`
+### Phase 2: File Consolidation
    - [ ] Consolidate `LayerContent.kt` and `LayerType.kt` into `Layers.kt`
    - [ ] Merge `VisualSource.kt` and `MandalaVisualSource.kt` (interface and primary implementation)
 
-2. **Simplify Theme Structure**:
+2.  **Simplify Theme Structure**:
    - [ ] Consolidate theme files (`Color.kt`, `Theme.kt`, `Type.kt`) into a single `AppTheme.kt`
 
-3. **Optimize CV Modifier Structure**:
+3.  **Optimize CV Modifier Structure**:
    - [ ] Group related CV modifiers into logical files (e.g., `AmplitudeModifiers.kt`, `TimeModifiers.kt`)
    - [ ] Consider consolidating smaller modifier classes into a unified structure
 
-### Phase 3: File Splitting and Reorganization
+### Phase 3: Critical Deconstruction - Splitting God Objects
 
-1. **Separate Concerns in Key Components**:
-   - [ ] Split `MandalaViewModel.kt` into `NavigationViewModel.kt` and editor-specific ViewModels
-   - [ ] Extract editor composables from `MainActivity.kt` into their own dedicated files
-   - [ ] Divide `MandalaDatabase.kt` into domain-specific repository classes if it's doing too much
+1.  **Dismantle `MandalaViewModel.kt` (Highest Priority)**:
+    - [ ] Create a dedicated `NavigationViewModel.kt` to manage the `navStack` and breadcrumb cascade logic.
+    - [ ] Create domain-specific `Repository` classes (e.g., `MandalaRepository`, `SetRepository`) to abstract all database operations, using the existing DAOs.
+    - [ ] Create individual ViewModels for each editor screen (e.g., `MandalaEditorViewModel`, `MixerEditorViewModel`). These will handle screen-specific state and logic, interacting with the repositories and the `NavigationViewModel`.
 
-2. **Clean Up Test Files**:
-   - [ ] Remove template test files (`ExampleInstrumentedTest.kt`, `ExampleUnitTest.kt`) if unused
-   - [ ] Create a proper test plan and structure for actual testing
+2.  **Extract Editor Composables from `MainActivity.kt`**:
+    - [ ] Move each primary screen composable (`ShowEditorScreen`, `MixerEditorScreen`, `MandalaSetEditorScreen`, `MandalaEditorScreen`, `RandomSetEditorScreen`, `CvLabScreen`) into its own file within a new `ui/screens` package.
+    - [ ] Move dialogs and overlays (`SettingsOverlay`, `RenamePatchDialog`) into their own files within a `ui/components` package.
+    - [ ] Reduce `MainActivity.kt` to its core responsibility: setting up the theme, navigation host, and top-level state management.
 
-3. **Optimize Configuration**:
-   - [ ] Evaluate and potentially consolidate `AppConfig.kt` and `DefaultsConfig.kt`
+3.  **Optimize Configuration**:
+    - [ ] Evaluate and potentially consolidate `AppConfig.kt` and `DefaultsConfig.kt`.
 
 ### Phase 4: Directory Structure Improvements
 
-1. **Create Specialized Packages**:
-   - [ ] Create an `engine` package for rendering components
+1.  **Establish a Standard `ui` Package**:
+    - [ ] Create a top-level `ui` package.
+    - [ ] Organize UI files into `ui/screens`, `ui/components`, and `ui/theme`.
+
+2.  **Create Specialized Packages**:
      - Move `MandalaRenderer.kt`, `SharedEGLContextFactory.kt`, `ShaderHelper.kt`
    - [ ] Reorganize models by domain
      - Create `models/mandala`, `models/mixer`, `models/set`, `models/show` subpackages
 
-2. **Properly Organize Database Components**:
-   - [ ] Create a dedicated `database` package
-   - [ ] Separate into `database/entities` and `database/daos` subpackages
-   - [ ] Add proper repository classes in `database/repositories`
+3.  **Properly Organize Database Components**:
+   - [ ] Create a dedicated `database` package.
+   - [ ] Separate into `database/entities` and `database/daos` subpackages.
+   - [ ] Place the newly created `Repository` classes from Phase 3 into a `database/repositories` subpackage.
 
-3. **Restructure CV System**:
+4.  **Restructure CV System**:
    - [ ] Reorganize into `cv/sources`, `cv/processors`, `cv/visualizers`
    - [ ] Group related files into these new subpackages
 
 ### Phase 5: Final Refinements
 
-1. **Normalize Naming Conventions**:
+1.  **Normalize Naming Conventions**:
    - [ ] Ensure consistent naming patterns across the codebase
    - [ ] Address any remaining inconsistencies between "Spiral" and "Mandala" terminology
    - [ ] Standardize abbreviation usage (CV vs Control vs Modulation)
 
-2. **Documentation Updates**:
+2.  **Documentation Updates**:
    - [ ] Update this FILE_STRUCTURE.md document to reflect the new organization
-   - [ ] Update imports and references in all documentation files
    - [ ] Add code comments explaining the rationale behind the new structure
 
-3. **Review and Testing**:
+3.  **Review and Testing**:
    - [ ] Perform full application testing after each phase
    - [ ] Review for any missed refactoring opportunities
    - [ ] Ensure all features continue to function correctly
+
+### Phase 6: Advanced Architectural Improvements
+
+1.  **Integrate Dependency Injection**:
+    - [ ] Add the Hilt library to the project.
+    - [ ] Annotate the Application class with `@HiltAndroidApp`.
+    - [ ] Provide dependencies like Repositories, ViewModels, and the `AudioEngine` using Hilt modules.
+    - [ ] Inject dependencies into `MainActivity` and other Android components using `@AndroidEntryPoint`.
+
+2.  **Formalize State Management**:
+    - [ ] Review the state management approach in the new, smaller ViewModels.
+    - [ ] Consider adopting a formal MVI (Model-View-Intent) pattern to ensure a unidirectional data flow and predictable state changes.
+    - [ ] This will make the application easier to debug and more robust, especially with its highly reactive nature.
 
 This roadmap provides a structured approach to improving the codebase organization without changing functionality. Each phase builds on the previous one, ensuring that the codebase remains functional throughout the refactoring process.

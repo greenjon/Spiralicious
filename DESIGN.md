@@ -145,3 +145,8 @@ The beat division system manages rhythmic parameters throughout the application:
 ## File Structure
 
 For a comprehensive overview of the application's file structure and the purpose of each file, please refer to the dedicated [FILE_STRUCTURE.md](FILE_STRUCTURE.md) document.
+
+## Additional Documentation
+
+For detailed information about the rendering system implementation:
+- [RENDERING.md](RENDERING.md) - Documentation on the shared OpenGL context and ping-pong feedback rendering systems

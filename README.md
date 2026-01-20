@@ -29,6 +29,12 @@ See **[DESIGN.md](DESIGN.md)** for comprehensive documentation including:
 - Recipe tagging workflow
 - Code organization
 
+For detailed information about the rendering system, see **[RENDERING.md](RENDERING.md)** which covers:
+- Shared OpenGL context architecture
+- Ping-pong feedback rendering system
+- Complete rendering pipeline
+- Performance considerations
+
 ## Tech Stack
 
 - Kotlin + Jetpack Compose

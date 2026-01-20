@@ -149,43 +149,88 @@ class RandomSetGenerator(private val context: Context) {
                     }
                 }
                 
-                if (useBeat) {
-                    // Beat subdivision from range
-                    // Use the standardized beat values and pick one in the valid range
-                val validValues = STANDARD_BEAT_VALUES.filter { it in c.beatDivMin..c.beatDivMax }
-                val subdivision = if (validValues.isNotEmpty()) {
-                    validValues.random(random)
+                // Choose source: beat, LFO or random
+                val sourceType = if (constraints == null) {
+                    // Using defaults - use probability-based selection including Random
+                    val defaults = defaultsConfig.getArmDefaults()
+                    val sourceRoll = random.nextFloat()
+                    when {
+                        sourceRoll < defaults.beatProbability -> "beat"
+                        sourceRoll < defaults.beatProbability + defaults.lfoProbability -> "lfo"
+                        else -> "random" // Random (sampleAndHold)
+                    }
                 } else {
-                    // Fallback to nearest allowed value
-                    STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - c.beatDivMin) } ?: 1f
+                    // Using explicit constraints - use deterministic selection based on enabled flags
+                    when {
+                        c.enableBeat && c.enableLfo -> if (random.nextBoolean()) "beat" else "lfo"
+                        c.enableBeat -> "beat"
+                        c.enableLfo -> "lfo"
+                        else -> "random" // Random (sampleAndHold) as fallback
+                    }
                 }
-                    
-                    param.modulators.add(
-                        CvModulator(
-                            sourceId = "beatPhase",
-                            operator = ModulationOperator.ADD,
-                            waveform = waveform,
-                            slope = 0.5f,
-                            weight = weight,
-                            phaseOffset = random.nextFloat(),
-                            subdivision = subdivision
+
+                // Configure modulator based on source type
+                when (sourceType) {
+                    "beat" -> {
+                        // Beat subdivision from range - use standardized beat values
+                        val validValues = STANDARD_BEAT_VALUES.filter { it in c.beatDivMin..c.beatDivMax }
+                        val subdivision = if (validValues.isNotEmpty()) {
+                            validValues.random(random)
+                        } else {
+                            // Fallback to nearest allowed value
+                            STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - c.beatDivMin) } ?: 1f
+                        }
+                        
+                        param.modulators.add(
+                            CvModulator(
+                                sourceId = "beatPhase",
+                                operator = ModulationOperator.ADD,
+                                waveform = waveform,
+                                slope = 0.5f,
+                                weight = weight,
+                                phaseOffset = random.nextFloat(),
+                                subdivision = subdivision
+                            )
                         )
-                    )
-                } else {
-                    // LFO time from range (convert to frequency)
-                    val timeSeconds = random.nextInt(c.lfoTimeMin.toInt(), c.lfoTimeMax.toInt() + 1).toFloat()
-                    
-                    param.modulators.add(
-                        CvModulator(
-                            sourceId = "lfo1",
-                            operator = ModulationOperator.ADD,
-                            waveform = waveform,
-                            slope = 0.5f,
-                            weight = weight,
-                            phaseOffset = random.nextFloat(),
-                            subdivision = timeSeconds
+                    }
+                    "lfo" -> {
+                        // LFO time from range (convert to frequency)
+                        val timeSeconds = random.nextInt(c.lfoTimeMin.toInt(), c.lfoTimeMax.toInt() + 1).toFloat()
+                        
+                        param.modulators.add(
+                            CvModulator(
+                                sourceId = "lfo1",
+                                operator = ModulationOperator.ADD,
+                                waveform = waveform,
+                                slope = 0.5f,
+                                weight = weight,
+                                phaseOffset = random.nextFloat(),
+                                subdivision = timeSeconds
+                            )
                         )
-                    )
+                    }
+                    "random" -> {
+                        // Random (sampleAndHold) - use beat divisions as with Beat
+                        val validValues = STANDARD_BEAT_VALUES.filter { it in c.beatDivMin..c.beatDivMax }
+                        val subdivision = if (validValues.isNotEmpty()) {
+                            validValues.random(random)
+                        } else {
+                            // Fallback to nearest allowed value
+                            STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - c.beatDivMin) } ?: 1f
+                        }
+                        
+                        param.modulators.add(
+                            CvModulator(
+                                sourceId = "sampleAndHold",
+                                operator = ModulationOperator.ADD,
+                                waveform = waveform,
+                                slope = 0.5f,
+                                weight = weight,
+                                phaseOffset = random.nextFloat(),
+                                subdivision = subdivision
+                            )
+                        )
+                    }
                 }
             }
         }
@@ -211,25 +256,39 @@ class RandomSetGenerator(private val context: Context) {
                 val slope = defaults.getRandomDirection(random)
                 
                 // Select source based on probability
-                val sourceId = if (defaults.getRandomSpeedSource(random) == llm.slop.spirals.models.SpeedSource.BEAT) {
-                    "beatPhase"
-                } else {
-                    "lfo1"
+                val speedSource = defaults.getRandomSpeedSource(random)
+                val sourceId = when (speedSource) {
+                    llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
+                    llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
+                    llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
                 }
                 
                 // Get appropriate time/division range
-                val subdivision = if (sourceId == "beatPhase") {
-                    // Get beat division from range
-                    val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
-                    if (validValues.isNotEmpty()) {
-                        validValues.random(random)
-                    } else {
-                        // Fallback
-                        4f
+                val subdivision = when (sourceId) {
+                    "beatPhase" -> {
+                        // Get beat division from range - use standardized values
+                        val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
+                        if (validValues.isNotEmpty()) {
+                            validValues.random(random)
+                        } else {
+                            // Fallback
+                            4f
+                        }
                     }
-                } else {
-                    // Get LFO time
-                    random.nextInt(defaults.lfoTimeMin.toInt(), defaults.lfoTimeMax.toInt() + 1).toFloat()
+                    "sampleAndHold" -> {
+                        // Random CV should also use beat divisions
+                        val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
+                        if (validValues.isNotEmpty()) {
+                            validValues.random(random)
+                        } else {
+                            // Fallback
+                            4f
+                        }
+                    }
+                    else -> {
+                        // Get LFO time
+                        random.nextInt(defaults.lfoTimeMin.toInt(), defaults.lfoTimeMax.toInt() + 1).toFloat()
+                    }
                 }
                 
                 param.modulators.add(
@@ -265,19 +324,29 @@ class RandomSetGenerator(private val context: Context) {
             val sourceId: String
             val subdivision: Float
             
-            if (constraints.speedSource == llm.slop.spirals.models.SpeedSource.BEAT) {
-                sourceId = "beatPhase"
-                // Use the standardized beat values and pick one in the valid range
-                val validValues = STANDARD_BEAT_VALUES.filter { it in constraints.beatDivMin..constraints.beatDivMax }
-                subdivision = if (validValues.isNotEmpty()) {
-                    validValues.random(random)
-                } else {
-                    // Fallback to nearest allowed value
-                    STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
+            // Set source ID based on speed source selection
+            sourceId = when(constraints.speedSource) {
+                llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
+                llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
+                llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
+            }
+            
+            // Set subdivision based on source type
+            subdivision = when(sourceId) {
+                "beatPhase", "sampleAndHold" -> {
+                    // Use the standardized beat values for both Beat and Random
+                    val validValues = STANDARD_BEAT_VALUES.filter { it in constraints.beatDivMin..constraints.beatDivMax }
+                    if (validValues.isNotEmpty()) {
+                        validValues.random(random)
+                    } else {
+                        // Fallback to nearest allowed value
+                        STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
+                    }
                 }
-            } else {
-                sourceId = "lfo1"
-                subdivision = random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
+                else -> {
+                    // LFO source uses time values
+                    random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
+                }
             }
             
             param.modulators.add(
@@ -314,25 +383,39 @@ class RandomSetGenerator(private val context: Context) {
                 val slope = defaults.getRandomDirection(random)
                 
                 // Select source based on probability
-                val sourceId = if (defaults.getRandomSpeedSource(random) == llm.slop.spirals.models.SpeedSource.BEAT) {
-                    "beatPhase"
-                } else {
-                    "lfo1"
+                val speedSource = defaults.getRandomSpeedSource(random)
+                val sourceId = when (speedSource) {
+                    llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
+                    llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
+                    llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
                 }
                 
                 // Get appropriate time/division range
-                val subdivision = if (sourceId == "beatPhase") {
-                    // Get beat division from range
-                    val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
-                    if (validValues.isNotEmpty()) {
-                        validValues.random(random)
-                    } else {
-                        // Fallback
-                        4f
+                val subdivision = when (sourceId) {
+                    "beatPhase" -> {
+                        // Get beat division from range - use standardized values
+                        val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
+                        if (validValues.isNotEmpty()) {
+                            validValues.random(random)
+                        } else {
+                            // Fallback
+                            4f
+                        }
                     }
-                } else {
-                    // Get LFO time
-                    random.nextInt(defaults.lfoTimeMin.toInt(), defaults.lfoTimeMax.toInt() + 1).toFloat()
+                    "sampleAndHold" -> {
+                        // Random CV should also use beat divisions
+                        val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
+                        if (validValues.isNotEmpty()) {
+                            validValues.random(random)
+                        } else {
+                            // Fallback
+                            4f
+                        }
+                    }
+                    else -> {
+                        // Get LFO time
+                        random.nextInt(defaults.lfoTimeMin.toInt(), defaults.lfoTimeMax.toInt() + 1).toFloat()
+                    }
                 }
                 
                 param.modulators.add(
@@ -368,19 +451,29 @@ class RandomSetGenerator(private val context: Context) {
             val sourceId: String
             val subdivision: Float
             
-            if (constraints.speedSource == llm.slop.spirals.models.SpeedSource.BEAT) {
-                sourceId = "beatPhase"
-                // Use the standardized beat values and pick one in the valid range
-                val validValues = STANDARD_BEAT_VALUES.filter { it in constraints.beatDivMin..constraints.beatDivMax }
-                subdivision = if (validValues.isNotEmpty()) {
-                    validValues.random(random)
-                } else {
-                    // Fallback to nearest allowed value
-                    STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
+            // Set source ID based on speed source selection
+            sourceId = when(constraints.speedSource) {
+                llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
+                llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
+                llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
+            }
+            
+            // Set subdivision based on source type
+            subdivision = when(sourceId) {
+                "beatPhase", "sampleAndHold" -> {
+                    // Use the standardized beat values for both Beat and Random
+                    val validValues = STANDARD_BEAT_VALUES.filter { it in constraints.beatDivMin..constraints.beatDivMax }
+                    if (validValues.isNotEmpty()) {
+                        validValues.random(random)
+                    } else {
+                        // Fallback to nearest allowed value
+                        STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
+                    }
                 }
-            } else {
-                sourceId = "lfo1"
-                subdivision = random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
+                else -> {
+                    // LFO source uses time values
+                    random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
+                }
             }
             
             param.modulators.add(

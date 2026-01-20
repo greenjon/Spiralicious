@@ -514,7 +514,7 @@ class MainActivity : ComponentActivity() {
                     color = AppBackground,
                     border = androidx.compose.foundation.BorderStroke(1.dp, AppText.copy(alpha = 0.1f))
                 ) {
-                    llm.slop.spirals.ui.settings.GlobalDefaultsScreen(
+                    llm.slop.spirals.ui.settings.MandalaDefaultsScreen(
                         defaultsConfig = defaultsConfig,
                         onClose = { showGlobalDefaults = false }
                     )
@@ -585,7 +585,7 @@ class MainActivity : ComponentActivity() {
                             colors = ButtonDefaults.buttonColors(containerColor = AppAccent),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Randomization Defaults")
+                            Text("Mandala Defaults")
                         }
                     }
                 }
@@ -917,30 +917,125 @@ class MainActivity : ComponentActivity() {
 
     private fun randomizeMandala(visualSource: MandalaVisualSource) {
         val random = kotlin.random.Random.Default
+        val context = applicationContext
+        val defaultsConfig = llm.slop.spirals.defaults.DefaultsConfig.getInstance(context)
         
-        // 1. Random recipe
-        visualSource.recipe = MandalaLibrary.MandalaRatios.random()
+        // Get all defaults
+        val mandalaDefaults = defaultsConfig.getMandalaDefaults()
+        val recipeDefaults = mandalaDefaults.recipeDefaults
+        val armDefaults = mandalaDefaults.armDefaults
+        val rotationDefaults = mandalaDefaults.rotationDefaults
+        val hueOffsetDefaults = mandalaDefaults.hueOffsetDefaults
         
-        // 2. Hue Sweep = petals (scaled by 9.0 in render code)
+        // 1. Random recipe - respecting recipe defaults
+        val allRecipes = MandalaLibrary.MandalaRatios
+        val filteredRecipes = if (recipeDefaults.preferFavorites) {
+            // Try to use favorites if available
+            val tagManager = RecipeTagManager(context)
+            val favorites = tagManager.getFavorites()
+            
+            if (favorites.isNotEmpty()) {
+                // Use favorites but filter by petal range
+                val favoriteRecipes = allRecipes.filter { it.id in favorites }
+                favoriteRecipes.filter { 
+                    it.petals in recipeDefaults.minPetalCount..recipeDefaults.maxPetalCount 
+                }
+            } else {
+                // No favorites, just filter by petal range
+                allRecipes.filter { 
+                    it.petals in recipeDefaults.minPetalCount..recipeDefaults.maxPetalCount 
+                }
+            }
+        } else {
+            // Just filter by petal range
+            allRecipes.filter { 
+                it.petals in recipeDefaults.minPetalCount..recipeDefaults.maxPetalCount 
+            }
+        }
+        
+        // Use the filtered recipes, or fall back to all recipes if filtering produced empty result
+        visualSource.recipe = if (filteredRecipes.isNotEmpty()) {
+            filteredRecipes.random(random)
+        } else {
+            allRecipes.random(random)
+        }
+        
+        // 2. Hue Sweep = petals (scaled by 9.0 in render code) if auto enabled
         visualSource.parameters["Hue Sweep"]?.let { param ->
-            param.baseValue = visualSource.recipe.petals / 9.0f
+            if (recipeDefaults.autoHueSweep) {
+                param.baseValue = visualSource.recipe.petals / 9.0f
+            } else {
+                param.baseValue = random.nextFloat() * 0.5f // Random value between 0-0.5
+            }
             param.modulators.clear()
         }
         
         // 3. L1-L4 (arm lengths)
         listOf("L1", "L2", "L3", "L4").forEach { paramName ->
             visualSource.parameters[paramName]?.let { param ->
-                param.baseValue = 0.2f // Base 20%
+                // Base length from range
+                val baseLength = random.nextInt(armDefaults.baseLengthMin, armDefaults.baseLengthMax + 1) / 100f
+                param.baseValue = baseLength
                 param.modulators.clear()
+                
+                // Select source based on probabilities
+                val sourceRoll = random.nextFloat()
+                val sourceId = when {
+                    sourceRoll < armDefaults.beatProbability -> "beatPhase"
+                    sourceRoll < armDefaults.beatProbability + armDefaults.lfoProbability -> "lfo1"
+                    else -> "sampleAndHold"
+                }
+                
+                // Select waveform based on probabilities
+                val waveform = armDefaults.getRandomWaveform(random)
+                
+                // Weight/intensity from range
+                val weight = random.nextInt(armDefaults.weightMin, armDefaults.weightMax + 1) / 100f
+                
+                // Beat division or LFO time based on source
+                val subdivision = when (sourceId) {
+                    "beatPhase" -> {
+                        // Beat division from STANDARD_BEAT_VALUES
+                        val validValues = llm.slop.spirals.models.STANDARD_BEAT_VALUES.filter { 
+                            it in armDefaults.beatDivMin..armDefaults.beatDivMax 
+                        }
+                        if (validValues.isNotEmpty()) {
+                            validValues.random(random)
+                        } else {
+                            // Fallback
+                            4f
+                        }
+                    }
+                    "sampleAndHold" -> {
+                        // Random CV should also use beat divisions, not arbitrary time
+                        val validValues = llm.slop.spirals.models.STANDARD_BEAT_VALUES.filter { 
+                            it in armDefaults.beatDivMin..armDefaults.beatDivMax 
+                        }
+                        if (validValues.isNotEmpty()) {
+                            validValues.random(random)
+                        } else {
+                            // Fallback
+                            4f
+                        }
+                    }
+                    else -> {
+                        // LFO time
+                        random.nextInt(armDefaults.lfoTimeMin.toInt(), armDefaults.lfoTimeMax.toInt() + 1).toFloat()
+                    }
+                }
+                
+                // Random phase offset
+                val phaseOffset = random.nextFloat()
+                
                 param.modulators.add(
                     llm.slop.spirals.cv.CvModulator(
-                        sourceId = "beatPhase",
+                        sourceId = sourceId,
                         operator = llm.slop.spirals.cv.ModulationOperator.ADD,
-                        waveform = if (random.nextBoolean()) llm.slop.spirals.cv.Waveform.SINE else llm.slop.spirals.cv.Waveform.TRIANGLE,
+                        waveform = waveform,
                         slope = 0.5f,
-                        weight = random.nextFloat() * 0.5f + 0.1f, // 10-60% -> 0.1-0.6
-                        phaseOffset = random.nextFloat(),
-                        subdivision = random.nextInt(8, 33).toFloat() // 8-32
+                        weight = weight,
+                        phaseOffset = phaseOffset,
+                        subdivision = subdivision
                     )
                 )
             }
@@ -950,15 +1045,59 @@ class MainActivity : ComponentActivity() {
         visualSource.parameters["Rotation"]?.let { param ->
             param.baseValue = 0f
             param.modulators.clear()
+            
+            // Direction based on probabilities
+            val slope = rotationDefaults.getRandomDirection(random)
+            
+            // Source based on probabilities
+            val speedSource = rotationDefaults.getRandomSpeedSource(random)
+            val sourceId = when(speedSource) {
+                llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
+                llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
+                llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
+            }
+            
+            // Subdivision based on source
+            val subdivision = when (sourceId) {
+                "beatPhase" -> {
+                    // Beat division from STANDARD_BEAT_VALUES
+                    val validValues = llm.slop.spirals.models.STANDARD_BEAT_VALUES.filter { 
+                        it in rotationDefaults.beatDivMin..rotationDefaults.beatDivMax 
+                    }
+                    if (validValues.isNotEmpty()) {
+                        validValues.random(random)
+                    } else {
+                        // Fallback
+                        4f
+                    }
+                }
+                "sampleAndHold" -> {
+                    // Random CV should also use beat divisions, not arbitrary time
+                    val validValues = llm.slop.spirals.models.STANDARD_BEAT_VALUES.filter { 
+                        it in rotationDefaults.beatDivMin..rotationDefaults.beatDivMax 
+                    }
+                    if (validValues.isNotEmpty()) {
+                        validValues.random(random)
+                    } else {
+                        // Fallback
+                        4f
+                    }
+                }
+                else -> {
+                    // LFO time
+                    random.nextInt(rotationDefaults.lfoTimeMin.toInt(), rotationDefaults.lfoTimeMax.toInt() + 1).toFloat()
+                }
+            }
+            
             param.modulators.add(
                 llm.slop.spirals.cv.CvModulator(
-                    sourceId = "beatPhase",
+                    sourceId = sourceId,
                     operator = llm.slop.spirals.cv.ModulationOperator.ADD,
                     waveform = llm.slop.spirals.cv.Waveform.TRIANGLE,
-                    slope = if (random.nextBoolean()) 0f else 1f, // 0 or 100
-                    weight = 1.0f, // 100%
+                    slope = slope,
+                    weight = 1.0f,
                     phaseOffset = random.nextFloat(),
-                    subdivision = random.nextInt(4, 129).toFloat() // 4-128
+                    subdivision = subdivision
                 )
             )
         }
@@ -967,15 +1106,59 @@ class MainActivity : ComponentActivity() {
         visualSource.parameters["Hue Offset"]?.let { param ->
             param.baseValue = 0f
             param.modulators.clear()
+            
+            // Direction based on probabilities
+            val slope = hueOffsetDefaults.getRandomDirection(random)
+            
+            // Source based on probabilities
+            val speedSource = hueOffsetDefaults.getRandomSpeedSource(random)
+            val sourceId = when(speedSource) {
+                llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
+                llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
+                llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
+            }
+            
+            // Subdivision based on source
+            val subdivision = when (sourceId) {
+                "beatPhase" -> {
+                    // Beat division from STANDARD_BEAT_VALUES
+                    val validValues = llm.slop.spirals.models.STANDARD_BEAT_VALUES.filter { 
+                        it in hueOffsetDefaults.beatDivMin..hueOffsetDefaults.beatDivMax 
+                    }
+                    if (validValues.isNotEmpty()) {
+                        validValues.random(random)
+                    } else {
+                        // Fallback
+                        4f
+                    }
+                }
+                "sampleAndHold" -> {
+                    // Random CV should also use beat divisions, not arbitrary time
+                    val validValues = llm.slop.spirals.models.STANDARD_BEAT_VALUES.filter { 
+                        it in hueOffsetDefaults.beatDivMin..hueOffsetDefaults.beatDivMax 
+                    }
+                    if (validValues.isNotEmpty()) {
+                        validValues.random(random)
+                    } else {
+                        // Fallback
+                        4f
+                    }
+                }
+                else -> {
+                    // LFO time
+                    random.nextInt(hueOffsetDefaults.lfoTimeMin.toInt(), hueOffsetDefaults.lfoTimeMax.toInt() + 1).toFloat()
+                }
+            }
+            
             param.modulators.add(
                 llm.slop.spirals.cv.CvModulator(
-                    sourceId = "beatPhase",
+                    sourceId = sourceId,
                     operator = llm.slop.spirals.cv.ModulationOperator.ADD,
                     waveform = llm.slop.spirals.cv.Waveform.TRIANGLE,
-                    slope = if (random.nextBoolean()) 0f else 1f, // 0 or 100
-                    weight = 1.0f, // 100%
+                    slope = slope,
+                    weight = 1.0f,
                     phaseOffset = random.nextFloat(),
-                    subdivision = random.nextInt(4, 17).toFloat() // 4-16
+                    subdivision = subdivision
                 )
             )
         }

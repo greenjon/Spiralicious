@@ -5,12 +5,54 @@ import llm.slop.spirals.models.STANDARD_BEAT_VALUES
 import llm.slop.spirals.models.SpeedSource
 
 /**
- * Data structures for storing default values for the Random Set Editor.
+ * Data structures for storing default values for the Mandala and Random Set Editors.
  * These values are used when a parameter is "unconfigured" (no specific constraints provided).
  */
 
 /**
- * Top-level container for all Random Set default values
+ * Top-level container for all Mandala default values
+ */
+data class MandalaDefaults(
+    val armDefaults: ArmDefaults = ArmDefaults(),
+    val rotationDefaults: RotationDefaults = RotationDefaults(),
+    val hueOffsetDefaults: HueOffsetDefaults = HueOffsetDefaults(),
+    val recipeDefaults: RecipeDefaults = RecipeDefaults(),
+    val feedbackDefaults: FeedbackDefaults = FeedbackDefaults()
+)
+
+/**
+ * Default values for recipe selection
+ */
+data class RecipeDefaults(
+    val preferFavorites: Boolean = true,  // Prefer favorites when randomizing
+    val minPetalCount: Int = 3,           // Minimum petals when randomizing
+    val maxPetalCount: Int = 12,          // Maximum petals when randomizing
+    val autoHueSweep: Boolean = true      // Auto-set hue sweep based on petals
+)
+
+/**
+ * Default values for feedback parameters
+ */
+data class FeedbackDefaults(
+    val fbDecayMin: Float = 0.0f,
+    val fbDecayMax: Float = 0.30f,
+    val fbGainMin: Float = 0.85f,
+    val fbGainMax: Float = 1.0f,
+    val fbZoomMin: Float = 0.5f,
+    val fbZoomMax: Float = 0.54f,
+    val fbRotateMin: Float = 0.5f,
+    val fbRotateMax: Float = 0.52f,
+    val fbShiftXMin: Float = 0.0f,
+    val fbShiftXMax: Float = 0.0f,
+    val fbShiftYMin: Float = 0.0f,
+    val fbShiftYMax: Float = 0.0f,
+    val fbBlurMin: Float = 0.0f,
+    val fbBlurMax: Float = 0.0f
+)
+
+/**
+ * For backward compatibility - same structure as MandalaDefaults
+ * Just pointing to the same defaults
  */
 data class RandomSetDefaults(
     val armDefaults: ArmDefaults = ArmDefaults(),
@@ -27,8 +69,9 @@ data class ArmDefaults(
     val baseLengthMax: Int = 100,
     
     // Movement source probabilities
-    val beatProbability: Float = 0.5f,
-    val lfoProbability: Float = 0.5f,
+    val beatProbability: Float = 0.4f,
+    val lfoProbability: Float = 0.4f,
+    val randomProbability: Float = 0.2f,
     
     // Beat division range 
     val beatDivMin: Float = STANDARD_BEAT_VALUES.first(),  // 1/16
@@ -54,7 +97,9 @@ data class ArmDefaults(
         fun createWithNormalizedProbabilities(
             baseLengthMin: Int = 0,
             baseLengthMax: Int = 100,
-            beatProbability: Float = 0.5f,
+            beatProbability: Float = 0.4f,
+            lfoProbability: Float = 0.4f,
+            randomProbability: Float = 0.2f,
             sineProbability: Float = 0.33f,
             triangleProbability: Float = 0.34f,
             squareProbability: Float = 0.33f,
@@ -66,8 +111,10 @@ data class ArmDefaults(
             lfoTimeMax: Float = 60.0f
         ): ArmDefaults {
             // Normalize movement source probabilities
-            val totalMovementProb = beatProbability + (1 - beatProbability)
-            val normalizedBeatProb = beatProbability / totalMovementProb
+            val totalMovementProb = beatProbability + lfoProbability + randomProbability
+            val normalizedBeatProb = if (totalMovementProb > 0) beatProbability / totalMovementProb else 0.4f
+            val normalizedLfoProb = if (totalMovementProb > 0) lfoProbability / totalMovementProb else 0.4f
+            val normalizedRandomProb = if (totalMovementProb > 0) randomProbability / totalMovementProb else 0.2f
             
             // Normalize waveform probabilities
             val totalWaveformProb = sineProbability + triangleProbability + squareProbability
@@ -79,7 +126,8 @@ data class ArmDefaults(
                 baseLengthMin = baseLengthMin,
                 baseLengthMax = baseLengthMax,
                 beatProbability = normalizedBeatProb,
-                lfoProbability = 1 - normalizedBeatProb,
+                lfoProbability = normalizedLfoProb,
+                randomProbability = normalizedRandomProb,
                 beatDivMin = beatDivMin,
                 beatDivMax = beatDivMax,
                 sineProbability = normalizedSineProb,
@@ -123,7 +171,12 @@ data class ArmDefaults(
      * Randomly select a movement source based on probabilities
      */
     fun getRandomMovementSource(random: kotlin.random.Random): String {
-        return if (random.nextFloat() < beatProbability) "beatPhase" else "lfo1"
+        val roll = random.nextFloat()
+        return when {
+            roll < beatProbability -> "beatPhase"
+            roll < beatProbability + lfoProbability -> "lfo1"
+            else -> "sampleAndHold"
+        }
     }
 }
 
@@ -136,8 +189,9 @@ data class RotationDefaults(
     val counterClockwiseProbability: Float = 0.5f,
     
     // Speed source probabilities
-    val beatProbability: Float = 0.7f,
-    val lfoProbability: Float = 0.3f,
+    val beatProbability: Float = 0.6f,
+    val lfoProbability: Float = 0.2f,
+    val randomProbability: Float = 0.2f,
     
     // Beat division range
     val beatDivMin: Float = 4f,
@@ -159,8 +213,16 @@ data class RotationDefaults(
      * Randomly select a speed source based on probabilities
      */
     fun getRandomSpeedSource(random: kotlin.random.Random): SpeedSource {
-        val normalizedBeat = beatProbability / (beatProbability + lfoProbability)
-        return if (random.nextFloat() < normalizedBeat) SpeedSource.BEAT else SpeedSource.LFO
+        val totalProb = beatProbability + lfoProbability + randomProbability
+        val normalizedBeat = beatProbability / totalProb
+        val normalizedLfo = lfoProbability / totalProb
+        
+        val roll = random.nextFloat()
+        return when {
+            roll < normalizedBeat -> SpeedSource.BEAT
+            roll < normalizedBeat + normalizedLfo -> SpeedSource.LFO
+            else -> SpeedSource.RANDOM
+        }
     }
 }
 
@@ -173,8 +235,9 @@ data class HueOffsetDefaults(
     val reverseProbability: Float = 0.5f,
     
     // Speed source probabilities
-    val beatProbability: Float = 0.8f,
+    val beatProbability: Float = 0.6f,
     val lfoProbability: Float = 0.2f,
+    val randomProbability: Float = 0.2f,
     
     // Beat division range
     val beatDivMin: Float = 4f,
@@ -196,7 +259,15 @@ data class HueOffsetDefaults(
      * Randomly select a speed source based on probabilities
      */
     fun getRandomSpeedSource(random: kotlin.random.Random): SpeedSource {
-        val normalizedBeat = beatProbability / (beatProbability + lfoProbability)
-        return if (random.nextFloat() < normalizedBeat) SpeedSource.BEAT else SpeedSource.LFO
+        val totalProb = beatProbability + lfoProbability + randomProbability
+        val normalizedBeat = beatProbability / totalProb
+        val normalizedLfo = lfoProbability / totalProb
+        
+        val roll = random.nextFloat()
+        return when {
+            roll < normalizedBeat -> SpeedSource.BEAT
+            roll < normalizedBeat + normalizedLfo -> SpeedSource.LFO
+            else -> SpeedSource.RANDOM
+        }
     }
 }

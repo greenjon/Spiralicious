@@ -131,7 +131,8 @@ data class HueOffsetConstraints(
 @Serializable
 enum class SpeedSource {
     BEAT,
-    LFO
+    LFO,
+    RANDOM // Sample and Hold CV source for random values
 }
 
 @Serializable

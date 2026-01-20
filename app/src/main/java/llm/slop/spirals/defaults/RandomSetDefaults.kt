@@ -88,7 +88,11 @@ data class ArmDefaults(
     
     // LFO time range
     val lfoTimeMin: Float = 1.0f,
-    val lfoTimeMax: Float = 60.0f
+    val lfoTimeMax: Float = 60.0f,
+    
+    // Random glide range (0.0-1.0)
+    val randomGlideMin: Float = 0.1f,
+    val randomGlideMax: Float = 0.5f
 ) {
     /**
      * Factory method to create default values with normalized probabilities
@@ -108,7 +112,9 @@ data class ArmDefaults(
             weightMin: Int = -100,
             weightMax: Int = 100,
             lfoTimeMin: Float = 1.0f,
-            lfoTimeMax: Float = 60.0f
+            lfoTimeMax: Float = 60.0f,
+            randomGlideMin: Float = 0.1f,
+            randomGlideMax: Float = 0.5f
         ): ArmDefaults {
             // Normalize movement source probabilities
             val totalMovementProb = beatProbability + lfoProbability + randomProbability
@@ -136,7 +142,9 @@ data class ArmDefaults(
                 weightMin = weightMin,
                 weightMax = weightMax,
                 lfoTimeMin = lfoTimeMin,
-                lfoTimeMax = lfoTimeMax
+                lfoTimeMax = lfoTimeMax,
+                randomGlideMin = randomGlideMin,
+                randomGlideMax = randomGlideMax
             )
         }
     }
@@ -193,13 +201,21 @@ data class RotationDefaults(
     val lfoProbability: Float = 0.2f,
     val randomProbability: Float = 0.2f,
     
-    // Beat division range
+    // Beat division range (for Beat CV source)
     val beatDivMin: Float = 4f,
     val beatDivMax: Float = 128f,
     
+    // Beat division range for Random CV source
+    val randomBeatDivMin: Float = 4f,
+    val randomBeatDivMax: Float = 64f,
+    
     // LFO time range
     val lfoTimeMin: Float = 5.0f,
-    val lfoTimeMax: Float = 30.0f
+    val lfoTimeMax: Float = 30.0f,
+    
+    // Random glide range (0.0-1.0)
+    val randomGlideMin: Float = 0.1f,
+    val randomGlideMax: Float = 0.5f
 ) {
     /**
      * Randomly select a direction (slope) based on probabilities
@@ -245,7 +261,11 @@ data class HueOffsetDefaults(
     
     // LFO time range
     val lfoTimeMin: Float = 10.0f,
-    val lfoTimeMax: Float = 60.0f
+    val lfoTimeMax: Float = 60.0f,
+    
+    // Random glide range (0.0-1.0)
+    val randomGlideMin: Float = 0.1f,
+    val randomGlideMax: Float = 0.5f
 ) {
     /**
      * Randomly select a direction (slope) based on probabilities

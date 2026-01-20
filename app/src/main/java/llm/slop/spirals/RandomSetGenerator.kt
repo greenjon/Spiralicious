@@ -102,7 +102,9 @@ class RandomSetGenerator(private val context: Context) {
                     weightMin = defaults.weightMin,
                     weightMax = defaults.weightMax,
                     lfoTimeMin = defaults.lfoTimeMin,
-                    lfoTimeMax = defaults.lfoTimeMax
+                    lfoTimeMax = defaults.lfoTimeMax,
+                    randomGlideMin = defaults.randomGlideMin,
+                    randomGlideMax = defaults.randomGlideMax
                 )
             }
             
@@ -219,12 +221,15 @@ class RandomSetGenerator(private val context: Context) {
                             STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - c.beatDivMin) } ?: 1f
                         }
                         
+                        // Get a random value in the glide range
+                        val randomGlide = random.nextFloat() * (c.randomGlideMax - c.randomGlideMin) + c.randomGlideMin
+                        
                         param.modulators.add(
                             CvModulator(
                                 sourceId = "sampleAndHold",
                                 operator = ModulationOperator.ADD,
                                 waveform = waveform,
-                                slope = 0.5f,
+                                slope = randomGlide,
                                 weight = weight,
                                 phaseOffset = random.nextFloat(),
                                 subdivision = subdivision
@@ -291,12 +296,21 @@ class RandomSetGenerator(private val context: Context) {
                     }
                 }
                 
+                // For random CV source, use the glide range
+                val finalSlope = if (sourceId == "sampleAndHold") {
+                    // Random value in the glide range
+                    random.nextFloat() * (defaults.randomGlideMax - defaults.randomGlideMin) + defaults.randomGlideMin
+                } else {
+                    // Direction slope for Beat and LFO
+                    slope
+                }
+                
                 param.modulators.add(
                     CvModulator(
                         sourceId = sourceId,
                         operator = ModulationOperator.ADD,
                         waveform = Waveform.TRIANGLE,
-                        slope = slope,
+                        slope = finalSlope,
                         weight = 1.0f,
                         phaseOffset = random.nextFloat(),
                         subdivision = subdivision
@@ -349,12 +363,21 @@ class RandomSetGenerator(private val context: Context) {
                 }
             }
             
+            // For Random CV, use the glide range instead of direction
+            val finalSlope = if (sourceId == "sampleAndHold") {
+                // Random value in the glide range
+                random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
+            } else {
+                // Direction slope for Beat and LFO
+                slope
+            }
+            
             param.modulators.add(
                 CvModulator(
                     sourceId = sourceId,
                     operator = ModulationOperator.ADD,
                     waveform = Waveform.TRIANGLE,
-                    slope = slope,
+                    slope = finalSlope,
                     weight = 1.0f,
                     phaseOffset = random.nextFloat(),
                     subdivision = subdivision
@@ -418,12 +441,21 @@ class RandomSetGenerator(private val context: Context) {
                     }
                 }
                 
+                // For random CV source, use the glide range
+                val finalSlope = if (sourceId == "sampleAndHold") {
+                    // Random value in the glide range
+                    random.nextFloat() * (defaults.randomGlideMax - defaults.randomGlideMin) + defaults.randomGlideMin
+                } else {
+                    // Direction slope for Beat and LFO
+                    slope
+                }
+                
                 param.modulators.add(
                     CvModulator(
                         sourceId = sourceId,
                         operator = ModulationOperator.ADD,
                         waveform = Waveform.TRIANGLE,
-                        slope = slope,
+                        slope = finalSlope,
                         weight = 1.0f,
                         phaseOffset = random.nextFloat(),
                         subdivision = subdivision
@@ -476,12 +508,21 @@ class RandomSetGenerator(private val context: Context) {
                 }
             }
             
+            // For Random CV, use the glide range instead of direction
+            val finalSlope = if (sourceId == "sampleAndHold") {
+                // Random value in the glide range
+                random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
+            } else {
+                // Direction slope for Beat and LFO
+                slope
+            }
+            
             param.modulators.add(
                 CvModulator(
                     sourceId = sourceId,
                     operator = ModulationOperator.ADD,
                     waveform = Waveform.TRIANGLE,
-                    slope = slope,
+                    slope = finalSlope,
                     weight = 1.0f,
                     phaseOffset = random.nextFloat(),
                     subdivision = subdivision

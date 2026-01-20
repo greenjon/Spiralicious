@@ -35,6 +35,12 @@ For detailed information about the rendering system, see **[RENDERING.md](RENDER
 - Complete rendering pipeline
 - Performance considerations
 
+For detailed information about the modulation system, see **[MODULATION.md](MODULATION.md)** which covers:
+- CV (Control Voltage) signal sources
+- Parameter modulation mechanisms
+- Audio analysis and signal processing
+- Signal flow from audio input to visual parameters
+
 ## Tech Stack
 
 - Kotlin + Jetpack Compose

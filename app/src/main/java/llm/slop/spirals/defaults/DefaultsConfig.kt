@@ -60,7 +60,9 @@ class DefaultsConfig(context: Context) {
             weightMin = prefs.getInt("${PREFIX_ARM}weight_min", -100),
             weightMax = prefs.getInt("${PREFIX_ARM}weight_max", 100),
             lfoTimeMin = prefs.getFloat("${PREFIX_ARM}lfo_time_min", 1.0f),
-            lfoTimeMax = prefs.getFloat("${PREFIX_ARM}lfo_time_max", 60.0f)
+            lfoTimeMax = prefs.getFloat("${PREFIX_ARM}lfo_time_max", 60.0f),
+            randomGlideMin = prefs.getFloat("${PREFIX_ARM}random_glide_min", 0.1f),
+            randomGlideMax = prefs.getFloat("${PREFIX_ARM}random_glide_max", 0.5f)
         )
     }
     
@@ -80,6 +82,8 @@ class DefaultsConfig(context: Context) {
             putInt("${PREFIX_ARM}weight_max", defaults.weightMax)
             putFloat("${PREFIX_ARM}lfo_time_min", defaults.lfoTimeMin)
             putFloat("${PREFIX_ARM}lfo_time_max", defaults.lfoTimeMax)
+            putFloat("${PREFIX_ARM}random_glide_min", defaults.randomGlideMin)
+            putFloat("${PREFIX_ARM}random_glide_max", defaults.randomGlideMax)
         }
     }
     
@@ -94,8 +98,12 @@ class DefaultsConfig(context: Context) {
             randomProbability = prefs.getFloat("${PREFIX_ROTATION}random_probability", 0.2f),
             beatDivMin = prefs.getFloat("${PREFIX_ROTATION}beat_div_min", 4f),
             beatDivMax = prefs.getFloat("${PREFIX_ROTATION}beat_div_max", 128f),
+            randomBeatDivMin = prefs.getFloat("${PREFIX_ROTATION}random_beat_div_min", 4f),
+            randomBeatDivMax = prefs.getFloat("${PREFIX_ROTATION}random_beat_div_max", 64f),
             lfoTimeMin = prefs.getFloat("${PREFIX_ROTATION}lfo_time_min", 5.0f),
-            lfoTimeMax = prefs.getFloat("${PREFIX_ROTATION}lfo_time_max", 30.0f)
+            lfoTimeMax = prefs.getFloat("${PREFIX_ROTATION}lfo_time_max", 30.0f),
+            randomGlideMin = prefs.getFloat("${PREFIX_ROTATION}random_glide_min", 0.1f),
+            randomGlideMax = prefs.getFloat("${PREFIX_ROTATION}random_glide_max", 0.5f)
         )
     }
     
@@ -108,8 +116,12 @@ class DefaultsConfig(context: Context) {
             putFloat("${PREFIX_ROTATION}random_probability", defaults.randomProbability)
             putFloat("${PREFIX_ROTATION}beat_div_min", defaults.beatDivMin)
             putFloat("${PREFIX_ROTATION}beat_div_max", defaults.beatDivMax)
+            putFloat("${PREFIX_ROTATION}random_beat_div_min", defaults.randomBeatDivMin)
+            putFloat("${PREFIX_ROTATION}random_beat_div_max", defaults.randomBeatDivMax)
             putFloat("${PREFIX_ROTATION}lfo_time_min", defaults.lfoTimeMin)
             putFloat("${PREFIX_ROTATION}lfo_time_max", defaults.lfoTimeMax)
+            putFloat("${PREFIX_ROTATION}random_glide_min", defaults.randomGlideMin)
+            putFloat("${PREFIX_ROTATION}random_glide_max", defaults.randomGlideMax)
         }
     }
     
@@ -125,7 +137,9 @@ class DefaultsConfig(context: Context) {
             beatDivMin = prefs.getFloat("${PREFIX_HUE}beat_div_min", 4f),
             beatDivMax = prefs.getFloat("${PREFIX_HUE}beat_div_max", 16f),
             lfoTimeMin = prefs.getFloat("${PREFIX_HUE}lfo_time_min", 10.0f),
-            lfoTimeMax = prefs.getFloat("${PREFIX_HUE}lfo_time_max", 60.0f)
+            lfoTimeMax = prefs.getFloat("${PREFIX_HUE}lfo_time_max", 60.0f),
+            randomGlideMin = prefs.getFloat("${PREFIX_HUE}random_glide_min", 0.1f),
+            randomGlideMax = prefs.getFloat("${PREFIX_HUE}random_glide_max", 0.5f)
         )
     }
     
@@ -140,6 +154,8 @@ class DefaultsConfig(context: Context) {
             putFloat("${PREFIX_HUE}beat_div_max", defaults.beatDivMax)
             putFloat("${PREFIX_HUE}lfo_time_min", defaults.lfoTimeMin)
             putFloat("${PREFIX_HUE}lfo_time_max", defaults.lfoTimeMax)
+            putFloat("${PREFIX_HUE}random_glide_min", defaults.randomGlideMin)
+            putFloat("${PREFIX_HUE}random_glide_max", defaults.randomGlideMax)
         }
     }
     

@@ -80,7 +80,11 @@ data class ArmConstraints(
     // LFO speed control
     val lfoSpeedMode: LfoSpeedMode = LfoSpeedMode.MEDIUM,
     val lfoTimeMin: Float = 1.0f, // seconds, within speed mode
-    val lfoTimeMax: Float = 60.0f  // seconds, within speed mode
+    val lfoTimeMax: Float = 60.0f,  // seconds, within speed mode
+    
+    // Random glide range (0.0-1.0)
+    val randomGlideMin: Float = 0.1f,
+    val randomGlideMax: Float = 0.5f
 )
 
 @Serializable
@@ -106,7 +110,11 @@ data class RotationConstraints(
     // LFO time range (when speedSource == LFO)
     val lfoSpeedMode: LfoSpeedMode = LfoSpeedMode.MEDIUM,
     val lfoTimeMin: Float = 5.0f,
-    val lfoTimeMax: Float = 30.0f
+    val lfoTimeMax: Float = 30.0f,
+    
+    // Random glide range (0.0-1.0)
+    val randomGlideMin: Float = 0.1f,
+    val randomGlideMax: Float = 0.5f
 )
 
 @Serializable
@@ -125,7 +133,11 @@ data class HueOffsetConstraints(
     // LFO time range (when speedSource == LFO)
     val lfoSpeedMode: LfoSpeedMode = LfoSpeedMode.MEDIUM,
     val lfoTimeMin: Float = 10.0f,
-    val lfoTimeMax: Float = 60.0f
+    val lfoTimeMax: Float = 60.0f,
+    
+    // Random glide range (0.0-1.0)
+    val randomGlideMin: Float = 0.1f,
+    val randomGlideMax: Float = 0.5f
 )
 
 @Serializable

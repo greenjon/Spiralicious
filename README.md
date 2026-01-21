@@ -41,6 +41,11 @@ For detailed information about the modulation system, see **[MODULATION.md](MODU
 - Audio analysis and signal processing
 - Signal flow from audio input to visual parameters
 
+For architectural diagrams and system interactions, see **[ARCHITECTURE_DIAGRAMS.md](ARCHITECTURE_DIAGRAMS.md)** which provides:
+- Component-level architecture diagrams of both systems
+- Sequence diagrams showing data flow and interactions
+- Guidelines for creating visual representations
+
 ## Tech Stack
 
 - Kotlin + Jetpack Compose

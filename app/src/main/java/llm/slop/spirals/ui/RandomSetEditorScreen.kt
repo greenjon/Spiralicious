@@ -538,6 +538,7 @@ fun ArmConstraintSection(
                         baseLengthMax = defaults.baseLengthMax,
                         enableBeat = defaults.beatProbability > 0,
                         enableLfo = defaults.lfoProbability > 0,
+                        enableRandom = defaults.randomProbability > 0,
                         allowSine = defaults.sineProbability > 0,
                         allowTriangle = defaults.triangleProbability > 0,
                         allowSquare = defaults.squareProbability > 0,
@@ -546,7 +547,9 @@ fun ArmConstraintSection(
                         weightMin = defaults.weightMin,
                         weightMax = defaults.weightMax,
                         lfoTimeMin = defaults.lfoTimeMin,
-                        lfoTimeMax = defaults.lfoTimeMax
+                        lfoTimeMax = defaults.lfoTimeMax,
+                        randomGlideMin = defaults.randomGlideMin,
+                        randomGlideMax = defaults.randomGlideMax
                     )
                 }
                 
@@ -600,10 +603,18 @@ fun ArmConstraintSection(
                         )
                         Text("LFO", color = AppText, style = MaterialTheme.typography.bodySmall)
                     }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = currentConstraints.enableRandom,
+                            onCheckedChange = { onUpdate(currentConstraints.copy(enableRandom = it)) },
+                            colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                        )
+                        Text("Random", color = AppText, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
                 
-                // Beat division controls (only shown when Beat is enabled)
-                if (currentConstraints.enableBeat) {
+                // Beat division controls (shown when Beat OR Random is enabled)
+                if (currentConstraints.enableBeat || currentConstraints.enableRandom) {
                     Spacer(modifier = Modifier.height(12.dp))
                     
                     val beatValues = STANDARD_BEAT_VALUES
@@ -661,6 +672,32 @@ fun ArmConstraintSection(
                     )
                 }
                 
+                // Random Glide controls (only shown when Random is enabled)
+                if (currentConstraints.enableRandom) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Text(
+                        text = "Random Glide: ${String.format("%.2f", currentConstraints.randomGlideMin)}-${String.format("%.2f", currentConstraints.randomGlideMax)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppText,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    RangeSlider(
+                        value = currentConstraints.randomGlideMin..currentConstraints.randomGlideMax,
+                        onValueChange = { range ->
+                            onUpdate(currentConstraints.copy(
+                                randomGlideMin = range.start,
+                                randomGlideMax = range.endInclusive
+                            ))
+                        },
+                        valueRange = 0f..1f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = AppAccent,
+                            activeTrackColor = AppAccent
+                        )
+                    )
+                }
+                
                 // LFO time controls (only shown when LFO is enabled)
                 if (currentConstraints.enableLfo) {
                     Spacer(modifier = Modifier.height(12.dp))
@@ -689,39 +726,41 @@ fun ArmConstraintSection(
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
-                // Waveforms
-                Text(
-                    text = "Waveforms:",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = AppText
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = currentConstraints.allowSine,
-                            onCheckedChange = { onUpdate(currentConstraints.copy(allowSine = it)) },
-                            colors = CheckboxDefaults.colors(checkedColor = AppAccent)
-                        )
-                        Text("Sine", color = AppText, style = MaterialTheme.typography.bodySmall)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = currentConstraints.allowTriangle,
-                            onCheckedChange = { onUpdate(currentConstraints.copy(allowTriangle = it)) },
-                            colors = CheckboxDefaults.colors(checkedColor = AppAccent)
-                        )
-                        Text("Triangle", color = AppText, style = MaterialTheme.typography.bodySmall)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
-                            checked = currentConstraints.allowSquare,
-                            onCheckedChange = { onUpdate(currentConstraints.copy(allowSquare = it)) },
-                            colors = CheckboxDefaults.colors(checkedColor = AppAccent)
-                        )
-                        Text("Square", color = AppText, style = MaterialTheme.typography.bodySmall)
+                // Waveforms (hide if only Random is enabled)
+                if (currentConstraints.enableBeat || currentConstraints.enableLfo) {
+                    Text(
+                        text = "Waveforms:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppText
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = currentConstraints.allowSine,
+                                onCheckedChange = { onUpdate(currentConstraints.copy(allowSine = it)) },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                            )
+                            Text("Sine", color = AppText, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = currentConstraints.allowTriangle,
+                                onCheckedChange = { onUpdate(currentConstraints.copy(allowTriangle = it)) },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                            )
+                            Text("Triangle", color = AppText, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = currentConstraints.allowSquare,
+                                onCheckedChange = { onUpdate(currentConstraints.copy(allowSquare = it)) },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                            )
+                            Text("Square", color = AppText, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
                 
@@ -770,6 +809,7 @@ fun ArmConstraintSection(
                                     baseLengthMax = defaults.baseLengthMax,
                                     enableBeat = defaults.beatProbability > 0,
                                     enableLfo = defaults.lfoProbability > 0,
+                                    enableRandom = defaults.randomProbability > 0,
                                     allowSine = defaults.sineProbability > 0,
                                     allowTriangle = defaults.triangleProbability > 0,
                                     allowSquare = defaults.squareProbability > 0,
@@ -778,7 +818,9 @@ fun ArmConstraintSection(
                                     weightMin = defaults.weightMin,
                                     weightMax = defaults.weightMax,
                                     lfoTimeMin = defaults.lfoTimeMin,
-                                    lfoTimeMax = defaults.lfoTimeMax
+                                    lfoTimeMax = defaults.lfoTimeMax,
+                                    randomGlideMin = defaults.randomGlideMin,
+                                    randomGlideMax = defaults.randomGlideMax
                                 )
                                 
                                 onUpdate(armConstraints)
@@ -815,6 +857,7 @@ fun MotionTab(
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
+        // (Rotation constraints implementation continues here - unchanged except for potentially adding Random CV source selection if requested, but for now focusing on Arms as per TODO Phase 1)
         Text(
             text = "Rotation Constraints",
             style = MaterialTheme.typography.titleMedium,

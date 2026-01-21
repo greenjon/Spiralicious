@@ -305,6 +305,8 @@ class RandomSetGenerator(private val context: Context) {
                     slope
                 }
                 
+                android.util.Log.d("GLIDE_DEBUG", "Creating modulator for ${param.javaClass.simpleName} - sourceId: $sourceId, slope: $finalSlope")
+                
                 param.modulators.add(
                     CvModulator(
                         sourceId = sourceId,
@@ -366,23 +368,27 @@ class RandomSetGenerator(private val context: Context) {
             // For Random CV, use the glide range instead of direction
             val finalSlope = if (sourceId == "sampleAndHold") {
                 // Random value in the glide range
-                random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
+                val randomVal = random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
+                android.util.Log.d("GLIDE_DEBUG", "Generated random glide value: $randomVal (range: ${constraints.randomGlideMin} - ${constraints.randomGlideMax})")
+                randomVal
             } else {
                 // Direction slope for Beat and LFO
                 slope
             }
             
-            param.modulators.add(
-                CvModulator(
-                    sourceId = sourceId,
-                    operator = ModulationOperator.ADD,
-                    waveform = Waveform.TRIANGLE,
-                    slope = finalSlope,
-                    weight = 1.0f,
-                    phaseOffset = random.nextFloat(),
-                    subdivision = subdivision
+                            android.util.Log.d("GLIDE_DEBUG", "Creating modulator for ${param.javaClass.simpleName} - sourceId: $sourceId, slope: $finalSlope")
+                
+                param.modulators.add(
+                    CvModulator(
+                        sourceId = sourceId,
+                        operator = ModulationOperator.ADD,
+                        waveform = Waveform.TRIANGLE,
+                        slope = finalSlope,
+                        weight = 1.0f,
+                        phaseOffset = random.nextFloat(),
+                        subdivision = subdivision
+                    )
                 )
-            )
         }
     }
     
@@ -450,6 +456,8 @@ class RandomSetGenerator(private val context: Context) {
                     slope
                 }
                 
+                android.util.Log.d("GLIDE_DEBUG", "Creating modulator for ${param.javaClass.simpleName} - sourceId: $sourceId, slope: $finalSlope")
+                
                 param.modulators.add(
                     CvModulator(
                         sourceId = sourceId,
@@ -511,23 +519,27 @@ class RandomSetGenerator(private val context: Context) {
             // For Random CV, use the glide range instead of direction
             val finalSlope = if (sourceId == "sampleAndHold") {
                 // Random value in the glide range
-                random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
+                val randomVal = random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
+                android.util.Log.d("GLIDE_DEBUG", "Generated random glide value: $randomVal (range: ${constraints.randomGlideMin} - ${constraints.randomGlideMax})")
+                randomVal
             } else {
                 // Direction slope for Beat and LFO
                 slope
             }
             
-            param.modulators.add(
-                CvModulator(
-                    sourceId = sourceId,
-                    operator = ModulationOperator.ADD,
-                    waveform = Waveform.TRIANGLE,
-                    slope = finalSlope,
-                    weight = 1.0f,
-                    phaseOffset = random.nextFloat(),
-                    subdivision = subdivision
+                            android.util.Log.d("GLIDE_DEBUG", "Creating modulator for ${param.javaClass.simpleName} - sourceId: $sourceId, slope: $finalSlope")
+                
+                param.modulators.add(
+                    CvModulator(
+                        sourceId = sourceId,
+                        operator = ModulationOperator.ADD,
+                        waveform = Waveform.TRIANGLE,
+                        slope = finalSlope,
+                        weight = 1.0f,
+                        phaseOffset = random.nextFloat(),
+                        subdivision = subdivision
+                    )
                 )
-            )
         }
     }
     

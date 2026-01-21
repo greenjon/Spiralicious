@@ -63,6 +63,7 @@ data class ArmConstraints(
     // Movement sources
     val enableBeat: Boolean = false,
     val enableLfo: Boolean = false,
+    val enableRandom: Boolean = false,
     
     // Waveform selection
     val allowSine: Boolean = true,

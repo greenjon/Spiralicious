@@ -70,6 +70,9 @@ class ModulatableParameter(
                     val localPhase = (beats / subdivision) % 1.0
                     val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
 
+                    // Debug slope value
+                    android.util.Log.d("GLIDE_DEBUG", "SampleAndHold slope: ${mod.slope}")
+                    
                     // Pass both the totalBeats and subdivision for deterministic randomness
                     ModulationRegistry.sampleAndHold.getValue(positivePhase, mod.slope, beats, subdivision.toDouble())
                 }

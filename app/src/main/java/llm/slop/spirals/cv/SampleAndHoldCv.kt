@@ -58,12 +58,18 @@ class SampleAndHoldCv : CvSignal {
         // Get the current and previous random values for this position
         val (currentValue, previousValue) = getValuesForPosition(totalBeats, subdivision)
         
+        // Debug glide calculation
+        android.util.Log.d("GLIDE_DEBUG", "SampleAndHold phase: $phase, slope: $slope")
+        
         // Calculate how far we should be in the glide
         val glideAmount = if (phase < slope) {
             // During glide phase - linear interpolation from previous to current
-            (phase / slope).toFloat()
+            val amount = (phase / slope).toFloat()
+            android.util.Log.d("GLIDE_DEBUG", "In glide phase, amount: $amount")
+            amount
         } else {
             // Hold phase - at the current value
+            android.util.Log.d("GLIDE_DEBUG", "In hold phase, amount: 1.0")
             1.0f
         }
         

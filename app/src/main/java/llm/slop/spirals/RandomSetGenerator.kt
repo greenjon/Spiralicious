@@ -240,41 +240,47 @@ class RandomSetGenerator(private val context: Context) {
         visualSource.parameters["Rotation"]?.let { param ->
             param.baseValue = 0f
             param.modulators.clear()
+            
+            // Determine direction (slope: 0 = clockwise ramp down, 1 = counter-clockwise ramp up)
             val directions = mutableListOf<Float>()
             if (constraints.enableClockwise) directions.add(0f)
             if (constraints.enableCounterClockwise) directions.add(1f)
             val slope = if (directions.isNotEmpty()) directions.random(random) else 0f
             
-            val sourceId = when(constraints.speedSource) {
-                llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
-                llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
-                llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
-            }
+            // Pool logic for movement sources
+            val availableSources = mutableListOf<String>()
+            if (constraints.enableBeat) availableSources.add("beatPhase")
+            if (constraints.enableLfo) availableSources.add("lfo1")
+            if (constraints.enableRandom) availableSources.add("sampleAndHold")
             
-            val subdivision = when(sourceId) {
-                "beatPhase", "sampleAndHold" -> {
-                    val validValues = STANDARD_BEAT_VALUES.filter { it in constraints.beatDivMin..constraints.beatDivMax }
-                    if (validValues.isNotEmpty()) validValues.random(random) 
-                    else STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
+            if (availableSources.isNotEmpty()) {
+                val sourceId = availableSources.random(random)
+                
+                val subdivision = when(sourceId) {
+                    "beatPhase", "sampleAndHold" -> {
+                        val validValues = STANDARD_BEAT_VALUES.filter { it in constraints.beatDivMin..constraints.beatDivMax }
+                        if (validValues.isNotEmpty()) validValues.random(random) 
+                        else STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
+                    }
+                    else -> random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
                 }
-                else -> random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
-            }
-            
-            val finalSlope = if (sourceId == "sampleAndHold") {
-                random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
-            } else slope
-            
-            param.modulators.add(
-                CvModulator(
-                    sourceId = sourceId,
-                    operator = ModulationOperator.ADD,
-                    waveform = Waveform.TRIANGLE,
-                    slope = finalSlope,
-                    weight = 1.0f,
-                    phaseOffset = random.nextFloat(),
-                    subdivision = subdivision
+                
+                val finalSlope = if (sourceId == "sampleAndHold") {
+                    random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
+                } else slope
+                
+                param.modulators.add(
+                    CvModulator(
+                        sourceId = sourceId,
+                        operator = ModulationOperator.ADD,
+                        waveform = Waveform.TRIANGLE,
+                        slope = finalSlope,
+                        weight = 1.0f,
+                        phaseOffset = random.nextFloat(),
+                        subdivision = subdivision
+                    )
                 )
-            )
+            }
         }
     }
     
@@ -329,41 +335,47 @@ class RandomSetGenerator(private val context: Context) {
         visualSource.parameters["Hue Offset"]?.let { param ->
             param.baseValue = 0f
             param.modulators.clear()
+            
+            // Determine direction
             val directions = mutableListOf<Float>()
             if (constraints.enableForward) directions.add(1f)
             if (constraints.enableReverse) directions.add(0f)
             val slope = if (directions.isNotEmpty()) directions.random(random) else 1f
             
-            val sourceId = when(constraints.speedSource) {
-                llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
-                llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
-                llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
-            }
+            // Pool logic for movement sources
+            val availableSources = mutableListOf<String>()
+            if (constraints.enableBeat) availableSources.add("beatPhase")
+            if (constraints.enableLfo) availableSources.add("lfo1")
+            if (constraints.enableRandom) availableSources.add("sampleAndHold")
             
-            val subdivision = when(sourceId) {
-                "beatPhase", "sampleAndHold" -> {
-                    val validValues = STANDARD_BEAT_VALUES.filter { it in constraints.beatDivMin..constraints.beatDivMax }
-                    if (validValues.isNotEmpty()) validValues.random(random)
-                    else STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
+            if (availableSources.isNotEmpty()) {
+                val sourceId = availableSources.random(random)
+                
+                val subdivision = when(sourceId) {
+                    "beatPhase", "sampleAndHold" -> {
+                        val validValues = STANDARD_BEAT_VALUES.filter { it in constraints.beatDivMin..constraints.beatDivMax }
+                        if (validValues.isNotEmpty()) validValues.random(random)
+                        else STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
+                    }
+                    else -> random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
                 }
-                else -> random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
-            }
-            
-            val finalSlope = if (sourceId == "sampleAndHold") {
-                random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
-            } else slope
-            
-            param.modulators.add(
-                CvModulator(
-                    sourceId = sourceId,
-                    operator = ModulationOperator.ADD,
-                    waveform = Waveform.TRIANGLE,
-                    slope = finalSlope,
-                    weight = 1.0f,
-                    phaseOffset = random.nextFloat(),
-                    subdivision = subdivision
+                
+                val finalSlope = if (sourceId == "sampleAndHold") {
+                    random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
+                } else slope
+                
+                param.modulators.add(
+                    CvModulator(
+                        sourceId = sourceId,
+                        operator = ModulationOperator.ADD,
+                        waveform = Waveform.TRIANGLE,
+                        slope = finalSlope,
+                        weight = 1.0f,
+                        phaseOffset = random.nextFloat(),
+                        subdivision = subdivision
+                    )
                 )
-            )
+            }
         }
     }
     
@@ -377,25 +389,25 @@ class RandomSetGenerator(private val context: Context) {
         when (mode) {
             llm.slop.spirals.models.FeedbackMode.NONE -> {
                 visualSource.parameters["FB Decay"]?.baseValue = 0f
-                visualSource.parameters["FB Gain"]?.baseValue = 1f
+                visualSource.parameters["FB Gain"]?.baseValue = 0f
             }
             llm.slop.spirals.models.FeedbackMode.LIGHT -> {
-                visualSource.parameters["FB Decay"]?.baseValue = 0.05f
-                visualSource.parameters["FB Gain"]?.baseValue = 0.95f
-                visualSource.parameters["FB Zoom"]?.baseValue = 0.51f
+                visualSource.parameters["FB Decay"]?.baseValue = 0.85f
+                visualSource.parameters["FB Gain"]?.baseValue = 0.45f
+                visualSource.parameters["FB Zoom"]?.baseValue = 0.50f
                 visualSource.parameters["FB Rotate"]?.baseValue = 0.50f
             }
             llm.slop.spirals.models.FeedbackMode.MEDIUM -> {
-                visualSource.parameters["FB Decay"]?.baseValue = 0.15f
-                visualSource.parameters["FB Gain"]?.baseValue = 0.90f
-                visualSource.parameters["FB Zoom"]?.baseValue = 0.52f
-                visualSource.parameters["FB Rotate"]?.baseValue = 0.51f
+                visualSource.parameters["FB Decay"]?.baseValue = 0.85f
+                visualSource.parameters["FB Gain"]?.baseValue = 0.55f
+                visualSource.parameters["FB Zoom"]?.baseValue = 0.7f
+                visualSource.parameters["FB Rotate"]?.baseValue = 0.55f
             }
             llm.slop.spirals.models.FeedbackMode.HEAVY -> {
-                visualSource.parameters["FB Decay"]?.baseValue = 0.30f
-                visualSource.parameters["FB Gain"]?.baseValue = 0.85f
-                visualSource.parameters["FB Zoom"]?.baseValue = 0.54f
-                visualSource.parameters["FB Rotate"]?.baseValue = 0.52f
+                visualSource.parameters["FB Decay"]?.baseValue = 0.85f
+                visualSource.parameters["FB Gain"]?.baseValue = 0.6f
+                visualSource.parameters["FB Zoom"]?.baseValue = 0.7f
+                visualSource.parameters["FB Rotate"]?.baseValue = 0.6f
             }
             llm.slop.spirals.models.FeedbackMode.CUSTOM -> { }
         }

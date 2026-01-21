@@ -11,12 +11,6 @@ val STANDARD_BEAT_VALUES = listOf(0.0625f, 0.125f, 0.25f, 0.5f, 1f, 2f, 4f, 8f, 
 
 /**
  * RSet (Random Set) - Generative patch templates for infinite mandala variations.
- * 
- * Philosophy: The RSet template IS the creative work - thoughtfully defining constraints
- * that produce a consistent aesthetic. Templates become reusable building blocks.
- * 
- * Usage: Load an RSet into a Mixer slot. Each time "Next" is triggered, a fresh mandala
- * is generated matching the template's constraints.
  */
 
 @Serializable
@@ -79,9 +73,8 @@ data class ArmConstraints(
     val beatDivMax: Float = 32.0f,
     
     // LFO speed control
-    val lfoSpeedMode: LfoSpeedMode = LfoSpeedMode.MEDIUM,
-    val lfoTimeMin: Float = 1.0f, // seconds, within speed mode
-    val lfoTimeMax: Float = 60.0f,  // seconds, within speed mode
+    val lfoTimeMin: Float = 1.0f, // seconds
+    val lfoTimeMax: Float = 60.0f, // seconds
     
     // Random glide range (0.0-1.0)
     val randomGlideMin: Float = 0.1f,
@@ -89,27 +82,21 @@ data class ArmConstraints(
 )
 
 @Serializable
-enum class LfoSpeedMode {
-    FAST,    // 0.1s - 10s
-    MEDIUM,  // 1s - 15min (900s)
-    SLOW     // 10s - 24h (86400s)
-}
-
-@Serializable
 data class RotationConstraints(
     // Direction
     val enableClockwise: Boolean = true,
     val enableCounterClockwise: Boolean = true,
     
-    // Speed control
-    val speedSource: SpeedSource = SpeedSource.BEAT,
+    // Movement sources
+    val enableBeat: Boolean = true,
+    val enableLfo: Boolean = false,
+    val enableRandom: Boolean = false,
     
-    // Beat division range (when speedSource == BEAT)
-    val beatDivMin: Float = 0.0625f, // 1/16
+    // Beat division range
+    val beatDivMin: Float = 0.0625f,
     val beatDivMax: Float = 256.0f,
     
-    // LFO time range (when speedSource == LFO)
-    val lfoSpeedMode: LfoSpeedMode = LfoSpeedMode.MEDIUM,
+    // LFO time range
     val lfoTimeMin: Float = 5.0f,
     val lfoTimeMax: Float = 30.0f,
     
@@ -124,15 +111,16 @@ data class HueOffsetConstraints(
     val enableForward: Boolean = true,
     val enableReverse: Boolean = true,
     
-    // Speed control
-    val speedSource: SpeedSource = SpeedSource.BEAT,
+    // Movement sources
+    val enableBeat: Boolean = true,
+    val enableLfo: Boolean = false,
+    val enableRandom: Boolean = false,
     
-    // Beat division range (when speedSource == BEAT)
-    val beatDivMin: Float = 0.0625f, // 1/16
+    // Beat division range
+    val beatDivMin: Float = 0.0625f,
     val beatDivMax: Float = 256.0f,
     
-    // LFO time range (when speedSource == LFO)
-    val lfoSpeedMode: LfoSpeedMode = LfoSpeedMode.MEDIUM,
+    // LFO time range
     val lfoTimeMin: Float = 10.0f,
     val lfoTimeMax: Float = 60.0f,
     
@@ -145,14 +133,14 @@ data class HueOffsetConstraints(
 enum class SpeedSource {
     BEAT,
     LFO,
-    RANDOM // Sample and Hold CV source for random values
+    RANDOM
 }
 
 @Serializable
 enum class FeedbackMode {
     NONE,
-    LIGHT,   // Preset ranges
-    MEDIUM,  // Preset ranges
-    HEAVY,   // Preset ranges
-    CUSTOM   // User-defined ranges (future)
+    LIGHT,
+    MEDIUM,
+    HEAVY,
+    CUSTOM
 }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -493,7 +494,7 @@ fun ArmConstraintSection(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowRight,
+                    imageVector = if (expanded) Icons.Default.KeyboardArrowDown else Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
                     tint = AppText,
                     modifier = Modifier.size(20.dp)
@@ -538,7 +539,7 @@ fun ArmConstraintSection(
                         baseLengthMax = defaults.baseLengthMax,
                         enableBeat = defaults.beatProbability > 0,
                         enableLfo = defaults.lfoProbability > 0,
-                        enableRandom = defaults.randomProbability > 0,
+                        enableRandom = defaults.defaultEnableRandom,
                         allowSine = defaults.sineProbability > 0,
                         allowTriangle = defaults.triangleProbability > 0,
                         allowSquare = defaults.squareProbability > 0,
@@ -809,7 +810,7 @@ fun ArmConstraintSection(
                                     baseLengthMax = defaults.baseLengthMax,
                                     enableBeat = defaults.beatProbability > 0,
                                     enableLfo = defaults.lfoProbability > 0,
-                                    enableRandom = defaults.randomProbability > 0,
+                                    enableRandom = defaults.defaultEnableRandom,
                                     allowSine = defaults.sineProbability > 0,
                                     allowTriangle = defaults.triangleProbability > 0,
                                     allowSquare = defaults.squareProbability > 0,
@@ -857,7 +858,6 @@ fun MotionTab(
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        // (Rotation constraints implementation continues here - unchanged except for potentially adding Random CV source selection if requested, but for now focusing on Arms as per TODO Phase 1)
         Text(
             text = "Rotation Constraints",
             style = MaterialTheme.typography.titleMedium,
@@ -905,12 +905,15 @@ fun MotionTab(
                                 val rotationConstraints = RotationConstraints(
                                     enableClockwise = defaults.clockwiseProbability > 0,
                                     enableCounterClockwise = defaults.counterClockwiseProbability > 0,
-                                    speedSource = if (defaults.beatProbability >= defaults.lfoProbability) 
-                                        SpeedSource.BEAT else SpeedSource.LFO,
+                                    enableBeat = defaults.beatProbability > 0,
+                                    enableLfo = defaults.lfoProbability > 0,
+                                    enableRandom = defaults.randomProbability > 0,
                                     beatDivMin = defaults.beatDivMin,
                                     beatDivMax = defaults.beatDivMax,
                                     lfoTimeMin = defaults.lfoTimeMin,
-                                    lfoTimeMax = defaults.lfoTimeMax
+                                    lfoTimeMax = defaults.lfoTimeMax,
+                                    randomGlideMin = defaults.randomGlideMin,
+                                    randomGlideMax = defaults.randomGlideMax
                                 )
                                 
                                 onUpdate(rset.copy(rotationConstraints = rotationConstraints))
@@ -962,9 +965,9 @@ fun MotionTab(
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    // Speed Source
+                    // Movement sources
                     Text(
-                        text = "Speed Control:",
+                        text = "Movement Sources:",
                         style = MaterialTheme.typography.bodyMedium,
                         color = AppText,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -974,26 +977,35 @@ fun MotionTab(
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = constraints.speedSource == SpeedSource.BEAT,
-                                onClick = { onUpdate(rset.copy(rotationConstraints = constraints.copy(speedSource = SpeedSource.BEAT))) },
-                                colors = RadioButtonDefaults.colors(selectedColor = AppAccent)
+                            Checkbox(
+                                checked = constraints.enableBeat,
+                                onCheckedChange = { onUpdate(rset.copy(rotationConstraints = constraints.copy(enableBeat = it))) },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
                             )
                             Text("Beat", color = AppText, style = MaterialTheme.typography.bodySmall)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = constraints.speedSource == SpeedSource.LFO,
-                                onClick = { onUpdate(rset.copy(rotationConstraints = constraints.copy(speedSource = SpeedSource.LFO))) },
-                                colors = RadioButtonDefaults.colors(selectedColor = AppAccent)
+                            Checkbox(
+                                checked = constraints.enableLfo,
+                                onCheckedChange = { onUpdate(rset.copy(rotationConstraints = constraints.copy(enableLfo = it))) },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
                             )
                             Text("LFO", color = AppText, style = MaterialTheme.typography.bodySmall)
                         }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = constraints.enableRandom,
+                                onCheckedChange = { onUpdate(rset.copy(rotationConstraints = constraints.copy(enableRandom = it))) },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                            )
+                            Text("Random", color = AppText, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                     
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    if (constraints.speedSource == SpeedSource.BEAT) {
+                    // Beat division controls (shown when Beat OR Random is enabled)
+                    if (constraints.enableBeat || constraints.enableRandom) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
                         val beatValues = STANDARD_BEAT_VALUES
                         val minValueIndex = beatValues.indexOfFirst { it >= constraints.beatDivMin }.coerceAtLeast(0)
                         val maxValueIndex = beatValues.indexOfLast { it <= constraints.beatDivMax }.coerceAtMost(beatValues.lastIndex)
@@ -1047,7 +1059,38 @@ fun MotionTab(
                                 activeTrackColor = AppAccent
                             )
                         )
-                    } else {
+                    }
+                    
+                    // Random Glide controls (only shown when Random is enabled)
+                    if (constraints.enableRandom) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Text(
+                            text = "Random Glide: ${String.format("%.2f", constraints.randomGlideMin)}-${String.format("%.2f", constraints.randomGlideMax)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppText,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        RangeSlider(
+                            value = constraints.randomGlideMin..constraints.randomGlideMax,
+                            onValueChange = { range ->
+                                onUpdate(rset.copy(rotationConstraints = constraints.copy(
+                                    randomGlideMin = range.start,
+                                    randomGlideMax = range.endInclusive
+                                )))
+                            },
+                            valueRange = 0f..1f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = AppAccent,
+                                activeTrackColor = AppAccent
+                            )
+                        )
+                    }
+                    
+                    // LFO time controls (only shown when LFO is enabled)
+                    if (constraints.enableLfo) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
                         Text(
                             text = "LFO Time: ${constraints.lfoTimeMin.toInt()}s-${constraints.lfoTimeMax.toInt()}s",
                             style = MaterialTheme.typography.bodySmall,
@@ -1135,12 +1178,15 @@ fun ColorTab(
                                 val hueOffsetConstraints = HueOffsetConstraints(
                                     enableForward = defaults.forwardProbability > 0,
                                     enableReverse = defaults.reverseProbability > 0,
-                                    speedSource = if (defaults.beatProbability >= defaults.lfoProbability) 
-                                        SpeedSource.BEAT else SpeedSource.LFO,
+                                    enableBeat = defaults.beatProbability > 0,
+                                    enableLfo = defaults.lfoProbability > 0,
+                                    enableRandom = defaults.randomProbability > 0,
                                     beatDivMin = defaults.beatDivMin,
                                     beatDivMax = defaults.beatDivMax,
                                     lfoTimeMin = defaults.lfoTimeMin,
-                                    lfoTimeMax = defaults.lfoTimeMax
+                                    lfoTimeMax = defaults.lfoTimeMax,
+                                    randomGlideMin = defaults.randomGlideMin,
+                                    randomGlideMax = defaults.randomGlideMax
                                 )
                                 
                                 onUpdate(rset.copy(hueOffsetConstraints = hueOffsetConstraints))
@@ -1192,9 +1238,9 @@ fun ColorTab(
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     
-                    // Speed Source
+                    // Movement sources
                     Text(
-                        text = "Speed Control:",
+                        text = "Movement Sources:",
                         style = MaterialTheme.typography.bodyMedium,
                         color = AppText,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -1204,26 +1250,35 @@ fun ColorTab(
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = constraints.speedSource == SpeedSource.BEAT,
-                                onClick = { onUpdate(rset.copy(hueOffsetConstraints = constraints.copy(speedSource = SpeedSource.BEAT))) },
-                                colors = RadioButtonDefaults.colors(selectedColor = AppAccent)
+                            Checkbox(
+                                checked = constraints.enableBeat,
+                                onCheckedChange = { onUpdate(rset.copy(hueOffsetConstraints = constraints.copy(enableBeat = it))) },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
                             )
                             Text("Beat", color = AppText, style = MaterialTheme.typography.bodySmall)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            RadioButton(
-                                selected = constraints.speedSource == SpeedSource.LFO,
-                                onClick = { onUpdate(rset.copy(hueOffsetConstraints = constraints.copy(speedSource = SpeedSource.LFO))) },
-                                colors = RadioButtonDefaults.colors(selectedColor = AppAccent)
+                            Checkbox(
+                                checked = constraints.enableLfo,
+                                onCheckedChange = { onUpdate(rset.copy(hueOffsetConstraints = constraints.copy(enableLfo = it))) },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
                             )
                             Text("LFO", color = AppText, style = MaterialTheme.typography.bodySmall)
                         }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = constraints.enableRandom,
+                                onCheckedChange = { onUpdate(rset.copy(hueOffsetConstraints = constraints.copy(enableRandom = it))) },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                            )
+                            Text("Random", color = AppText, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                     
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    if (constraints.speedSource == SpeedSource.BEAT) {
+                    // Beat division controls (shown when Beat OR Random is enabled)
+                    if (constraints.enableBeat || constraints.enableRandom) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
                         val beatValues = STANDARD_BEAT_VALUES
                         val minValueIndex = beatValues.indexOfFirst { it >= constraints.beatDivMin }.coerceAtLeast(0)
                         val maxValueIndex = beatValues.indexOfLast { it <= constraints.beatDivMax }.coerceAtMost(beatValues.lastIndex)
@@ -1277,7 +1332,38 @@ fun ColorTab(
                                 activeTrackColor = AppAccent
                             )
                         )
-                    } else {
+                    }
+                    
+                    // Random Glide controls (only shown when Random is enabled)
+                    if (constraints.enableRandom) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        Text(
+                            text = "Random Glide: ${String.format("%.2f", constraints.randomGlideMin)}-${String.format("%.2f", constraints.randomGlideMax)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppText,
+                            modifier = Modifier.padding(bottom = 4.dp)
+                        )
+                        RangeSlider(
+                            value = constraints.randomGlideMin..constraints.randomGlideMax,
+                            onValueChange = { range ->
+                                onUpdate(rset.copy(hueOffsetConstraints = constraints.copy(
+                                    randomGlideMin = range.start,
+                                    randomGlideMax = range.endInclusive
+                                )))
+                            },
+                            valueRange = 0f..1f,
+                            colors = SliderDefaults.colors(
+                                thumbColor = AppAccent,
+                                activeTrackColor = AppAccent
+                            )
+                        )
+                    }
+                    
+                    // LFO time controls (only shown when LFO is enabled)
+                    if (constraints.enableLfo) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
                         Text(
                             text = "LFO Time: ${constraints.lfoTimeMin.toInt()}s-${constraints.lfoTimeMax.toInt()}s",
                             style = MaterialTheme.typography.bodySmall,

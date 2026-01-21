@@ -129,12 +129,43 @@ class RandomSetEditorViewModel(
     fun updateArmConstraints(armIndex: Int, constraints: ArmConstraints) {
         val randomSet = _currentRandomSet.value ?: return
         
-        val updatedSet = when (armIndex) {
+        var updatedSet = when (armIndex) {
             1 -> randomSet.copy(l1Constraints = constraints)
             2 -> randomSet.copy(l2Constraints = constraints)
             3 -> randomSet.copy(l3Constraints = constraints)
             4 -> randomSet.copy(l4Constraints = constraints)
             else -> return
+        }
+        
+        // If linked and updating L1, update all others
+        if (randomSet.linkArms && armIndex == 1) {
+            updatedSet = updatedSet.copy(
+                l2Constraints = constraints,
+                l3Constraints = constraints,
+                l4Constraints = constraints
+            )
+        }
+        
+        updateRandomSet(updatedSet)
+    }
+    
+    /**
+     * Updates the link arms setting.
+     * 
+     * @param linked Whether to link all arms to L1
+     */
+    fun updateLinkArms(linked: Boolean) {
+        val randomSet = _currentRandomSet.value ?: return
+        var updatedSet = randomSet.copy(linkArms = linked)
+        
+        // If just linked, copy L1 to all others
+        if (linked) {
+            val l1 = randomSet.l1Constraints
+            updatedSet = updatedSet.copy(
+                l2Constraints = l1,
+                l3Constraints = l1,
+                l4Constraints = l1
+            )
         }
         
         updateRandomSet(updatedSet)

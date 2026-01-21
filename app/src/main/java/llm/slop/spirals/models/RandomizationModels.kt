@@ -11,6 +11,12 @@ val STANDARD_BEAT_VALUES = listOf(0.0625f, 0.125f, 0.25f, 0.5f, 1f, 2f, 4f, 8f, 
 
 /**
  * RSet (Random Set) - Generative patch templates for infinite mandala variations.
+ * 
+ * Philosophy: The RSet template IS the creative work - thoughtfully defining constraints
+ * that produce a consistent aesthetic. Templates become reusable building blocks.
+ * 
+ * Usage: Load an RSet into a Mixer slot. Each time "Next" is triggered, a fresh mandala
+ * is generated matching the template's constraints.
  */
 
 @Serializable
@@ -27,6 +33,7 @@ data class RandomSet(
     val autoHueSweep: Boolean = true, // Auto-set hue sweep to match petals
     
     // Per-Parameter Constraints (null = use defaults)
+    val linkArms: Boolean = false, // If true, L2-L4 follow L1
     val l1Constraints: ArmConstraints? = null,
     val l2Constraints: ArmConstraints? = null,
     val l3Constraints: ArmConstraints? = null,

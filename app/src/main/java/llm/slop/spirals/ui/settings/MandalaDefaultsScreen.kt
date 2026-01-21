@@ -305,6 +305,27 @@ fun MandalaDefaultsScreen(
                             modifier = Modifier.padding(bottom = 16.dp)
                         )
                         
+                        // Default Enable Random (RSet)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        ) {
+                            Checkbox(
+                                checked = armDefaults.defaultEnableRandom,
+                                onCheckedChange = { 
+                                    armDefaults = armDefaults.copy(defaultEnableRandom = it)
+                                    defaultsConfig.saveArmDefaults(armDefaults)
+                                },
+                                colors = CheckboxDefaults.colors(checkedColor = AppAccent)
+                            )
+                            Text(
+                                text = "Enable Random (S&H) by default in templates",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = AppText,
+                                modifier = Modifier.padding(start = 8.dp)
+                            )
+                        }
+
                         // Movement Source Probabilities
                         Text(
                             text = "Movement Source Probabilities",

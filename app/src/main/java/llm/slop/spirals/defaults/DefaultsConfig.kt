@@ -52,6 +52,7 @@ class DefaultsConfig(context: Context) {
             beatProbability = prefs.getFloat("${PREFIX_ARM}beat_probability", 0.4f),
             lfoProbability = prefs.getFloat("${PREFIX_ARM}lfo_probability", 0.4f),
             randomProbability = prefs.getFloat("${PREFIX_ARM}random_probability", 0.2f),
+            defaultEnableRandom = prefs.getBoolean("${PREFIX_ARM}default_enable_random", false),
             beatDivMin = prefs.getFloat("${PREFIX_ARM}beat_div_min", STANDARD_BEAT_VALUES.first()),
             beatDivMax = prefs.getFloat("${PREFIX_ARM}beat_div_max", 32f),
             sineProbability = prefs.getFloat("${PREFIX_ARM}sine_probability", 0.33f),
@@ -73,6 +74,7 @@ class DefaultsConfig(context: Context) {
             putFloat("${PREFIX_ARM}beat_probability", defaults.beatProbability)
             putFloat("${PREFIX_ARM}lfo_probability", defaults.lfoProbability)
             putFloat("${PREFIX_ARM}random_probability", defaults.randomProbability)
+            putBoolean("${PREFIX_ARM}default_enable_random", defaults.defaultEnableRandom)
             putFloat("${PREFIX_ARM}beat_div_min", defaults.beatDivMin)
             putFloat("${PREFIX_ARM}beat_div_max", defaults.beatDivMax)
             putFloat("${PREFIX_ARM}sine_probability", defaults.sineProbability)

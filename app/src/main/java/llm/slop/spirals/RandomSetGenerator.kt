@@ -14,20 +14,6 @@ import llm.slop.spirals.models.STANDARD_BEAT_VALUES
  * PHILOSOPHY:
  * The RSet template IS the creative work. This generator respects the constraints
  * defined in the template and produces infinite variations within those guardrails.
- * 
- * PHASE 1 IMPLEMENTATION:
- * - Recipe filtering (ALL, FAVORITES_ONLY, PETALS_EXACT, PETALS_RANGE)
- * - Auto hue sweep (matches recipe petals)
- * - Default randomization for arms, rotation, hue offset (using existing logic)
- * - Feedback mode presets
- * 
- * PHASE 2 (Future):
- * - Granular arm constraints (base length ranges, waveform selection, weight ranges)
- * - Rotation and hue offset constraints (direction, speed control)
- * - Custom feedback ranges
- * 
- * NOTE TO FUTURE AI: When implementing Phase 2, use the constraint objects in the
- * RandomSet data class. The structure is already in place, just needs the logic here.
  */
 class RandomSetGenerator(private val context: Context) {
     
@@ -73,7 +59,7 @@ class RandomSetGenerator(private val context: Context) {
     }
     
     /**
-     * Applies arm parameter constraints with full Phase 2 support.
+     * Applies arm parameter constraints.
      */
     private fun applyArmConstraints(
         paramName: String,
@@ -84,16 +70,15 @@ class RandomSetGenerator(private val context: Context) {
         visualSource.parameters[paramName]?.let { param ->
             // Use constraints if provided, otherwise use defaults from settings
             val c = if (constraints != null) {
-                // Use provided constraints
                 constraints
             } else {
-                // Use defaults from settings
                 val defaults = defaultsConfig.getArmDefaults()
                 llm.slop.spirals.models.ArmConstraints(
                     baseLengthMin = defaults.baseLengthMin,
                     baseLengthMax = defaults.baseLengthMax,
                     enableBeat = defaults.beatProbability > 0,
                     enableLfo = defaults.lfoProbability > 0,
+                    enableRandom = defaults.defaultEnableRandom,
                     allowSine = defaults.sineProbability > 0,
                     allowTriangle = defaults.triangleProbability > 0,
                     allowSquare = defaults.squareProbability > 0,
@@ -112,21 +97,27 @@ class RandomSetGenerator(private val context: Context) {
             param.baseValue = (random.nextInt(c.baseLengthMin, c.baseLengthMax + 1) / 100f)
             param.modulators.clear()
             
-            // Add modulator if Beat or LFO is enabled
-            if (c.enableBeat || c.enableLfo) {
-                // Select waveform based on probability or allowed options
-                val waveform = if (constraints == null) {
-                    // Using defaults - use probability-based selection
-                    val defaults = defaultsConfig.getArmDefaults()
-                    defaults.getRandomWaveform(random)
+            // Pool logic for movement sources
+            val availableSources = mutableListOf<String>()
+            if (c.enableBeat) availableSources.add("beat")
+            if (c.enableLfo) availableSources.add("lfo")
+            if (c.enableRandom) availableSources.add("sampleAndHold")
+            
+            if (availableSources.isNotEmpty()) {
+                val chosenSource = availableSources.random(random)
+                
+                // Weight from range (convert to 0-1 scale)
+                val weight = random.nextInt(c.weightMin, c.weightMax + 1) / 100f
+                
+                // Waveform logic (S&H doesn't use it, but we need a value for CvModulator)
+                val waveform = if (chosenSource == "sampleAndHold") {
+                    Waveform.SINE // Dummy for S&H
                 } else {
-                    // Using constraints - select from allowed waveforms
                     val allowedWaveforms = mutableListOf<Waveform>()
                     if (c.allowSine) allowedWaveforms.add(Waveform.SINE)
                     if (c.allowTriangle) allowedWaveforms.add(Waveform.TRIANGLE)
                     if (c.allowSquare) allowedWaveforms.add(Waveform.SQUARE)
                     
-                    // Fall back to SINE if no waveforms selected
                     if (allowedWaveforms.isNotEmpty()) {
                         allowedWaveforms.random(random)
                     } else {
@@ -134,52 +125,12 @@ class RandomSetGenerator(private val context: Context) {
                     }
                 }
                 
-                // Weight from range (convert to 0-1 scale)
-                val weight = random.nextInt(c.weightMin, c.weightMax + 1) / 100f
-                
-                // Choose beat or LFO based on what's enabled
-                val useBeat = if (constraints == null) {
-                    // Using defaults - use probability-based selection
-                    val defaults = defaultsConfig.getArmDefaults()
-                    random.nextFloat() < defaults.beatProbability
-                } else {
-                    // Using explicit constraints - use deterministic selection based on enabled flags
-                    when {
-                        c.enableBeat && c.enableLfo -> random.nextBoolean()
-                        c.enableBeat -> true
-                        else -> false
-                    }
-                }
-                
-                // Choose source: beat, LFO or random
-                val sourceType = if (constraints == null) {
-                    // Using defaults - use probability-based selection including Random
-                    val defaults = defaultsConfig.getArmDefaults()
-                    val sourceRoll = random.nextFloat()
-                    when {
-                        sourceRoll < defaults.beatProbability -> "beat"
-                        sourceRoll < defaults.beatProbability + defaults.lfoProbability -> "lfo"
-                        else -> "random" // Random (sampleAndHold)
-                    }
-                } else {
-                    // Using explicit constraints - use deterministic selection based on enabled flags
-                    when {
-                        c.enableBeat && c.enableLfo -> if (random.nextBoolean()) "beat" else "lfo"
-                        c.enableBeat -> "beat"
-                        c.enableLfo -> "lfo"
-                        else -> "random" // Random (sampleAndHold) as fallback
-                    }
-                }
-
-                // Configure modulator based on source type
-                when (sourceType) {
+                when (chosenSource) {
                     "beat" -> {
-                        // Beat subdivision from range - use standardized beat values
                         val validValues = STANDARD_BEAT_VALUES.filter { it in c.beatDivMin..c.beatDivMax }
                         val subdivision = if (validValues.isNotEmpty()) {
                             validValues.random(random)
                         } else {
-                            // Fallback to nearest allowed value
                             STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - c.beatDivMin) } ?: 1f
                         }
                         
@@ -196,7 +147,6 @@ class RandomSetGenerator(private val context: Context) {
                         )
                     }
                     "lfo" -> {
-                        // LFO time from range (convert to frequency)
                         val timeSeconds = random.nextInt(c.lfoTimeMin.toInt(), c.lfoTimeMax.toInt() + 1).toFloat()
                         
                         param.modulators.add(
@@ -211,17 +161,15 @@ class RandomSetGenerator(private val context: Context) {
                             )
                         )
                     }
-                    "random" -> {
-                        // Random (sampleAndHold) - use beat divisions as with Beat
+                    "sampleAndHold" -> {
                         val validValues = STANDARD_BEAT_VALUES.filter { it in c.beatDivMin..c.beatDivMax }
                         val subdivision = if (validValues.isNotEmpty()) {
                             validValues.random(random)
                         } else {
-                            // Fallback to nearest allowed value
                             STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - c.beatDivMin) } ?: 1f
                         }
                         
-                        // Get a random value in the glide range
+                        // Glide Assignment: random value between min and max
                         val randomGlide = random.nextFloat() * (c.randomGlideMax - c.randomGlideMin) + c.randomGlideMin
                         
                         param.modulators.add(
@@ -242,7 +190,7 @@ class RandomSetGenerator(private val context: Context) {
     }
     
     /**
-     * Applies rotation constraints with full Phase 2 support.
+     * Applies rotation constraints.
      */
     private fun applyRotationConstraints(
         constraints: llm.slop.spirals.models.RotationConstraints?,
@@ -250,17 +198,11 @@ class RandomSetGenerator(private val context: Context) {
         random: kotlin.random.Random
     ) {
         if (constraints == null) {
-            // Use defaults from settings
             val defaults = defaultsConfig.getRotationDefaults()
-            
             visualSource.parameters["Rotation"]?.let { param ->
                 param.baseValue = 0f
                 param.modulators.clear()
-                
-                // Select direction based on probability
                 val slope = defaults.getRandomDirection(random)
-                
-                // Select source based on probability
                 val speedSource = defaults.getRandomSpeedSource(random)
                 val sourceId = when (speedSource) {
                     llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
@@ -268,44 +210,17 @@ class RandomSetGenerator(private val context: Context) {
                     llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
                 }
                 
-                // Get appropriate time/division range
                 val subdivision = when (sourceId) {
-                    "beatPhase" -> {
-                        // Get beat division from range - use standardized values
+                    "beatPhase", "sampleAndHold" -> {
                         val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
-                        if (validValues.isNotEmpty()) {
-                            validValues.random(random)
-                        } else {
-                            // Fallback
-                            4f
-                        }
+                        if (validValues.isNotEmpty()) validValues.random(random) else 4f
                     }
-                    "sampleAndHold" -> {
-                        // Random CV should also use beat divisions
-                        val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
-                        if (validValues.isNotEmpty()) {
-                            validValues.random(random)
-                        } else {
-                            // Fallback
-                            4f
-                        }
-                    }
-                    else -> {
-                        // Get LFO time
-                        random.nextInt(defaults.lfoTimeMin.toInt(), defaults.lfoTimeMax.toInt() + 1).toFloat()
-                    }
+                    else -> random.nextInt(defaults.lfoTimeMin.toInt(), defaults.lfoTimeMax.toInt() + 1).toFloat()
                 }
                 
-                // For random CV source, use the glide range
                 val finalSlope = if (sourceId == "sampleAndHold") {
-                    // Random value in the glide range
                     random.nextFloat() * (defaults.randomGlideMax - defaults.randomGlideMin) + defaults.randomGlideMin
-                } else {
-                    // Direction slope for Beat and LFO
-                    slope
-                }
-                
-                android.util.Log.d("GLIDE_DEBUG", "Creating modulator for ${param.javaClass.simpleName} - sourceId: $sourceId, slope: $finalSlope")
+                } else slope
                 
                 param.modulators.add(
                     CvModulator(
@@ -325,75 +240,46 @@ class RandomSetGenerator(private val context: Context) {
         visualSource.parameters["Rotation"]?.let { param ->
             param.baseValue = 0f
             param.modulators.clear()
-            
-            // Determine direction (slope: 0 = clockwise ramp down, 1 = counter-clockwise ramp up)
             val directions = mutableListOf<Float>()
             if (constraints.enableClockwise) directions.add(0f)
             if (constraints.enableCounterClockwise) directions.add(1f)
+            val slope = if (directions.isNotEmpty()) directions.random(random) else 0f
             
-            val slope = if (directions.isNotEmpty()) {
-                directions.random(random)
-            } else {
-                0f // Default to clockwise if nothing selected
-            }
-            
-            val sourceId: String
-            val subdivision: Float
-            
-            // Set source ID based on speed source selection
-            sourceId = when(constraints.speedSource) {
+            val sourceId = when(constraints.speedSource) {
                 llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
                 llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
                 llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
             }
             
-            // Set subdivision based on source type
-            subdivision = when(sourceId) {
+            val subdivision = when(sourceId) {
                 "beatPhase", "sampleAndHold" -> {
-                    // Use the standardized beat values for both Beat and Random
                     val validValues = STANDARD_BEAT_VALUES.filter { it in constraints.beatDivMin..constraints.beatDivMax }
-                    if (validValues.isNotEmpty()) {
-                        validValues.random(random)
-                    } else {
-                        // Fallback to nearest allowed value
-                        STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
-                    }
+                    if (validValues.isNotEmpty()) validValues.random(random) 
+                    else STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
                 }
-                else -> {
-                    // LFO source uses time values
-                    random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
-                }
+                else -> random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
             }
             
-            // For Random CV, use the glide range instead of direction
             val finalSlope = if (sourceId == "sampleAndHold") {
-                // Random value in the glide range
-                val randomVal = random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
-                android.util.Log.d("GLIDE_DEBUG", "Generated random glide value: $randomVal (range: ${constraints.randomGlideMin} - ${constraints.randomGlideMax})")
-                randomVal
-            } else {
-                // Direction slope for Beat and LFO
-                slope
-            }
+                random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
+            } else slope
             
-                            android.util.Log.d("GLIDE_DEBUG", "Creating modulator for ${param.javaClass.simpleName} - sourceId: $sourceId, slope: $finalSlope")
-                
-                param.modulators.add(
-                    CvModulator(
-                        sourceId = sourceId,
-                        operator = ModulationOperator.ADD,
-                        waveform = Waveform.TRIANGLE,
-                        slope = finalSlope,
-                        weight = 1.0f,
-                        phaseOffset = random.nextFloat(),
-                        subdivision = subdivision
-                    )
+            param.modulators.add(
+                CvModulator(
+                    sourceId = sourceId,
+                    operator = ModulationOperator.ADD,
+                    waveform = Waveform.TRIANGLE,
+                    slope = finalSlope,
+                    weight = 1.0f,
+                    phaseOffset = random.nextFloat(),
+                    subdivision = subdivision
                 )
+            )
         }
     }
     
     /**
-     * Applies hue offset constraints with full Phase 2 support.
+     * Applies hue offset constraints.
      */
     private fun applyHueOffsetConstraints(
         constraints: llm.slop.spirals.models.HueOffsetConstraints?,
@@ -401,17 +287,11 @@ class RandomSetGenerator(private val context: Context) {
         random: kotlin.random.Random
     ) {
         if (constraints == null) {
-            // Use defaults from settings
             val defaults = defaultsConfig.getHueOffsetDefaults()
-            
             visualSource.parameters["Hue Offset"]?.let { param ->
                 param.baseValue = 0f
                 param.modulators.clear()
-                
-                // Select direction based on probability
                 val slope = defaults.getRandomDirection(random)
-                
-                // Select source based on probability
                 val speedSource = defaults.getRandomSpeedSource(random)
                 val sourceId = when (speedSource) {
                     llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
@@ -419,44 +299,17 @@ class RandomSetGenerator(private val context: Context) {
                     llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
                 }
                 
-                // Get appropriate time/division range
                 val subdivision = when (sourceId) {
-                    "beatPhase" -> {
-                        // Get beat division from range - use standardized values
+                    "beatPhase", "sampleAndHold" -> {
                         val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
-                        if (validValues.isNotEmpty()) {
-                            validValues.random(random)
-                        } else {
-                            // Fallback
-                            4f
-                        }
+                        if (validValues.isNotEmpty()) validValues.random(random) else 4f
                     }
-                    "sampleAndHold" -> {
-                        // Random CV should also use beat divisions
-                        val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
-                        if (validValues.isNotEmpty()) {
-                            validValues.random(random)
-                        } else {
-                            // Fallback
-                            4f
-                        }
-                    }
-                    else -> {
-                        // Get LFO time
-                        random.nextInt(defaults.lfoTimeMin.toInt(), defaults.lfoTimeMax.toInt() + 1).toFloat()
-                    }
+                    else -> random.nextInt(defaults.lfoTimeMin.toInt(), defaults.lfoTimeMax.toInt() + 1).toFloat()
                 }
                 
-                // For random CV source, use the glide range
                 val finalSlope = if (sourceId == "sampleAndHold") {
-                    // Random value in the glide range
                     random.nextFloat() * (defaults.randomGlideMax - defaults.randomGlideMin) + defaults.randomGlideMin
-                } else {
-                    // Direction slope for Beat and LFO
-                    slope
-                }
-                
-                android.util.Log.d("GLIDE_DEBUG", "Creating modulator for ${param.javaClass.simpleName} - sourceId: $sourceId, slope: $finalSlope")
+                } else slope
                 
                 param.modulators.add(
                     CvModulator(
@@ -476,76 +329,46 @@ class RandomSetGenerator(private val context: Context) {
         visualSource.parameters["Hue Offset"]?.let { param ->
             param.baseValue = 0f
             param.modulators.clear()
-            
-            // Determine direction
             val directions = mutableListOf<Float>()
             if (constraints.enableForward) directions.add(1f)
             if (constraints.enableReverse) directions.add(0f)
+            val slope = if (directions.isNotEmpty()) directions.random(random) else 1f
             
-            val slope = if (directions.isNotEmpty()) {
-                directions.random(random)
-            } else {
-                1f // Default to forward
-            }
-            
-            val sourceId: String
-            val subdivision: Float
-            
-            // Set source ID based on speed source selection
-            sourceId = when(constraints.speedSource) {
+            val sourceId = when(constraints.speedSource) {
                 llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
                 llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
                 llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
             }
             
-            // Set subdivision based on source type
-            subdivision = when(sourceId) {
+            val subdivision = when(sourceId) {
                 "beatPhase", "sampleAndHold" -> {
-                    // Use the standardized beat values for both Beat and Random
                     val validValues = STANDARD_BEAT_VALUES.filter { it in constraints.beatDivMin..constraints.beatDivMax }
-                    if (validValues.isNotEmpty()) {
-                        validValues.random(random)
-                    } else {
-                        // Fallback to nearest allowed value
-                        STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
-                    }
+                    if (validValues.isNotEmpty()) validValues.random(random)
+                    else STANDARD_BEAT_VALUES.minByOrNull { kotlin.math.abs(it - constraints.beatDivMin) } ?: 1f
                 }
-                else -> {
-                    // LFO source uses time values
-                    random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
-                }
+                else -> random.nextInt(constraints.lfoTimeMin.toInt(), constraints.lfoTimeMax.toInt() + 1).toFloat()
             }
             
-            // For Random CV, use the glide range instead of direction
             val finalSlope = if (sourceId == "sampleAndHold") {
-                // Random value in the glide range
-                val randomVal = random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
-                android.util.Log.d("GLIDE_DEBUG", "Generated random glide value: $randomVal (range: ${constraints.randomGlideMin} - ${constraints.randomGlideMax})")
-                randomVal
-            } else {
-                // Direction slope for Beat and LFO
-                slope
-            }
+                random.nextFloat() * (constraints.randomGlideMax - constraints.randomGlideMin) + constraints.randomGlideMin
+            } else slope
             
-                            android.util.Log.d("GLIDE_DEBUG", "Creating modulator for ${param.javaClass.simpleName} - sourceId: $sourceId, slope: $finalSlope")
-                
-                param.modulators.add(
-                    CvModulator(
-                        sourceId = sourceId,
-                        operator = ModulationOperator.ADD,
-                        waveform = Waveform.TRIANGLE,
-                        slope = finalSlope,
-                        weight = 1.0f,
-                        phaseOffset = random.nextFloat(),
-                        subdivision = subdivision
-                    )
+            param.modulators.add(
+                CvModulator(
+                    sourceId = sourceId,
+                    operator = ModulationOperator.ADD,
+                    waveform = Waveform.TRIANGLE,
+                    slope = finalSlope,
+                    weight = 1.0f,
+                    phaseOffset = random.nextFloat(),
+                    subdivision = subdivision
                 )
+            )
         }
     }
     
     /**
      * Applies feedback mode presets.
-     * Note: Feedback parameters may need to be added to MandalaVisualSource for full support.
      */
     private fun applyFeedbackMode(
         mode: llm.slop.spirals.models.FeedbackMode,
@@ -574,62 +397,32 @@ class RandomSetGenerator(private val context: Context) {
                 visualSource.parameters["FB Zoom"]?.baseValue = 0.54f
                 visualSource.parameters["FB Rotate"]?.baseValue = 0.52f
             }
-            llm.slop.spirals.models.FeedbackMode.CUSTOM -> {
-                // For future: user-defined ranges
-            }
+            llm.slop.spirals.models.FeedbackMode.CUSTOM -> { }
         }
     }
     
-    /**
-     * Selects a recipe from the library based on the RSet's recipe filter.
-     * 
-     * @param rset The Random Set template
-     * @return A randomly selected recipe matching the filter criteria
-     */
     private fun selectRecipe(rset: RandomSet): Mandala4Arm {
         val allRecipes = MandalaLibrary.MandalaRatios
-        
         val filteredRecipes = when (rset.recipeFilter) {
-            RecipeFilter.ALL -> {
-                allRecipes
-            }
-            
+            RecipeFilter.ALL -> allRecipes
             RecipeFilter.FAVORITES_ONLY -> {
                 val favorites = tagManager.getFavorites()
-                if (favorites.isEmpty()) {
-                    // Fallback to all if no favorites
-                    allRecipes
-                } else {
-                    allRecipes.filter { it.id in favorites }
-                }
+                if (favorites.isEmpty()) allRecipes else allRecipes.filter { it.id in favorites }
             }
-            
             RecipeFilter.PETALS_EXACT -> {
                 val targetPetals = rset.petalCount ?: 5
                 allRecipes.filter { it.petals == targetPetals }
             }
-            
             RecipeFilter.PETALS_RANGE -> {
                 val min = rset.petalMin ?: 3
                 val max = rset.petalMax ?: 9
                 allRecipes.filter { it.petals in min..max }
             }
-            
             RecipeFilter.SPECIFIC_IDS -> {
                 val ids = rset.specificRecipeIds ?: emptyList()
-                if (ids.isEmpty()) {
-                    allRecipes
-                } else {
-                    allRecipes.filter { it.id in ids }
-                }
+                if (ids.isEmpty()) allRecipes else allRecipes.filter { it.id in ids }
             }
         }
-        
-        // If filter resulted in empty list, fall back to all recipes
-        return if (filteredRecipes.isEmpty()) {
-            allRecipes.random()
-        } else {
-            filteredRecipes.random()
-        }
+        return if (filteredRecipes.isEmpty()) allRecipes.random() else filteredRecipes.random()
     }
 }

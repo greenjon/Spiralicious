@@ -73,6 +73,9 @@ data class ArmDefaults(
     val lfoProbability: Float = 0.4f,
     val randomProbability: Float = 0.2f,
     
+    // Default enablement for RSet templates
+    val defaultEnableRandom: Boolean = false,
+    
     // Beat division range 
     val beatDivMin: Float = STANDARD_BEAT_VALUES.first(),  // 1/16
     val beatDivMax: Float = 32f,
@@ -104,6 +107,7 @@ data class ArmDefaults(
             beatProbability: Float = 0.4f,
             lfoProbability: Float = 0.4f,
             randomProbability: Float = 0.2f,
+            defaultEnableRandom: Boolean = false,
             sineProbability: Float = 0.33f,
             triangleProbability: Float = 0.34f,
             squareProbability: Float = 0.33f,
@@ -134,6 +138,7 @@ data class ArmDefaults(
                 beatProbability = normalizedBeatProb,
                 lfoProbability = normalizedLfoProb,
                 randomProbability = normalizedRandomProb,
+                defaultEnableRandom = defaultEnableRandom,
                 beatDivMin = beatDivMin,
                 beatDivMax = beatDivMax,
                 sineProbability = normalizedSineProb,

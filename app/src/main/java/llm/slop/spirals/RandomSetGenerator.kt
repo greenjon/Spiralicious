@@ -43,10 +43,24 @@ class RandomSetGenerator(private val context: Context) {
         }
         
         // 3. Apply constraints to L1-L4
-        applyArmConstraints("L1", rset.l1Constraints, visualSource, random)
-        applyArmConstraints("L2", rset.l2Constraints, visualSource, random)
-        applyArmConstraints("L3", rset.l3Constraints, visualSource, random)
-        applyArmConstraints("L4", rset.l4Constraints, visualSource, random)
+        if (rset.linkArms) {
+            applyArmConstraints("L1", rset.l1Constraints, visualSource, random)
+            val l1Param = visualSource.parameters["L1"]
+            if (l1Param != null) {
+                listOf("L2", "L3", "L4").forEach { name ->
+                    visualSource.parameters[name]?.let { p ->
+                        p.baseValue = l1Param.baseValue
+                        p.modulators.clear()
+                        p.modulators.addAll(l1Param.modulators.map { it.copy() })
+                    }
+                }
+            }
+        } else {
+            applyArmConstraints("L1", rset.l1Constraints, visualSource, random)
+            applyArmConstraints("L2", rset.l2Constraints, visualSource, random)
+            applyArmConstraints("L3", rset.l3Constraints, visualSource, random)
+            applyArmConstraints("L4", rset.l4Constraints, visualSource, random)
+        }
         
         // 4. Apply rotation constraints
         applyRotationConstraints(rset.rotationConstraints, visualSource, random)

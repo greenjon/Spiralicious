@@ -433,40 +433,93 @@ fun ArmsTab(
             color = AppText.copy(alpha = 0.7f),
             modifier = Modifier.padding(bottom = 16.dp)
         )
-        
-        ArmConstraintSection(
-            title = "L1 (Outer Arm)",
-            constraints = rset.l1Constraints,
-            onUpdate = { onUpdate(rset.copy(l1Constraints = it)) },
-            onClear = { onUpdate(rset.copy(l1Constraints = null)) }
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        ArmConstraintSection(
-            title = "L2",
-            constraints = rset.l2Constraints,
-            onUpdate = { onUpdate(rset.copy(l2Constraints = it)) },
-            onClear = { onUpdate(rset.copy(l2Constraints = null)) }
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        ArmConstraintSection(
-            title = "L3",
-            constraints = rset.l3Constraints,
-            onUpdate = { onUpdate(rset.copy(l3Constraints = it)) },
-            onClear = { onUpdate(rset.copy(l3Constraints = null)) }
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        ArmConstraintSection(
-            title = "L4 (Inner Arm)",
-            constraints = rset.l4Constraints,
-            onUpdate = { onUpdate(rset.copy(l4Constraints = it)) },
-            onClear = { onUpdate(rset.copy(l4Constraints = null)) }
-        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            Text(
+                text = "Link all arms to L1",
+                style = MaterialTheme.typography.bodyMedium,
+                color = AppText,
+                modifier = Modifier.weight(1f)
+            )
+            Switch(
+                checked = rset.linkArms,
+                onCheckedChange = { linked ->
+                    if (linked) {
+                        onUpdate(rset.copy(
+                            linkArms = true,
+                            l2Constraints = rset.l1Constraints,
+                            l3Constraints = rset.l1Constraints,
+                            l4Constraints = rset.l1Constraints
+                        ))
+                    } else {
+                        onUpdate(rset.copy(linkArms = false))
+                    }
+                },
+                colors = SwitchDefaults.colors(checkedThumbColor = AppAccent, checkedTrackColor = AppAccent.copy(alpha = 0.5f))
+            )
+        }
+
+        if (rset.linkArms) {
+            ArmConstraintSection(
+                title = "L1 (Master Control)",
+                constraints = rset.l1Constraints,
+                onUpdate = { constraints ->
+                    onUpdate(rset.copy(
+                        l1Constraints = constraints,
+                        l2Constraints = constraints,
+                        l3Constraints = constraints,
+                        l4Constraints = constraints
+                    ))
+                },
+                onClear = { 
+                    onUpdate(rset.copy(
+                        l1Constraints = null,
+                        l2Constraints = null,
+                        l3Constraints = null,
+                        l4Constraints = null
+                    ))
+                }
+            )
+        } else {
+            ArmConstraintSection(
+                title = "L1 (Outer Arm)",
+                constraints = rset.l1Constraints,
+                onUpdate = { onUpdate(rset.copy(l1Constraints = it)) },
+                onClear = { onUpdate(rset.copy(l1Constraints = null)) }
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            ArmConstraintSection(
+                title = "L2",
+                constraints = rset.l2Constraints,
+                onUpdate = { onUpdate(rset.copy(l2Constraints = it)) },
+                onClear = { onUpdate(rset.copy(l2Constraints = null)) }
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            ArmConstraintSection(
+                title = "L3",
+                constraints = rset.l3Constraints,
+                onUpdate = { onUpdate(rset.copy(l3Constraints = it)) },
+                onClear = { onUpdate(rset.copy(l3Constraints = null)) }
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            ArmConstraintSection(
+                title = "L4 (Inner Arm)",
+                constraints = rset.l4Constraints,
+                onUpdate = { onUpdate(rset.copy(l4Constraints = it)) },
+                onClear = { onUpdate(rset.copy(l4Constraints = null)) }
+            )
+        }
     }
 }
 

@@ -603,7 +603,9 @@ fun ArmConstraintSection(
                         lfoTimeMin = defaults.lfoTimeMin,
                         lfoTimeMax = defaults.lfoTimeMax,
                         randomGlideMin = defaults.randomGlideMin,
-                        randomGlideMax = defaults.randomGlideMax
+                        randomGlideMax = defaults.randomGlideMax,
+                        phaseMin = defaults.phaseMin,
+                        phaseMax = defaults.phaseMax
                     )
                 }
                 
@@ -756,14 +758,16 @@ fun ArmConstraintSection(
                 if (currentConstraints.enableLfo) {
                     Spacer(modifier = Modifier.height(12.dp))
                     
+                    val minTime = currentConstraints.lfoTimeMin
+                    val maxTime = currentConstraints.lfoTimeMax
                     Text(
-                        text = "LFO Time: ${currentConstraints.lfoTimeMin.toInt()}s-${currentConstraints.lfoTimeMax.toInt()}s",
+                        text = "LFO Time: ${minTime.toInt()}s-${maxTime.toInt()}s",
                         style = MaterialTheme.typography.bodySmall,
                         color = AppText,
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
                     RangeSlider(
-                        value = currentConstraints.lfoTimeMin..currentConstraints.lfoTimeMax,
+                        value = minTime..maxTime,
                         onValueChange = { range ->
                             onUpdate(currentConstraints.copy(
                                 lfoTimeMin = range.start,
@@ -771,6 +775,32 @@ fun ArmConstraintSection(
                             ))
                         },
                         valueRange = 1f..600f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = AppAccent,
+                            activeTrackColor = AppAccent
+                        )
+                    )
+                }
+
+                // Phase Range Control
+                if (currentConstraints.enableBeat || currentConstraints.enableLfo || currentConstraints.enableRandom) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Phase Range: ${currentConstraints.phaseMin.toInt()}° - ${currentConstraints.phaseMax.toInt()}°",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AppText,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    RangeSlider(
+                        value = currentConstraints.phaseMin..currentConstraints.phaseMax,
+                        onValueChange = { range ->
+                            onUpdate(currentConstraints.copy(
+                                phaseMin = range.start,
+                                phaseMax = range.endInclusive
+                            ))
+                        },
+                        valueRange = 0f..360f,
+                        steps = 7,
                         colors = SliderDefaults.colors(
                             thumbColor = AppAccent,
                             activeTrackColor = AppAccent
@@ -874,7 +904,9 @@ fun ArmConstraintSection(
                                     lfoTimeMin = defaults.lfoTimeMin,
                                     lfoTimeMax = defaults.lfoTimeMax,
                                     randomGlideMin = defaults.randomGlideMin,
-                                    randomGlideMax = defaults.randomGlideMax
+                                    randomGlideMax = defaults.randomGlideMax,
+                                    phaseMin = defaults.phaseMin,
+                                    phaseMax = defaults.phaseMax
                                 )
                                 
                                 onUpdate(armConstraints)

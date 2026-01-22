@@ -85,7 +85,11 @@ data class ArmConstraints(
     
     // Random glide range (0.0-1.0)
     val randomGlideMin: Float = 0.1f,
-    val randomGlideMax: Float = 0.5f
+    val randomGlideMax: Float = 0.5f,
+
+    // Phase range (0-360 degrees)
+    val phaseMin: Float = 0f,
+    val phaseMax: Float = 360f
 )
 
 @Serializable

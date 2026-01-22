@@ -95,7 +95,11 @@ data class ArmDefaults(
     
     // Random glide range (0.0-1.0)
     val randomGlideMin: Float = 0.1f,
-    val randomGlideMax: Float = 0.5f
+    val randomGlideMax: Float = 0.5f,
+
+    // Phase range (0-360 degrees)
+    val phaseMin: Float = 0f,
+    val phaseMax: Float = 360f
 ) {
     /**
      * Factory method to create default values with normalized probabilities
@@ -118,7 +122,9 @@ data class ArmDefaults(
             lfoTimeMin: Float = 1.0f,
             lfoTimeMax: Float = 60.0f,
             randomGlideMin: Float = 0.1f,
-            randomGlideMax: Float = 0.5f
+            randomGlideMax: Float = 0.5f,
+            phaseMin: Float = 0f,
+            phaseMax: Float = 360f
         ): ArmDefaults {
             // Normalize movement source probabilities
             val totalMovementProb = beatProbability + lfoProbability + randomProbability
@@ -149,7 +155,9 @@ data class ArmDefaults(
                 lfoTimeMin = lfoTimeMin,
                 lfoTimeMax = lfoTimeMax,
                 randomGlideMin = randomGlideMin,
-                randomGlideMax = randomGlideMax
+                randomGlideMax = randomGlideMax,
+                phaseMin = phaseMin,
+                phaseMax = phaseMax
             )
         }
     }

@@ -63,7 +63,9 @@ class DefaultsConfig(context: Context) {
             lfoTimeMin = prefs.getFloat("${PREFIX_ARM}lfo_time_min", 1.0f),
             lfoTimeMax = prefs.getFloat("${PREFIX_ARM}lfo_time_max", 60.0f),
             randomGlideMin = prefs.getFloat("${PREFIX_ARM}random_glide_min", 0.1f),
-            randomGlideMax = prefs.getFloat("${PREFIX_ARM}random_glide_max", 0.5f)
+            randomGlideMax = prefs.getFloat("${PREFIX_ARM}random_glide_max", 0.5f),
+            phaseMin = prefs.getFloat("${PREFIX_ARM}phase_min", 0f),
+            phaseMax = prefs.getFloat("${PREFIX_ARM}phase_max", 360f)
         )
     }
     
@@ -86,6 +88,8 @@ class DefaultsConfig(context: Context) {
             putFloat("${PREFIX_ARM}lfo_time_max", defaults.lfoTimeMax)
             putFloat("${PREFIX_ARM}random_glide_min", defaults.randomGlideMin)
             putFloat("${PREFIX_ARM}random_glide_max", defaults.randomGlideMax)
+            putFloat("${PREFIX_ARM}phase_min", defaults.phaseMin)
+            putFloat("${PREFIX_ARM}phase_max", defaults.phaseMax)
         }
     }
     

@@ -7,6 +7,7 @@ import llm.slop.spirals.cv.Waveform
 import llm.slop.spirals.models.RandomSet
 import llm.slop.spirals.models.RecipeFilter
 import llm.slop.spirals.models.STANDARD_BEAT_VALUES
+import kotlin.math.round
 
 /**
  * RandomSetGenerator - Generates ephemeral mandala patches from RSet templates.
@@ -103,7 +104,9 @@ class RandomSetGenerator(private val context: Context) {
                     lfoTimeMin = defaults.lfoTimeMin,
                     lfoTimeMax = defaults.lfoTimeMax,
                     randomGlideMin = defaults.randomGlideMin,
-                    randomGlideMax = defaults.randomGlideMax
+                    randomGlideMax = defaults.randomGlideMax,
+                    phaseMin = defaults.phaseMin,
+                    phaseMax = defaults.phaseMax
                 )
             }
             
@@ -123,6 +126,15 @@ class RandomSetGenerator(private val context: Context) {
                 // Weight from range (convert to 0-1 scale)
                 val weight = random.nextInt(c.weightMin, c.weightMax + 1) / 100f
                 
+                // Phase Calculation
+                val rawPhase = if (c.phaseMax > c.phaseMin) {
+                    random.nextFloat() * (c.phaseMax - c.phaseMin) + c.phaseMin
+                } else {
+                    c.phaseMin
+                }
+                val snappedPhase = (round(rawPhase / 45.0) * 45.0).toFloat()
+                val normalizedPhase = snappedPhase / 360f
+
                 // Waveform logic (S&H doesn't use it, but we need a value for CvModulator)
                 val waveform = if (chosenSource == "sampleAndHold") {
                     Waveform.SINE // Dummy for S&H
@@ -155,7 +167,7 @@ class RandomSetGenerator(private val context: Context) {
                                 waveform = waveform,
                                 slope = 0.5f,
                                 weight = weight,
-                                phaseOffset = random.nextFloat(),
+                                phaseOffset = normalizedPhase,
                                 subdivision = subdivision
                             )
                         )
@@ -170,7 +182,7 @@ class RandomSetGenerator(private val context: Context) {
                                 waveform = waveform,
                                 slope = 0.5f,
                                 weight = weight,
-                                phaseOffset = random.nextFloat(),
+                                phaseOffset = normalizedPhase,
                                 subdivision = timeSeconds
                             )
                         )
@@ -193,7 +205,7 @@ class RandomSetGenerator(private val context: Context) {
                                 waveform = waveform,
                                 slope = randomGlide,
                                 weight = weight,
-                                phaseOffset = random.nextFloat(),
+                                phaseOffset = normalizedPhase,
                                 subdivision = subdivision
                             )
                         )

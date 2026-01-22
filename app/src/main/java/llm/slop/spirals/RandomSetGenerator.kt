@@ -217,50 +217,15 @@ class RandomSetGenerator(private val context: Context) {
         visualSource: MandalaVisualSource,
         random: kotlin.random.Random
     ) {
-        if (constraints == null) {
-            val defaults = defaultsConfig.getRotationDefaults()
-            visualSource.parameters["Rotation"]?.let { param ->
-                param.baseValue = 0f
-                param.modulators.clear()
-                val slope = defaults.getRandomDirection(random)
-                val speedSource = defaults.getRandomSpeedSource(random)
-                val sourceId = when (speedSource) {
-                    llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
-                    llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
-                    llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
-                }
-                
-                val subdivision = when (sourceId) {
-                    "beatPhase", "sampleAndHold" -> {
-                        val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
-                        if (validValues.isNotEmpty()) validValues.random(random) else 4f
-                    }
-                    else -> random.nextInt(defaults.lfoTimeMin.toInt(), defaults.lfoTimeMax.toInt() + 1).toFloat()
-                }
-                
-                val finalSlope = if (sourceId == "sampleAndHold") {
-                    random.nextFloat() * (defaults.randomGlideMax - defaults.randomGlideMin) + defaults.randomGlideMin
-                } else slope
-                
-                param.modulators.add(
-                    CvModulator(
-                        sourceId = sourceId,
-                        operator = ModulationOperator.ADD,
-                        waveform = Waveform.TRIANGLE,
-                        slope = finalSlope,
-                        weight = 1.0f,
-                        phaseOffset = random.nextFloat(),
-                        subdivision = subdivision
-                    )
-                )
-            }
-            return
-        }
-        
         visualSource.parameters["Rotation"]?.let { param ->
             param.baseValue = 0f
             param.modulators.clear()
             
+            if (constraints == null) {
+                // No constraints means rotation is disabled - leave with no modulators
+                return@let
+            }
+
             // Determine direction (slope: 0 = clockwise ramp down, 1 = counter-clockwise ramp up)
             val directions = mutableListOf<Float>()
             if (constraints.enableClockwise) directions.add(0f)
@@ -312,50 +277,15 @@ class RandomSetGenerator(private val context: Context) {
         visualSource: MandalaVisualSource,
         random: kotlin.random.Random
     ) {
-        if (constraints == null) {
-            val defaults = defaultsConfig.getHueOffsetDefaults()
-            visualSource.parameters["Hue Offset"]?.let { param ->
-                param.baseValue = 0f
-                param.modulators.clear()
-                val slope = defaults.getRandomDirection(random)
-                val speedSource = defaults.getRandomSpeedSource(random)
-                val sourceId = when (speedSource) {
-                    llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
-                    llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
-                    llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
-                }
-                
-                val subdivision = when (sourceId) {
-                    "beatPhase", "sampleAndHold" -> {
-                        val validValues = STANDARD_BEAT_VALUES.filter { it in defaults.beatDivMin..defaults.beatDivMax }
-                        if (validValues.isNotEmpty()) validValues.random(random) else 4f
-                    }
-                    else -> random.nextInt(defaults.lfoTimeMin.toInt(), defaults.lfoTimeMax.toInt() + 1).toFloat()
-                }
-                
-                val finalSlope = if (sourceId == "sampleAndHold") {
-                    random.nextFloat() * (defaults.randomGlideMax - defaults.randomGlideMin) + defaults.randomGlideMin
-                } else slope
-                
-                param.modulators.add(
-                    CvModulator(
-                        sourceId = sourceId,
-                        operator = ModulationOperator.ADD,
-                        waveform = Waveform.TRIANGLE,
-                        slope = finalSlope,
-                        weight = 1.0f,
-                        phaseOffset = random.nextFloat(),
-                        subdivision = subdivision
-                    )
-                )
-            }
-            return
-        }
-        
         visualSource.parameters["Hue Offset"]?.let { param ->
             param.baseValue = 0f
             param.modulators.clear()
             
+            if (constraints == null) {
+                // No constraints means hue offset is disabled - leave with no modulators
+                return@let
+            }
+
             // Determine direction
             val directions = mutableListOf<Float>()
             if (constraints.enableForward) directions.add(1f)

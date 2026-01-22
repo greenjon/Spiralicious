@@ -67,18 +67,17 @@ fun EditorBreadcrumbs(
             maxLines = 2
         ) {
             stack.forEachIndexed { index, layer ->
-                // Skip generic "Editor" names - only show if there's actual data
-                val showName = layer.data != null
-                
-                if (showName) {
-                    // Get the actual name from the data if available, otherwise use layer.name
+                // Always show breadcrumbs, use fallback names for layers without data
+                val showName = true
+
+                // Get the actual name from the data if available, otherwise use layer.name as fallback
                     val actualName = when (val data = layer.data) {
                         is llm.slop.spirals.MandalaLayerContent -> data.patch.name
                         is llm.slop.spirals.SetLayerContent -> data.set.name
                         is llm.slop.spirals.MixerLayerContent -> data.mixer.name
                         is llm.slop.spirals.ShowLayerContent -> data.show.name
                         is llm.slop.spirals.RandomSetLayerContent -> data.randomSet.name
-                        null -> layer.name
+                    null -> layer.name // Use layer name as fallback
                     }
                     
                     val displayName = if (layer.isDirty) "$actualName *" else actualName
@@ -114,8 +113,6 @@ fun EditorBreadcrumbs(
                     }
                 }
             }
-        }
-        
         // Reserve fixed space for actions/menu (48dp for IconButton)
         Box(
             contentAlignment = Alignment.Center,

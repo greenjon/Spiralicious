@@ -2,6 +2,7 @@ package llm.slop.spirals
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.core.content.edit
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -38,7 +39,9 @@ class AppConfig(context: Context) {
         try {
             lastNavStackJson = Json.encodeToString(ListSerializer(NavLayer.serializer()), stack)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("AppConfig", "Failed to serialize nav stack: ${e.message}")
+            // Optionally save a minimal stack or clear corrupted data
+            lastNavStackJson = null
         }
     }
 
@@ -47,7 +50,7 @@ class AppConfig(context: Context) {
         return try {
             Json.decodeFromString(ListSerializer(NavLayer.serializer()), json)
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e("AppConfig", "Failed to deserialize nav stack: ${e.message}")
             null
         }
     }

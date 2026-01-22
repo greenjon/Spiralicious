@@ -132,10 +132,13 @@ fun ModulatorRow(
                     }
                     "sampleAndHold" -> {
                         val beats = ModulationRegistry.getSynchronizedTotalBeats()
-                        val localPhase = (beats / subdivision) % 1.0
-                        val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
-                        
-                        ModulationRegistry.sampleAndHold.getValue(positivePhase, slope, beats, subdivision.toDouble())
+                        // S&H handles its internal phase and seeds via phaseOffset
+                        ModulationRegistry.sampleAndHold.getValue(
+                            totalBeats = beats,
+                            subdivision = subdivision.toDouble(),
+                            phaseOffset = phaseOffset,
+                            slope = slope
+                        )
                     }
                     else -> ModulationRegistry.get(sourceId)
                 }
@@ -410,26 +413,21 @@ fun ModulatorRow(
                             }
                         }
 
-                        // Phase Knob - not needed for SampleAndHold
-                        if (!isSampleAndHold) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
-                                KnobView(
-                                    baseValue = phaseOffset,
-                                    onValueChange = { newValue ->
-                                        phaseOffset = newValue
-                                        if (!isNew) onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope, lfoSpeedMode))
-                                    },
-                                    onInteractionFinished = onInteractionFinished,
-                                    isBipolar = false,
-                                    focused = true,
-                                    knobSize = 44.dp,
-                                    showValue = true
-                                )
-                                Text("Phase", style = MaterialTheme.typography.labelSmall, color = AppText)
-                            }
-                        } else {
-                            // Spacer for SampleAndHold in place of Phase knob
-                            Spacer(modifier = Modifier.weight(1f))
+                        // Phase Knob
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            KnobView(
+                                baseValue = phaseOffset,
+                                onValueChange = { newValue ->
+                                    phaseOffset = newValue
+                                    if (!isNew) onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, newValue, slope, lfoSpeedMode))
+                                },
+                                onInteractionFinished = onInteractionFinished,
+                                isBipolar = false,
+                                focused = true,
+                                knobSize = 44.dp,
+                                showValue = true
+                            )
+                            Text("Phase", style = MaterialTheme.typography.labelSmall, color = AppText)
                         }
 
                         // Slope/Duty Knob

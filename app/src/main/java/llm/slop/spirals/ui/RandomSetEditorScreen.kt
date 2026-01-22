@@ -799,8 +799,8 @@ fun ArmConstraintSection(
                                 phaseMax = range.endInclusive
                             ))
                         },
-                        valueRange = 0f..360f,
-                        steps = 7,
+                        valueRange = 0f..270f,
+                        steps = 2,
                         colors = SliderDefaults.colors(
                             thumbColor = AppAccent,
                             activeTrackColor = AppAccent

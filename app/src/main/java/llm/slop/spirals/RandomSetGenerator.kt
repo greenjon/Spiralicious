@@ -45,17 +45,11 @@ class RandomSetGenerator(private val context: Context) {
         
         // 3. Apply constraints to L1-L4
         if (rset.linkArms) {
+            // Apply the SAME constraints (L1) to all arms, but with INDEPENDENT randomization
             applyArmConstraints("L1", rset.l1Constraints, visualSource, random)
-            val l1Param = visualSource.parameters["L1"]
-            if (l1Param != null) {
-                listOf("L2", "L3", "L4").forEach { name ->
-                    visualSource.parameters[name]?.let { p ->
-                        p.baseValue = l1Param.baseValue
-                        p.modulators.clear()
-                        p.modulators.addAll(l1Param.modulators.map { it.copy() })
-                    }
-                }
-            }
+            applyArmConstraints("L2", rset.l1Constraints, visualSource, random)
+            applyArmConstraints("L3", rset.l1Constraints, visualSource, random)
+            applyArmConstraints("L4", rset.l1Constraints, visualSource, random)
         } else {
             applyArmConstraints("L1", rset.l1Constraints, visualSource, random)
             applyArmConstraints("L2", rset.l2Constraints, visualSource, random)

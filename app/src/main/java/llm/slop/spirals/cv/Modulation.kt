@@ -64,17 +64,16 @@ class ModulatableParameter(
                 }
                 "sampleAndHold" -> {
                     val beats = ModulationRegistry.getSynchronizedTotalBeats()
-                    val subdivision = mod.subdivision.coerceAtLeast(0.01f)
-
-                    // Calculate phase within the current cycle
-                    val localPhase = (beats / subdivision) % 1.0
-                    val positivePhase = if (localPhase < 0) (localPhase + 1.0) else localPhase
-
-                    // Debug slope value
-                    android.util.Log.d("GLIDE_DEBUG", "SampleAndHold slope: ${mod.slope}")
+                    val subdivision = mod.subdivision.toDouble().coerceAtLeast(0.01)
                     
-                    // Pass both the totalBeats and subdivision for deterministic randomness
-                    ModulationRegistry.sampleAndHold.getValue(positivePhase, mod.slope, beats, subdivision.toDouble())
+                    // The S&H implementation now handles its own phase/cycle calculation internally
+                    // using the phaseOffset to shift the random seed and the sampling points.
+                    ModulationRegistry.sampleAndHold.getValue(
+                        totalBeats = beats,
+                        subdivision = subdivision,
+                        phaseOffset = mod.phaseOffset,
+                        slope = mod.slope
+                    )
                 }
                 "lfo" -> {
                     val seconds = ModulationRegistry.getElapsedRealtimeSec()

@@ -30,7 +30,7 @@ fun ShowEditorScreen(
     showManager: Boolean = false,
     onHideManager: () -> Unit = {}
 ) {
-    val allMixerPatches by vm.allMixerPatches.collectAsState(initial = emptyList())
+    val allRandomSets by vm.allRandomSets.collectAsState(initial = emptyList())
     val allShowPatches by vm.allShowPatches.collectAsState(initial = emptyList())
     val currentShowIndex by vm.currentShowIndex.collectAsState()
 
@@ -53,16 +53,17 @@ fun ShowEditorScreen(
         }
     }
 
-    // Apply the active mixer from the show sequence to the renderer
-    LaunchedEffect(currentShowIndex, currentShow.mixerNames, allMixerPatches) {
-        if (currentShow.mixerNames.isNotEmpty()) {
-            val safeIndex = currentShowIndex.coerceIn(0, currentShow.mixerNames.size - 1)
-            val mixerName = currentShow.mixerNames[safeIndex]
-            val mixerEntity = allMixerPatches.find { it.name == mixerName }
-            mixerEntity?.let { entity ->
+    // Apply the active random set from the show sequence to the renderer
+    LaunchedEffect(currentShowIndex, currentShow.randomSetIds, allRandomSets) {
+        if (currentShow.randomSetIds.isNotEmpty()) {
+            val safeIndex = currentShowIndex.coerceIn(0, currentShow.randomSetIds.size - 1)
+            val randomSetId = currentShow.randomSetIds[safeIndex]
+            val randomSetEntity = allRandomSets.find { it.id == randomSetId }
+            randomSetEntity?.let { entity ->
                 try {
-                    val mixerPatch = Json.decodeFromString<MixerPatch>(entity.jsonSettings)
-                    mainRenderer?.mixerPatch = mixerPatch
+                    val randomSet = Json.decodeFromString<RandomSet>(entity.jsonSettings)
+                    val tempMixer = createTemporaryMixerFromRandomSet(randomSet)
+                    mainRenderer?.mixerPatch = tempMixer
                 } catch (e: Exception) {}
             }
         }
@@ -93,14 +94,14 @@ fun ShowEditorScreen(
                 previewContent()
                 
                 // Show Index Indicator
-                if (currentShow.mixerNames.isNotEmpty()) {
+                if (currentShow.randomSetIds.isNotEmpty()) {
                     Surface(
                         color = AppBackground.copy(alpha = 0.7f),
                         modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
                         shape = MaterialTheme.shapes.extraSmall
                     ) {
                         Text(
-                            text = "${currentShowIndex + 1} / ${currentShow.mixerNames.size}",
+                            text = "${currentShowIndex + 1} / ${currentShow.randomSetIds.size}",
                             style = MaterialTheme.typography.labelSmall,
                             color = AppAccent,
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
@@ -126,7 +127,7 @@ fun ShowEditorScreen(
                         onValueChange = { currentShow = currentShow.copy(prevTrigger = currentShow.prevTrigger.copy(baseValue = it)) },
                         onInteractionFinished = {
                             if (currentShow.prevTrigger.baseValue > 0.5f) {
-                                vm.triggerPrevMixer(currentShow.mixerNames.size)
+                                vm.triggerPrevMixer(currentShow.randomSetIds.size)
                             }
                         }
                     )
@@ -139,7 +140,7 @@ fun ShowEditorScreen(
                         onValueChange = { currentShow = currentShow.copy(nextTrigger = currentShow.nextTrigger.copy(baseValue = it)) },
                         onInteractionFinished = {
                             if (currentShow.nextTrigger.baseValue > 0.5f) {
-                                vm.triggerNextMixer(currentShow.mixerNames.size)
+                                vm.triggerNextMixer(currentShow.randomSetIds.size)
                             }
                         }
                     )
@@ -148,29 +149,29 @@ fun ShowEditorScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 3. Mixer sequence (Set Editor style)
+            // 3. RandomSet sequence (Set Editor style)
             Column(modifier = Modifier.padding(horizontal = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    var showMixerPicker by remember { mutableStateOf(false) }
-                    
-                    Button(onClick = { showMixerPicker = true }) {
+                    var showRandomSetPicker by remember { mutableStateOf(false) }
+
+                    Button(onClick = { showRandomSetPicker = true }) {
                         Icon(Icons.Default.Add, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Add Mixer")
+                        Text("Add RandomSet")
                     }
 
-                    if (showMixerPicker) {
+                    if (showRandomSetPicker) {
                         PickerDialog(
-                            title = "Add Mixer to Show",
-                            items = allMixerPatches.map { it.name to it.name },
-                            onSelect = { name ->
-                                currentShow = currentShow.copy(mixerNames = currentShow.mixerNames + name)
-                                showMixerPicker = false
+                            title = "Add RandomSet to Show",
+                            items = allRandomSets.map { it.name to it.id },
+                            onSelect = { randomSetId ->
+                                currentShow = currentShow.copy(randomSetIds = currentShow.randomSetIds + randomSetId)
+                                showRandomSetPicker = false
                             },
-                            onDismiss = { showMixerPicker = false },
+                            onDismiss = { showRandomSetPicker = false },
                             onCreateNew = {
-                                vm.createAndPushLayer(LayerType.MIXER)
-                                showMixerPicker = false
+                                vm.createAndPushLayer(LayerType.RANDOM_SET)
+                                showRandomSetPicker = false
                             }
                         )
                     }
@@ -179,22 +180,22 @@ fun ShowEditorScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 SetChipList(
-                    chipIds = currentShow.mixerNames,
-                    onChipTapped = { name ->
-                        val idx = currentShow.mixerNames.indexOf(name)
+                    chipIds = currentShow.randomSetIds,
+                    onChipTapped = { randomSetId ->
+                        val idx = currentShow.randomSetIds.indexOf(randomSetId)
                         if (idx != -1) vm.jumpToShowIndex(idx)
                     },
                     onChipReordered = { newList ->
-                        currentShow = currentShow.copy(mixerNames = newList)
+                        currentShow = currentShow.copy(randomSetIds = newList)
                     }
                 )
             }
         }
 
         if (showManager) {
-            val mixerNames = currentShow.mixerNames
-            val currentMixerIndex = if (mixerNames.isNotEmpty()) currentShowIndex.coerceIn(0, mixerNames.size - 1) else 0
-            
+            val randomSetIds = currentShow.randomSetIds
+            val currentRandomSetIndex = if (randomSetIds.isNotEmpty()) currentShowIndex.coerceIn(0, randomSetIds.size - 1) else 0
+
             PatchManagerOverlay(
                 title = "Manage Shows",
                 patches = allShowPatches.map { it.name to it.jsonSettings },
@@ -206,8 +207,8 @@ fun ShowEditorScreen(
                         currentShow = selected
                         val idx = navStack.indexOfLast { it.type == LayerType.SHOW }
                         if (idx != -1) vm.updateLayerName(idx, selected.name)
-                        // Reset to first mixer when switching shows
-                        if (selected.mixerNames.isNotEmpty()) vm.jumpToShowIndex(0)
+                        // Reset to first RandomSet when switching shows
+                        if (selected.randomSetIds.isNotEmpty()) vm.jumpToShowIndex(0)
                     } catch (e: Exception) {}
                 },
                 onOpen = { json ->
@@ -239,15 +240,15 @@ fun ShowEditorScreen(
                         vm.deleteSavedPatch(LayerType.SHOW, p.name)
                     } catch (e: Exception) {}
                 },
-                // Navigation through mixers in the show
-                navigationLabel = if (mixerNames.isNotEmpty()) "Mixer" else null,
-                navigationIndex = if (mixerNames.isNotEmpty()) currentMixerIndex else null,
-                navigationTotal = if (mixerNames.isNotEmpty()) mixerNames.size else null,
-                onNavigatePrev = if (mixerNames.isNotEmpty()) {
-                    { vm.triggerPrevMixer(mixerNames.size) }
+                // Navigation through RandomSets in the show
+                navigationLabel = if (randomSetIds.isNotEmpty()) "RandomSet" else null,
+                navigationIndex = if (randomSetIds.isNotEmpty()) currentRandomSetIndex else null,
+                navigationTotal = if (randomSetIds.isNotEmpty()) randomSetIds.size else null,
+                onNavigatePrev = if (randomSetIds.isNotEmpty()) {
+                    { vm.triggerPrevMixer(randomSetIds.size) }
                 } else null,
-                onNavigateNext = if (mixerNames.isNotEmpty()) {
-                    { vm.triggerNextMixer(mixerNames.size) }
+                onNavigateNext = if (randomSetIds.isNotEmpty()) {
+                    { vm.triggerNextMixer(randomSetIds.size) }
                 } else null
             )
         }

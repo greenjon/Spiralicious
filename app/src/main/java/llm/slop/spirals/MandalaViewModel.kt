@@ -346,7 +346,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
      * This is called during breadcrumb cascade to add the child to the parent's
      * appropriate collection. Each parent type has different linking logic:
      * 
-     * - SHOW → Adds mixer.name to show.mixerNames list
+     * - SHOW → Adds randomSet.id to show.randomSetIds list
      * - MIXER → Adds set.id OR mandala.name to mixer.slots[parentSlotIndex]
      * - SET → Adds mandala.name to set.orderedMandalaIds list (at end)
      * - MANDALA → Cannot have children
@@ -371,13 +371,13 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         
         when (parent.type) {
             LayerType.SHOW -> {
-                // SHOW parent: Add Mixer to show's mixer list
+                // SHOW parent: Add RandomSet to show's randomSetIds list
                 val show = (parentData as? ShowLayerContent)?.show ?: return
-                val mixer = (child.data as? MixerLayerContent)?.mixer ?: return
-                
-                // Add mixer to show if not already present (prevents duplicates)
-                if (!show.mixerNames.contains(mixer.name)) {
-                    val updatedShow = show.copy(mixerNames = show.mixerNames + mixer.name)
+                val randomSet = (child.data as? RandomSetLayerContent)?.randomSet ?: return
+
+                // Add randomSet to show if not already present (prevents duplicates)
+                if (!show.randomSetIds.contains(randomSet.id)) {
+                    val updatedShow = show.copy(randomSetIds = show.randomSetIds + randomSet.id)
                     updateLayerData(parentIndex, ShowLayerContent(updatedShow), isDirty = true)
                     saveLayer(_navStack.value[parentIndex])
                 }

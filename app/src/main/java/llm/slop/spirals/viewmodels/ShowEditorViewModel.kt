@@ -8,7 +8,7 @@ import kotlinx.coroutines.launch
 import llm.slop.spirals.LayerType
 import llm.slop.spirals.MandalaDatabase
 import llm.slop.spirals.ShowLayerContent
-import llm.slop.spirals.database.repositories.MixerRepository
+import llm.slop.spirals.database.repositories.RandomSetRepository
 import llm.slop.spirals.database.repositories.ShowRepository
 import llm.slop.spirals.models.ShowPatch
 import llm.slop.spirals.navigation.NavigationViewModel
@@ -25,22 +25,22 @@ class ShowEditorViewModel(
 ) : AndroidViewModel(application) {
     private val database = MandalaDatabase.getDatabase(application)
     private val showRepository = ShowRepository(database)
-    private val mixerRepository = MixerRepository(database)
-    
+    private val randomSetRepository = RandomSetRepository(database)
+
     // The current show being edited
     private val _currentShow = MutableStateFlow<ShowPatch?>(null)
     val currentShow: StateFlow<ShowPatch?> = _currentShow.asStateFlow()
     
-    // Currently selected mixer index in the show
+    // Currently selected random set index in the show
     private val _currentShowIndex = MutableStateFlow(0)
     val currentShowIndex = _currentShowIndex.asStateFlow()
     
     // All available shows for selection
     val allShows = showRepository.getAll()
     
-    // All available mixers that can be added to the show
-    val allMixers = mixerRepository.getAll()
-    
+    // All available random sets that can be added to the show
+    val allRandomSets = randomSetRepository.getAll()
+
     /**
      * Sets the current show being edited.
      * 
@@ -68,47 +68,47 @@ class ShowEditorViewModel(
     }
     
     /**
-     * Adds a mixer to the show.
-     * 
-     * @param mixerName The name of the mixer to add
+     * Adds a random set to the show.
+     *
+     * @param randomSetId The ID of the random set to add
      */
-    fun addMixerToShow(mixerName: String) {
+    fun addRandomSetToShow(randomSetId: String) {
         val show = _currentShow.value ?: return
-        if (!show.mixerNames.contains(mixerName)) {
-            val updatedMixerNames = show.mixerNames + mixerName
-            val updatedShow = show.copy(mixerNames = updatedMixerNames)
+        if (!show.randomSetIds.contains(randomSetId)) {
+            val updatedRandomSetIds = show.randomSetIds + randomSetId
+            val updatedShow = show.copy(randomSetIds = updatedRandomSetIds)
             updateShow(updatedShow)
         }
     }
     
     /**
-     * Removes a mixer from the show.
-     * 
-     * @param mixerName The name of the mixer to remove
+     * Removes a random set from the show.
+     *
+     * @param randomSetId The ID of the random set to remove
      */
-    fun removeMixerFromShow(mixerName: String) {
+    fun removeRandomSetFromShow(randomSetId: String) {
         val show = _currentShow.value ?: return
-        val updatedMixerNames = show.mixerNames.filter { it != mixerName }
-        if (updatedMixerNames.size != show.mixerNames.size) {
-            val updatedShow = show.copy(mixerNames = updatedMixerNames)
+        val updatedRandomSetIds = show.randomSetIds.filter { it != randomSetId }
+        if (updatedRandomSetIds.size != show.randomSetIds.size) {
+            val updatedShow = show.copy(randomSetIds = updatedRandomSetIds)
             updateShow(updatedShow)
         }
     }
     
     /**
-     * Reorders mixers in the show.
-     * 
+     * Reorders random sets in the show.
+     *
      * @param fromIndex The original index
      * @param toIndex The target index
      */
-    fun reorderMixers(fromIndex: Int, toIndex: Int) {
+    fun reorderRandomSets(fromIndex: Int, toIndex: Int) {
         val show = _currentShow.value ?: return
-        val mixerNames = show.mixerNames.toMutableList()
-        
-        if (fromIndex < mixerNames.size && toIndex < mixerNames.size) {
-            val item = mixerNames.removeAt(fromIndex)
-            mixerNames.add(toIndex, item)
-            val updatedShow = show.copy(mixerNames = mixerNames)
+        val randomSetIds = show.randomSetIds.toMutableList()
+
+        if (fromIndex < randomSetIds.size && toIndex < randomSetIds.size) {
+            val item = randomSetIds.removeAt(fromIndex)
+            randomSetIds.add(toIndex, item)
+            val updatedShow = show.copy(randomSetIds = randomSetIds)
             updateShow(updatedShow)
         }
     }
@@ -189,31 +189,31 @@ class ShowEditorViewModel(
     }
     
     /**
-     * Jumps to a specific mixer in the show.
-     * 
-     * @param index The index of the mixer to jump to
+     * Jumps to a specific random set in the show.
+     *
+     * @param index The index of the random set to jump to
      */
     fun jumpToShowIndex(index: Int) {
-        if (index >= 0 && index < (_currentShow.value?.mixerNames?.size ?: 0)) {
+        if (index >= 0 && index < (_currentShow.value?.randomSetIds?.size ?: 0)) {
             _currentShowIndex.value = index
         }
     }
     
     /**
-     * Moves to the next mixer in the show.
+     * Moves to the next random set in the show.
      */
     fun triggerNextMixer() {
-        val size = _currentShow.value?.mixerNames?.size ?: 0
+        val size = _currentShow.value?.randomSetIds?.size ?: 0
         if (size > 0) {
             _currentShowIndex.value = (_currentShowIndex.value + 1) % size
         }
     }
     
     /**
-     * Moves to the previous mixer in the show.
+     * Moves to the previous random set in the show.
      */
     fun triggerPrevMixer() {
-        val size = _currentShow.value?.mixerNames?.size ?: 0
+        val size = _currentShow.value?.randomSetIds?.size ?: 0
         if (size > 0) {
             _currentShowIndex.value = if (_currentShowIndex.value <= 0) size - 1 else _currentShowIndex.value - 1
         }

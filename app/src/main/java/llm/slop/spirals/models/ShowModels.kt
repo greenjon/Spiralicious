@@ -7,7 +7,7 @@ import java.util.UUID
 data class ShowPatch(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
-    val mixerNames: List<String> = emptyList(),
+    val randomSetIds: List<String> = emptyList(),
     val prevTrigger: ModulatableParameterData = ModulatableParameterData(0.0f),
     val nextTrigger: ModulatableParameterData = ModulatableParameterData(0.0f)
 )

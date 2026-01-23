@@ -45,6 +45,16 @@ fun RandomSetEditorScreen(
     var selectedTab by remember { mutableStateOf(0) }
     var regenerateTrigger by remember { mutableIntStateOf(0) }
     
+    // Renderer configuration for video display
+    val renderer = LocalSpiralRenderer.current
+    DisposableEffect(renderer) {
+        renderer?.visualSource = visualSource
+        renderer?.mixerPatch = null  // Ensure single mandala mode
+        onDispose {
+            renderer?.visualSource = null
+        }
+    }
+
     // Update local state if nav data changes (e.g. from Manage overlay)
     LaunchedEffect(layer?.data) {
         (layer?.data as? RandomSetLayerContent)?.randomSet?.let {

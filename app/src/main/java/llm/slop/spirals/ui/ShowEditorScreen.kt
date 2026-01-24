@@ -20,6 +20,7 @@ import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppAccent
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +44,7 @@ fun ShowEditorScreen(
     }
 
     val mainRenderer = LocalSpiralRenderer.current
+    val generator = remember { RandomSetGenerator(vm.getApplication()) }
 
     // Update local state if nav data changes
     LaunchedEffect(layer?.data) {
@@ -54,18 +56,48 @@ fun ShowEditorScreen(
     }
 
     // Apply the active random set from the show sequence to the renderer
-    LaunchedEffect(currentShowIndex, currentShow.randomSetIds, allRandomSets) {
+    LaunchedEffect(currentShowIndex, currentShow.randomSetIds, allRandomSets, navStack) {
+        Log.d("ShowEditor", "Syncing preview: Index=$currentShowIndex, ShowID=${currentShow.id}, RSetCount=${currentShow.randomSetIds.size}")
+        
         if (currentShow.randomSetIds.isNotEmpty()) {
             val safeIndex = currentShowIndex.coerceIn(0, currentShow.randomSetIds.size - 1)
             val randomSetId = currentShow.randomSetIds[safeIndex]
+            
+            // Fallback logic: check DB first, then NavStack for unsaved/newly created sets
             val randomSetEntity = allRandomSets.find { it.id == randomSetId }
-            randomSetEntity?.let { entity ->
-                try {
-                    val randomSet = Json.decodeFromString<RandomSet>(entity.jsonSettings)
-                    val tempMixer = createTemporaryMixerFromRandomSet(randomSet)
-                    mainRenderer?.mixerPatch = tempMixer
-                } catch (e: Exception) {}
+            val randomSet = if (randomSetEntity != null) {
+                try { Json.decodeFromString<RandomSet>(randomSetEntity.jsonSettings) } catch (e: Exception) { null }
+            } else {
+                // Fallback to NavStack - handles cases where DB hasn't updated yet or item is being edited
+                navStack.find { it.id == randomSetId && it.type == LayerType.RANDOM_SET }?.let { l ->
+                    (l.data as? RandomSetLayerContent)?.randomSet
+                }
             }
+
+            Log.d("ShowEditor", "Found RandomSet: ${randomSet?.name ?: "NULL"} (ID=$randomSetId), Renderer=${if (mainRenderer != null) "Ready" else "NULL"}")
+
+            if (randomSet != null && mainRenderer != null) {
+                try {
+                    // Create a shell MixerPatch that points to this RandomSet
+                    val tempMixer = createTemporaryMixerFromRandomSet(randomSet)
+                    mainRenderer.mixerPatch = tempMixer
+                    mainRenderer.monitorSource = "F"
+                    
+                    // CRITICAL: Generate the actual mandala configuration for the renderer's visual source.
+                    // createTemporaryMixerFromRandomSet puts the RandomSet in slot 0.
+                    generator.generateFromRSet(randomSet, mainRenderer.getSlotSource(0))
+                    
+                    Log.d("ShowEditor", "Renderer updated with RandomSet: ${randomSet.name}")
+                } catch (e: Exception) {
+                    Log.e("ShowEditor", "Error applying RandomSet to renderer", e)
+                }
+            } else if (mainRenderer != null) {
+                // Clear to avoid stale visuals if we have no valid data for this index
+                mainRenderer.mixerPatch = null
+            }
+        } else {
+            // Clear mixerPatch when there are no random sets to prevent stale previews
+            mainRenderer?.mixerPatch = null
         }
     }
 
@@ -214,10 +246,20 @@ fun ShowEditorScreen(
                     try {
                         val selected = Json.decodeFromString<ShowPatch>(json)
                         currentShow = selected
+                        
+                        // Force a re-fetch of current state if needed by updating the nav layer
                         val idx = navStack.indexOfLast { it.type == LayerType.SHOW }
-                        if (idx != -1) vm.updateLayerName(idx, selected.name)
+                        if (idx != -1) {
+                            vm.updateLayerName(idx, selected.name)
+                            vm.updateLayerData(idx, ShowLayerContent(selected))
+                        }
+                        
                         // Reset to first RandomSet when switching shows
-                        if (selected.randomSetIds.isNotEmpty()) vm.jumpToShowIndex(0)
+                        if (selected.randomSetIds.isNotEmpty()) {
+                            vm.jumpToShowIndex(0)
+                        } else {
+                            mainRenderer?.mixerPatch = null
+                        }
                     } catch (e: Exception) {}
                 },
                 onOpen = { json ->
@@ -226,7 +268,10 @@ fun ShowEditorScreen(
                         val selected = Json.decodeFromString<ShowPatch>(json)
                         currentShow = selected
                         val idx = navStack.indexOfLast { it.type == LayerType.SHOW }
-                        if (idx != -1) vm.updateLayerName(idx, selected.name)
+                        if (idx != -1) {
+                            vm.updateLayerName(idx, selected.name)
+                            vm.updateLayerData(idx, ShowLayerContent(selected))
+                        }
                         onHideManager()
                     } catch (e: Exception) {}
                 },

@@ -54,12 +54,15 @@ import llm.slop.spirals.defaults.DefaultsConfig
 import llm.slop.spirals.models.MixerPatch
 import llm.slop.spirals.models.ShowPatch
 import kotlinx.serialization.json.Json
+import llm.slop.spirals.display.ExternalDisplayCoordinator
+import llm.slop.spirals.ui.components.HdmiStatusOverlay
 
 class MainActivity : ComponentActivity() {
 
     private lateinit var audioEngine: AudioEngine
     private var spiralSurfaceView: SpiralSurfaceView? = null
     private var sourceManager: MandalaVisualSource? = null
+    private lateinit var displayCoordinator: ExternalDisplayCoordinator
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -71,6 +74,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         
+        displayCoordinator = ExternalDisplayCoordinator(this)
         audioEngine = AudioEngine(applicationContext)
         val manager = MandalaVisualSource()
         sourceManager = manager
@@ -187,11 +191,19 @@ class MainActivity : ComponentActivity() {
 
                 CompositionLocalProvider(LocalSpiralRenderer provides renderer) {
                     val previewContent = @Composable {
-                        AndroidView(
-                            factory = { surfaceView },
-                            modifier = Modifier.fillMaxSize(),
-                            update = {}
-                        )
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            AndroidView(
+                                factory = { surfaceView },
+                                modifier = Modifier.fillMaxSize(),
+                                update = {}
+                            )
+                            
+                            val isHdmiConnected by displayCoordinator.isConnected.collectAsState()
+                            HdmiStatusOverlay(
+                                isConnected = isHdmiConnected,
+                                modifier = Modifier.align(Alignment.BottomStart)
+                            )
+                        }
                     }
 
                     Column(
@@ -447,7 +459,8 @@ class MainActivity : ComponentActivity() {
                     SettingsOverlay(
                         currentMode = vm.getStartupMode(),
                         onModeChange = { vm.setStartupMode(it) },
-                        onClose = { showSettings = false }
+                        onClose = { showSettings = false },
+                        displayCoordinator = displayCoordinator
                     )
                 }
                 
@@ -512,7 +525,8 @@ class MainActivity : ComponentActivity() {
     fun SettingsOverlay(
         currentMode: StartupMode,
         onModeChange: (StartupMode) -> Unit,
-        onClose: () -> Unit
+        onClose: () -> Unit,
+        displayCoordinator: ExternalDisplayCoordinator
     ) {
         val context = LocalContext.current
         val defaultsConfig = remember { DefaultsConfig.getInstance(context) }
@@ -565,6 +579,32 @@ class MainActivity : ComponentActivity() {
                         
                         Spacer(modifier = Modifier.height(24.dp))
                         
+                        // HDMI Toggle
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("HDMI Output", style = MaterialTheme.typography.titleMedium, color = AppText)
+                                Text("Enable external display", style = MaterialTheme.typography.bodySmall, color = AppText.copy(alpha = 0.6f))
+                            }
+                            var hdmiEnabled by remember { mutableStateOf(defaultsConfig.isHdmiEnabled()) }
+                            Switch(
+                                checked = hdmiEnabled,
+                                onCheckedChange = { 
+                                    hdmiEnabled = it
+                                    defaultsConfig.setHdmiEnabled(it)
+                                    displayCoordinator.updatePresentation()
+                                },
+                                colors = SwitchDefaults.colors(checkedThumbColor = AppAccent)
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(24.dp))
+                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                        Spacer(modifier = Modifier.height(24.dp))
+
                         Text("Start app with...", style = MaterialTheme.typography.titleMedium, color = AppText)
                         
                         Spacer(modifier = Modifier.height(12.dp))
@@ -1183,6 +1223,16 @@ class MainActivity : ComponentActivity() {
                 )
             )
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        displayCoordinator.start()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        displayCoordinator.stop()
     }
 
     override fun onPause() { super.onPause(); spiralSurfaceView?.onPause(); audioEngine.stop() }

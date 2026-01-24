@@ -20,46 +20,6 @@ val LocalSpiralRenderer = staticCompositionLocalOf<SpiralRenderer?> { null }
 
 /**
  * Main OpenGL renderer for Spirals app.
- *
- * ## Architecture Overview:
- * This renderer manages a complex pipeline involving multiple shaders, Framebuffer Objects (FBOs),
- * and a shared OpenGL context strategy to support UI previews.
- *
- * ## Rendering Pipeline (Mixer Mode):
- * 1.  **Slot Rendering**: Each of the 4 mixer slots is rendered independently into its own texture.
- *     - Each slot has its own persistent feedback system, using a pair of ping-pong FBOs.
- *     - The final output of each slot is stored in `masterTextures[0-3]`.
- * 2.  **Mixer Stage A/B**:
- *     - Mixer A combines the textures from slots 1 and 2 (`masterTextures[0]`, `masterTextures[1]`)
- *       and writes the result to `masterTextures[4]`.
- *     - Mixer B combines the textures from slots 3 and 4 (`masterTextures[2]`, `masterTextures[3]`)
- *       and writes the result to `masterTextures[5]`.
- * 3.  **Final Mixer (F) Stage**:
- *     - The final mixer combines the output of Mixer A and Mixer B (`masterTextures[4]`, `masterTextures[5]`).
- *     - This stage has its *own* feedback system, which was the source of the "white blob" issue.
- *     - The final composited image is written to `masterTextures[6]`.
- * 4.  **UI Display**:
- *     - The main `GLSurfaceView` displays a single source, determined by `monitorSource`. It reads
- *       the appropriate texture from the `masterTextures` array (e.g., "1", "A", "F").
- *     - The mini-monitor previews (`StripPreview`) are separate `GLSurfaceView` instances that run
- *       in a shared EGL context. They use a `SimpleBlitHelper` to draw the same textures from
- *       `masterTextures` into their own views.
- *
- * ## Key Texture and FBO Layout:
- * - `masterTextures[0-6]`: The primary output textures for each stage.
- *   - `[0-3]`: Outputs for mixer slots 1-4.
- *   - `[4]`: Output for Mixer A.
- *   - `[5]`: Output for Mixer B.
- *   - `[6]`: Final output for Mixer F.
- * - `slotFBTextures[4][2]`: Ping-pong feedback textures for each of the 4 slots.
- * - `finalFBTextures[2]`: Ping-pong feedback textures for the final mixer stage.
- * - `currentFrameTexture`: A temporary FBO used as an intermediate target during the feedback process.
- *
- * ## Important Note on GL Contexts:
- * Shader programs (`program`, `feedbackProgram`, etc.) and Vertex Array Objects (VAOs) are *not*
- * shared between OpenGL contexts. However, textures and buffer objects *are* shared. This is why
- * the UI previews (`StripPreview`) need their own `SimpleBlitHelper` class to create their own
- * shaders and VAOs to render the shared textures.
  */
 class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
@@ -442,11 +402,12 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         }
 
         // 5. Ensure all rendering commands are submitted before the UI thread tries to read them.
-        // This is critical for multi-context rendering to work correctly.
         GLES30.glFlush()
 
-        // 6. Blit the selected monitor source texture to the screen.
-        // This draws the final image visible to the user in the large preview window.
+        // 6. Notify HDMI presentation thread if active
+        SharedContextManager.notifyFrameReady(masterTextures[6])
+
+        // 7. Blit the selected monitor source texture to the screen.
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0); GLES30.glViewport(0, 0, screenWidth, screenHeight); GLES30.glClearColor(0f,0f,0f,1f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
         val dTex = getTextureForSource(monitorSource); if (dTex != 0) drawTextureToCurrentBuffer(dTex)
     }
@@ -467,7 +428,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     private fun compositeFinalMixer(tA: Int, tB: Int) {
-        // Null-safety guard: use safe access for mixer parameters
         val fx = mapOf(
             "FB_GAIN" to 0.0f, 
             "FB_ZOOM" to (mixerParams["MF_FB_ZOOM"]?.value ?: 0.5f), 
@@ -502,7 +462,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
     /**
      * Composite with persistent feedback (no ghost/trails).
-     * Supports per-slot feedback via separate texture arrays.
      */
     private fun compositeWithFeedback(
         render: () -> Unit,
@@ -513,17 +472,14 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         fbIndexSet: (Int) -> Unit,
         targetFboIdx: Int
     ) {
-        // Render to temp buffer
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, currentFrameFBO)
         GLES30.glClearColor(0f, 0f, 0f, 0f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
         render()
         
-        // Apply feedback if enabled
         val gain = fx["FB_GAIN"] ?: 1f
         val fbIdx = fbIndexRef()
         
-        // Only apply feedback when gain is above threshold (intentional OFF switch)
         if (gain > 0.01f) {
             val nextIdx = (fbIdx + 1) % 2
             GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, fbFramebuffers[nextIdx])
@@ -531,7 +487,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             GLES30.glUseProgram(feedbackProgram)
             GLES30.glBindVertexArray(trailVao)
             
-            // Bind current frame (live) and feedback history
             GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
             GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, currentFrameTexture)
             GLES30.glUniform1i(uFBTextureLiveLoc, 0)
@@ -539,20 +494,11 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, fbTextures[fbIdx])
             GLES30.glUniform1i(uFBTextureHistoryLoc, 1)
             
-            // Apply feedback parameters
             GLES30.glUniform1f(uFBDecayLoc, 0.0f)
             
-            // The shader uses uGain in two ways:
-            // 1. As a multiplier for the history RGB
-            // 2. As a blend factor between live and feedback
-            // For knob values:
-            // 0 = off
-            // 1-100 = mapped to 1.1-1.25 range for effective feedback
             val mappedGain = if (gain <= 0.01f) {
-                // Special case for "off" position
                 0.0f
             } else {
-                // Convert 0.01-1.0 range to 1.1-1.25 range
                 1.1f + (gain * 0.15f)
             }
             GLES30.glUniform1f(uFBGainLoc, mappedGain)
@@ -567,7 +513,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             fbIndexSet(nextIdx)
         }
         
-        // Copy result to target
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, masterFramebuffers[targetFboIdx])
         GLES30.glClearColor(0f, 0f, 0f, 0f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
@@ -575,7 +520,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glBindVertexArray(trailVao)
         GLES30.glUniform1f(uTrailAlphaLocation, 1.0f)
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
-        // Restore the intended behavior - only use feedback buffer when gain > threshold
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, if (gain > 0.01f) fbTextures[fbIndexRef()] else currentFrameTexture)
         GLES30.glUniform1i(uTrailTextureLocation, 0)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
@@ -585,7 +529,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         val p = s.parameters
         val hS = ((p["Hue Sweep"]?.value ?: (1f/9f)) * 9f).roundToInt().toFloat()
         
-        // Always use line mode now
         GLES30.glUniform1f(uFillModeLocation, 0.0f)
         GLES30.glUniform1f(uHueOffsetLocation, p["Hue Offset"]?.value ?: 0f)
         GLES30.glUniform1f(uHueSweepLocation, hS)
@@ -609,7 +552,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glUniform1f(uCLoc, s.recipe.c.toFloat())
         GLES30.glUniform1f(uDLoc, s.recipe.d.toFloat())
         
-        // Original line rendering mode - always use triangle strip now
         GLES30.glBindVertexArray(vao)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, (resolution + 1) * 2)
     }

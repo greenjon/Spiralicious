@@ -25,6 +25,7 @@ class DefaultsConfig(context: Context) {
         private const val PREFIX_HUE = "${PREFIX_MANDALA}hue_"
         private const val PREFIX_RECIPE = "${PREFIX_MANDALA}recipe_"
         private const val PREFIX_FEEDBACK = "${PREFIX_MANDALA}feedback_"
+        private const val PREFIX_HDMI = "defaults_hdmi_"
         
         // Legacy prefix for backward compatibility
         private const val PREFIX_RANDOMSET = PREFIX_MANDALA
@@ -42,6 +43,16 @@ class DefaultsConfig(context: Context) {
     
     private val prefs: SharedPreferences = context.applicationContext
         .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    
+    // HDMI Output Settings
+    
+    fun isHdmiEnabled(): Boolean {
+        return prefs.getBoolean("${PREFIX_HDMI}enabled", true)
+    }
+    
+    fun setHdmiEnabled(enabled: Boolean) {
+        prefs.edit { putBoolean("${PREFIX_HDMI}enabled", enabled) }
+    }
     
     // Random Set Defaults - Arms
     

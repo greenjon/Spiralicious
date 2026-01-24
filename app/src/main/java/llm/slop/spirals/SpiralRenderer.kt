@@ -140,6 +140,13 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             field = value
             value?.let { syncMixerParameters(it) }
         }
+
+    @Volatile
+    var showPatch: ShowPatch? = null
+        set(value) {
+            field = value
+            value?.let { syncShowParameters(it) }
+        }
         
     private var clearFeedbackNextFrame = false
 
@@ -167,6 +174,10 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         mixerParams["MF_FB_ZOOM"]?.baseValue = 0.5f
         mixerParams["MF_FB_ROTATE"]?.baseValue = 0.5f
         mixerParams["MF_SNAP_COUNT"]?.baseValue = 0.5f
+
+        // Show Triggers
+        mixerParams["SHOW_PREV"] = ModulatableParameter(0.0f)
+        mixerParams["SHOW_NEXT"] = ModulatableParameter(0.0f)
     }
 
     fun getSlotSource(index: Int): MandalaVisualSource = slotSources[index]
@@ -200,6 +211,11 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         mixerParams["MF_SNAP_MODE"]?.let { syncParam(it, fx.snapMode) }
         mixerParams["MF_SNAP_BLEND"]?.let { syncParam(it, fx.snapBlend) }
         mixerParams["MF_SNAP_TRIG"]?.let { syncParam(it, fx.snapTrigger) }
+    }
+
+    private fun syncShowParameters(patch: ShowPatch) {
+        mixerParams["SHOW_PREV"]?.let { syncParam(it, patch.prevTrigger) }
+        mixerParams["SHOW_NEXT"]?.let { syncParam(it, patch.nextTrigger) }
     }
 
     private fun syncGroup(group: MixerGroupData, prefix: String) {

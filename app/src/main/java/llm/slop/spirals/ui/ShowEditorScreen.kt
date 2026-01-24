@@ -1,7 +1,11 @@
 package llm.slop.spirals.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
@@ -10,14 +14,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spirals.*
 import llm.slop.spirals.models.*
 import llm.slop.spirals.ui.components.PatchManagerOverlay
 import llm.slop.spirals.ui.components.SetChipList
 import llm.slop.spirals.ui.components.KnobView
+import llm.slop.spirals.ui.components.OscilloscopeView
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppAccent
+import llm.slop.spirals.ui.theme.AppText
+import llm.slop.spirals.cv.ModulatableParameter
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import android.util.Log
@@ -43,8 +51,35 @@ fun ShowEditorScreen(
         mutableStateOf((layer?.data as? ShowLayerContent)?.show ?: ShowPatch(name = "New Show")) 
     }
 
+    var focusedTriggerId by remember { mutableStateOf("SHOW_NEXT") }
+    var frameTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            withFrameNanos { frameTick++ }
+        }
+    }
+
     val mainRenderer = LocalSpiralRenderer.current
     val generator = remember { RandomSetGenerator(vm.getApplication()) }
+
+    // Background monitoring for CV-based triggering
+    var lastModPrev by remember { mutableFloatStateOf(0f) }
+    var lastModNext by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(frameTick) {
+        val modPrev = mainRenderer?.getMixerParam("SHOW_PREV")?.value ?: 0f
+        val modNext = mainRenderer?.getMixerParam("SHOW_NEXT")?.value ?: 0f
+
+        if (modPrev > 0.5f && lastModPrev <= 0.5f) {
+            vm.triggerPrevMixer(currentShow.randomSetIds.size)
+        }
+        if (modNext > 0.5f && lastModNext <= 0.5f) {
+            vm.triggerNextMixer(currentShow.randomSetIds.size)
+        }
+        
+        lastModPrev = modPrev
+        lastModNext = modNext
+    }
 
     // Update local state if nav data changes
     LaunchedEffect(layer?.data) {
@@ -53,6 +88,11 @@ fun ShowEditorScreen(
                 currentShow = it
             }
         }
+    }
+
+    // Pass the active currentShow to the mainRenderer
+    LaunchedEffect(mainRenderer, currentShow) {
+        mainRenderer?.showPatch = currentShow
     }
 
     // Apply the active random set from the show sequence to the renderer
@@ -142,7 +182,19 @@ fun ShowEditorScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Oscilloscope View
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(60.dp).border(1.dp, AppText.copy(alpha = 0.1f))) {
+                key(frameTick) {
+                    val targetParam = mainRenderer?.getMixerParam(focusedTriggerId)
+                    if (targetParam != null) {
+                        OscilloscopeView(history = targetParam.history, modifier = Modifier.fillMaxSize())
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             // 2. Performance Controls (Prev/Next)
             Row(
@@ -152,44 +204,81 @@ fun ShowEditorScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("PREV", style = MaterialTheme.typography.labelSmall, color = AppAccent)
+                // PREV Trigger
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally, 
+                    modifier = Modifier.clickable { focusedTriggerId = "SHOW_PREV" }
+                ) {
+                    Text(
+                        text = "PREV", 
+                        style = MaterialTheme.typography.labelSmall, 
+                        color = if (focusedTriggerId == "SHOW_PREV") AppAccent else AppText
+                    )
+                    // Polling the modulated value from the renderer on every frameTick
+                    val modulatedPrev = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_PREV")?.value ?: currentShow.prevTrigger.baseValue else 0f
                     KnobView(
                         baseValue = currentShow.prevTrigger.baseValue,
+                        modulatedValue = modulatedPrev,
                         onValueChange = { currentShow = currentShow.copy(prevTrigger = currentShow.prevTrigger.copy(baseValue = it)) },
                         onInteractionFinished = {
                             if (currentShow.prevTrigger.baseValue > 0.5f) {
                                 vm.triggerPrevMixer(currentShow.randomSetIds.size)
                             }
-                        }
+                        },
+                        focused = focusedTriggerId == "SHOW_PREV" || currentShow.prevTrigger.modulators.isNotEmpty(),
+                        tick = frameTick.toLong()
                     )
                 }
 
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("NEXT", style = MaterialTheme.typography.labelSmall, color = AppAccent)
+                // NEXT Trigger
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally, 
+                    modifier = Modifier.clickable { focusedTriggerId = "SHOW_NEXT" }
+                ) {
+                    Text(
+                        text = "NEXT", 
+                        style = MaterialTheme.typography.labelSmall, 
+                        color = if (focusedTriggerId == "SHOW_NEXT") AppAccent else AppText
+                    )
+                    // Polling the modulated value from the renderer on every frameTick
+                    val modulatedNext = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_NEXT")?.value ?: currentShow.nextTrigger.baseValue else 0f
                     KnobView(
                         baseValue = currentShow.nextTrigger.baseValue,
+                        modulatedValue = modulatedNext,
                         onValueChange = { currentShow = currentShow.copy(nextTrigger = currentShow.nextTrigger.copy(baseValue = it)) },
                         onInteractionFinished = {
                             if (currentShow.nextTrigger.baseValue > 0.5f) {
                                 vm.triggerNextMixer(currentShow.randomSetIds.size)
                             }
-                        }
+                        },
+                        focused = focusedTriggerId == "SHOW_NEXT" || currentShow.nextTrigger.modulators.isNotEmpty(),
+                        tick = frameTick.toLong()
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // 3. RandomSet sequence (Set Editor style)
-            Column(modifier = Modifier.padding(horizontal = 12.dp)) {
+            // 3. CV Editor for focused parameter
+            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                ShowCvEditor(
+                    show = currentShow,
+                    focusedId = focusedTriggerId,
+                    onShowUpdate = { currentShow = it }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 4. RandomSet sequence (Set Editor style)
+            Column(modifier = Modifier.padding(horizontal = 12.dp).height(120.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     var showRandomSetPicker by remember { mutableStateOf(false) }
 
-                    Button(onClick = { showRandomSetPicker = true }) {
-                        Icon(Icons.Default.Add, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Add RandomSet")
+                    Button(onClick = { showRandomSetPicker = true }, modifier = Modifier.height(36.dp), contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Add RandomSet", fontSize = 12.sp)
                     }
 
                     if (showRandomSetPicker) {
@@ -209,7 +298,7 @@ fun ShowEditorScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Create mapping from RandomSet IDs to (name, id) pairs for display
                 val randomSetItems = remember(currentShow.randomSetIds, allRandomSets) {
@@ -307,4 +396,82 @@ fun ShowEditorScreen(
             )
         }
     }
+}
+
+@Composable
+fun ShowCvEditor(
+    show: ShowPatch,
+    focusedId: String,
+    onShowUpdate: (ShowPatch) -> Unit
+) {
+    val scrollState = rememberScrollState()
+    
+    val focusedParamData = remember(show, focusedId) {
+        when (focusedId) {
+            "SHOW_PREV" -> show.prevTrigger
+            "SHOW_NEXT" -> show.nextTrigger
+            else -> null
+        }
+    }
+
+    if (focusedParamData == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Select a trigger to patch CV", color = AppText.copy(alpha = 0.5f))
+        }
+        return
+    }
+
+    val tempParam = remember(focusedId, focusedParamData) {
+        ModulatableParameter(baseValue = focusedParamData.baseValue).apply {
+            modulators.addAll(focusedParamData.modulators)
+        }
+    }
+    
+    var refreshCount by remember { mutableIntStateOf(0) }
+
+    Column(modifier = Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
+        Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
+            key(focusedId, refreshCount) {
+                tempParam.modulators.forEachIndexed { index, mod ->
+                    ModulatorRow(
+                        mod = mod,
+                        onUpdate = { updatedMod ->
+                            tempParam.modulators[index] = updatedMod
+                            syncShowParam(show, focusedId, tempParam, onShowUpdate)
+                        },
+                        onInteractionFinished = { syncShowParam(show, focusedId, tempParam, onShowUpdate) },
+                        onRemove = {
+                            tempParam.modulators.removeAt(index)
+                            refreshCount++
+                            syncShowParam(show, focusedId, tempParam, onShowUpdate)
+                        }
+                    )
+                    HorizontalDivider(color = AppText.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
+                }
+
+                ModulatorRow(
+                    mod = null,
+                    onUpdate = { newMod ->
+                        tempParam.modulators.add(newMod)
+                        refreshCount++
+                        syncShowParam(show, focusedId, tempParam, onShowUpdate)
+                    },
+                    onInteractionFinished = { syncShowParam(show, focusedId, tempParam, onShowUpdate) },
+                    onRemove = {}
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(20.dp))
+        }
+    }
+}
+
+private fun syncShowParam(show: ShowPatch, id: String, param: ModulatableParameter, onUpdate: (ShowPatch) -> Unit) {
+    val data = ModulatableParameterData(baseValue = param.baseValue, modulators = param.modulators.toList())
+    val newShow = when (id) {
+        "SHOW_PREV" -> show.copy(prevTrigger = data)
+        "SHOW_NEXT" -> show.copy(nextTrigger = data)
+        else -> show
+    }
+    onUpdate(newShow)
 }

@@ -46,6 +46,18 @@ class ModulatableParameter(
     var value: Float = baseValue
         private set
 
+    // Pulse logic for manual triggering via UI
+    @Volatile
+    private var pulseCountdown = 0
+    
+    /**
+     * Triggers a manual pulse (dip then spike) to ensure a rising edge 
+     * is detected by trigger logic even if currently modulated high.
+     */
+    fun triggerPulse() {
+        pulseCountdown = 12 // 6 frames low, 6 frames high (~100ms at 120Hz)
+    }
+
     /**
      * Calculates the final value. Called at 120Hz from the Renderer.
      */
@@ -98,7 +110,15 @@ class ModulatableParameter(
             }
         }
         
-        value = result.coerceIn(0f, 1f)
+        // Apply pulse override
+        val pulse = pulseCountdown
+        if (pulse > 0) {
+            value = if (pulse > 6) 0.0f else 1.0f
+            pulseCountdown = pulse - 1
+        } else {
+            value = result.coerceIn(0f, 1f)
+        }
+        
         history.add(value)
         return value
     }

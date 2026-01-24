@@ -177,7 +177,8 @@ fun ShowEditorScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .aspectRatio(16 / 9f)
-                    .background(Color.Black),
+                    .background(Color.Black)
+                    .clickable { mainRenderer?.getMixerParam("SHOW_GENERATE")?.triggerPulse() },
                 contentAlignment = Alignment.Center
             ) {
                 previewContent()
@@ -224,7 +225,10 @@ fun ShowEditorScreen(
                 // PREV Trigger
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally, 
-                    modifier = Modifier.clickable { focusedTriggerId = "SHOW_PREV" }
+                    modifier = Modifier.clickable { 
+                        focusedTriggerId = "SHOW_PREV"
+                        mainRenderer?.getMixerParam("SHOW_PREV")?.triggerPulse()
+                    }
                 ) {
                     Text(
                         text = "PREV", 
@@ -249,7 +253,10 @@ fun ShowEditorScreen(
                 // RANDOM Trigger
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally, 
-                    modifier = Modifier.clickable { focusedTriggerId = "SHOW_RANDOM" }
+                    modifier = Modifier.clickable { 
+                        focusedTriggerId = "SHOW_RANDOM"
+                        mainRenderer?.getMixerParam("SHOW_RANDOM")?.triggerPulse()
+                    }
                 ) {
                     Text(
                         text = "RAND", 
@@ -274,7 +281,10 @@ fun ShowEditorScreen(
                 // NEXT Trigger
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally, 
-                    modifier = Modifier.clickable { focusedTriggerId = "SHOW_NEXT" }
+                    modifier = Modifier.clickable { 
+                        focusedTriggerId = "SHOW_NEXT"
+                        mainRenderer?.getMixerParam("SHOW_NEXT")?.triggerPulse()
+                    }
                 ) {
                     Text(
                         text = "NEXT", 
@@ -299,7 +309,10 @@ fun ShowEditorScreen(
                 // GENERATE Trigger
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally, 
-                    modifier = Modifier.clickable { focusedTriggerId = "SHOW_GENERATE" }
+                    modifier = Modifier.clickable { 
+                        focusedTriggerId = "SHOW_GENERATE"
+                        mainRenderer?.getMixerParam("SHOW_GENERATE")?.triggerPulse()
+                    }
                 ) {
                     Text(
                         text = "GEN", 

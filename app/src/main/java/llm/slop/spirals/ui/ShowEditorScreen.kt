@@ -213,7 +213,7 @@ fun ShowEditorScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 2. Performance Controls (Prev/Next/Random/Generate)
+            // 2. Performance Controls (Prev/Random/Next/Generate)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -271,31 +271,6 @@ fun ShowEditorScreen(
                     )
                 }
 
-                // GENERATE Trigger
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally, 
-                    modifier = Modifier.clickable { focusedTriggerId = "SHOW_GENERATE" }
-                ) {
-                    Text(
-                        text = "GEN", 
-                        style = MaterialTheme.typography.labelSmall, 
-                        color = if (focusedTriggerId == "SHOW_GENERATE") AppAccent else AppText
-                    )
-                    val modulatedGen = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_GENERATE")?.value ?: currentShow.generateTrigger.baseValue else 0f
-                    KnobView(
-                        baseValue = currentShow.generateTrigger.baseValue,
-                        modulatedValue = modulatedGen,
-                        onValueChange = { currentShow = currentShow.copy(generateTrigger = currentShow.generateTrigger.copy(baseValue = it)) },
-                        onInteractionFinished = {
-                            if (currentShow.generateTrigger.baseValue > 0.5f) {
-                                reRollTick++
-                            }
-                        },
-                        focused = focusedTriggerId == "SHOW_GENERATE" || currentShow.generateTrigger.modulators.isNotEmpty(),
-                        tick = frameTick.toLong()
-                    )
-                }
-
                 // NEXT Trigger
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally, 
@@ -317,6 +292,31 @@ fun ShowEditorScreen(
                             }
                         },
                         focused = focusedTriggerId == "SHOW_NEXT" || currentShow.nextTrigger.modulators.isNotEmpty(),
+                        tick = frameTick.toLong()
+                    )
+                }
+
+                // GENERATE Trigger
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally, 
+                    modifier = Modifier.clickable { focusedTriggerId = "SHOW_GENERATE" }
+                ) {
+                    Text(
+                        text = "GEN", 
+                        style = MaterialTheme.typography.labelSmall, 
+                        color = if (focusedTriggerId == "SHOW_GENERATE") AppAccent else AppText
+                    )
+                    val modulatedGen = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_GENERATE")?.value ?: currentShow.generateTrigger.baseValue else 0f
+                    KnobView(
+                        baseValue = currentShow.generateTrigger.baseValue,
+                        modulatedValue = modulatedGen,
+                        onValueChange = { currentShow = currentShow.copy(generateTrigger = currentShow.generateTrigger.copy(baseValue = it)) },
+                        onInteractionFinished = {
+                            if (currentShow.generateTrigger.baseValue > 0.5f) {
+                                reRollTick++
+                            }
+                        },
+                        focused = focusedTriggerId == "SHOW_GENERATE" || currentShow.generateTrigger.modulators.isNotEmpty(),
                         tick = frameTick.toLong()
                     )
                 }

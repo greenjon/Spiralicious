@@ -179,13 +179,22 @@ fun ShowEditorScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Create mapping from RandomSet IDs to (name, id) pairs for display
+                val randomSetItems = remember(currentShow.randomSetIds, allRandomSets) {
+                    currentShow.randomSetIds.mapNotNull { randomSetId ->
+                        val randomSetEntity = allRandomSets.find { it.id == randomSetId }
+                        randomSetEntity?.let { it.name to it.id }
+                    }
+                }
+
                 SetChipList(
-                    chipIds = currentShow.randomSetIds,
+                    chipItems = randomSetItems,
                     onChipTapped = { randomSetId ->
                         val idx = currentShow.randomSetIds.indexOf(randomSetId)
                         if (idx != -1) vm.jumpToShowIndex(idx)
                     },
                     onChipReordered = { newList ->
+                        // newList contains IDs in the new order
                         currentShow = currentShow.copy(randomSetIds = newList)
                     }
                 )

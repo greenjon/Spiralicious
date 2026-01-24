@@ -168,11 +168,17 @@ fun MandalaSetEditorScreen(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
+                        // For mandala sets, the mandala name is used as both display text and ID
+                        val mandalaItems = remember(activeSet.orderedMandalaIds) {
+                            activeSet.orderedMandalaIds.map { mandalaName -> mandalaName to mandalaName }
+                        }
+
                         SetChipList(
-                            chipIds = activeSet.orderedMandalaIds,
+                            chipItems = mandalaItems,
                             onChipTapped = { focusedMandalaId = it },
-                            onChipReordered = { newOrder -> 
-                                currentSet = activeSet.copy(orderedMandalaIds = newOrder.toMutableList())
+                            onChipReordered = { newList ->
+                                // newList contains mandala names in the new order
+                                currentSet = activeSet.copy(orderedMandalaIds = newList.toMutableList())
                             }
                         )
                     }

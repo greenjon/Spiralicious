@@ -24,7 +24,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun SetChipList(
-    chipIds: List<String>,
+    chipItems: List<Pair<String, String>>,
     onChipTapped: (String) -> Unit,
     onChipReordered: (List<String>) -> Unit
 ) {
@@ -42,7 +42,7 @@ fun SetChipList(
         modifier = Modifier
             .fillMaxWidth()
             .height(60.dp)
-            .pointerInput(chipIds) { // Re-bind when chipIds change
+            .pointerInput(chipItems) { // Re-bind when chipItems change
                 detectDragGesturesAfterLongPress(
                     onDragStart = { offset ->
                         listState.layoutInfo.visibleItemsInfo
@@ -60,10 +60,11 @@ fun SetChipList(
                             val targetIndex = targetItem?.index ?: startIndex
 
                             if (startIndex != targetIndex) {
-                                val reordered = chipIds.toMutableList()
+                                val reordered = chipItems.toMutableList()
                                 val item = reordered.removeAt(startIndex)
                                 reordered.add(targetIndex, item)
-                                onChipReordered(reordered)
+                                // Extract just the IDs for the callback
+                                onChipReordered(reordered.map { it.second })
                             }
                         }
                         draggedIndex = null
@@ -93,7 +94,8 @@ fun SetChipList(
         contentPadding = PaddingValues(horizontal = 4.dp)
     ) {
         // Fix: Use index as key to prevent crash when adding the same mandala multiple times
-        itemsIndexed(chipIds, key = { index, _ -> index }) { index, chipId ->
+        itemsIndexed(chipItems, key = { index, _ -> index }) { index, chipItem ->
+            val (displayName, chipId) = chipItem
             Card(
                 modifier = Modifier
                     .padding(vertical = 4.dp)
@@ -102,7 +104,7 @@ fun SetChipList(
                 elevation = CardDefaults.cardElevation(defaultElevation = if (draggedIndex == index) 8.dp else 2.dp)
             ) {
                 Text(
-                    text = chipId,
+                    text = displayName,
                     color = chipTextColor,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                 )

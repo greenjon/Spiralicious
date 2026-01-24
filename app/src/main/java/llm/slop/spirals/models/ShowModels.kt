@@ -10,5 +10,6 @@ data class ShowPatch(
     val randomSetIds: List<String> = emptyList(),
     val prevTrigger: ModulatableParameterData = ModulatableParameterData(0.0f),
     val nextTrigger: ModulatableParameterData = ModulatableParameterData(0.0f),
-    val randomTrigger: ModulatableParameterData = ModulatableParameterData(0.0f)
+    val randomTrigger: ModulatableParameterData = ModulatableParameterData(0.0f),
+    val generateTrigger: ModulatableParameterData = ModulatableParameterData(0.0f)
 )

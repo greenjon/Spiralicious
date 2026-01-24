@@ -179,6 +179,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         mixerParams["SHOW_PREV"] = ModulatableParameter(0.0f)
         mixerParams["SHOW_NEXT"] = ModulatableParameter(0.0f)
         mixerParams["SHOW_RANDOM"] = ModulatableParameter(0.0f)
+        mixerParams["SHOW_GENERATE"] = ModulatableParameter(0.0f)
     }
 
     fun getSlotSource(index: Int): MandalaVisualSource = slotSources[index]
@@ -218,6 +219,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         mixerParams["SHOW_PREV"]?.let { syncParam(it, patch.prevTrigger) }
         mixerParams["SHOW_NEXT"]?.let { syncParam(it, patch.nextTrigger) }
         mixerParams["SHOW_RANDOM"]?.let { syncParam(it, patch.randomTrigger) }
+        mixerParams["SHOW_GENERATE"]?.let { syncParam(it, patch.generateTrigger) }
     }
 
     private fun syncGroup(group: MixerGroupData, prefix: String) {

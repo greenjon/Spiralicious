@@ -54,6 +54,8 @@ fun ShowEditorScreen(
 
     var focusedTriggerId by remember { mutableStateOf("SHOW_NEXT") }
     var frameTick by remember { mutableIntStateOf(0) }
+    var reRollTick by remember { mutableIntStateOf(0) }
+
     LaunchedEffect(Unit) {
         while (true) {
             withFrameNanos { frameTick++ }
@@ -67,11 +69,13 @@ fun ShowEditorScreen(
     var lastModPrev by remember { mutableFloatStateOf(0f) }
     var lastModNext by remember { mutableFloatStateOf(0f) }
     var lastModRand by remember { mutableFloatStateOf(0f) }
+    var lastModGen by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(frameTick) {
         val modPrev = mainRenderer?.getMixerParam("SHOW_PREV")?.value ?: 0f
         val modNext = mainRenderer?.getMixerParam("SHOW_NEXT")?.value ?: 0f
         val modRand = mainRenderer?.getMixerParam("SHOW_RANDOM")?.value ?: 0f
+        val modGen = mainRenderer?.getMixerParam("SHOW_GENERATE")?.value ?: 0f
 
         if (modPrev > 0.5f && lastModPrev <= 0.5f) {
             vm.triggerPrevMixer(currentShow.randomSetIds.size)
@@ -84,10 +88,14 @@ fun ShowEditorScreen(
                 vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size))
             }
         }
+        if (modGen > 0.5f && lastModGen <= 0.5f) {
+            reRollTick++
+        }
         
         lastModPrev = modPrev
         lastModNext = modNext
         lastModRand = modRand
+        lastModGen = modGen
     }
 
     // Update local state if nav data changes
@@ -105,8 +113,8 @@ fun ShowEditorScreen(
     }
 
     // Apply the active random set from the show sequence to the renderer
-    LaunchedEffect(currentShowIndex, currentShow.randomSetIds, allRandomSets, navStack) {
-        Log.d("ShowEditor", "Syncing preview: Index=$currentShowIndex, ShowID=${currentShow.id}, RSetCount=${currentShow.randomSetIds.size}")
+    LaunchedEffect(currentShowIndex, currentShow.randomSetIds, allRandomSets, navStack, reRollTick) {
+        Log.d("ShowEditor", "Syncing preview: Index=$currentShowIndex, ShowID=${currentShow.id}, RSetCount=${currentShow.randomSetIds.size}, reRoll=$reRollTick")
         
         if (currentShow.randomSetIds.isNotEmpty()) {
             val safeIndex = currentShowIndex.coerceIn(0, currentShow.randomSetIds.size - 1)
@@ -205,7 +213,7 @@ fun ShowEditorScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 2. Performance Controls (Prev/Next/Random)
+            // 2. Performance Controls (Prev/Next/Random/Generate)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -259,6 +267,31 @@ fun ShowEditorScreen(
                             }
                         },
                         focused = focusedTriggerId == "SHOW_RANDOM" || currentShow.randomTrigger.modulators.isNotEmpty(),
+                        tick = frameTick.toLong()
+                    )
+                }
+
+                // GENERATE Trigger
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally, 
+                    modifier = Modifier.clickable { focusedTriggerId = "SHOW_GENERATE" }
+                ) {
+                    Text(
+                        text = "GEN", 
+                        style = MaterialTheme.typography.labelSmall, 
+                        color = if (focusedTriggerId == "SHOW_GENERATE") AppAccent else AppText
+                    )
+                    val modulatedGen = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_GENERATE")?.value ?: currentShow.generateTrigger.baseValue else 0f
+                    KnobView(
+                        baseValue = currentShow.generateTrigger.baseValue,
+                        modulatedValue = modulatedGen,
+                        onValueChange = { currentShow = currentShow.copy(generateTrigger = currentShow.generateTrigger.copy(baseValue = it)) },
+                        onInteractionFinished = {
+                            if (currentShow.generateTrigger.baseValue > 0.5f) {
+                                reRollTick++
+                            }
+                        },
+                        focused = focusedTriggerId == "SHOW_GENERATE" || currentShow.generateTrigger.modulators.isNotEmpty(),
                         tick = frameTick.toLong()
                     )
                 }
@@ -443,6 +476,7 @@ fun ShowCvEditor(
             "SHOW_PREV" -> show.prevTrigger
             "SHOW_NEXT" -> show.nextTrigger
             "SHOW_RANDOM" -> show.randomTrigger
+            "SHOW_GENERATE" -> show.generateTrigger
             else -> null
         }
     }
@@ -505,6 +539,7 @@ private fun syncShowParam(show: ShowPatch, id: String, param: ModulatableParamet
         "SHOW_PREV" -> show.copy(prevTrigger = data)
         "SHOW_NEXT" -> show.copy(nextTrigger = data)
         "SHOW_RANDOM" -> show.copy(randomTrigger = data)
+        "SHOW_GENERATE" -> show.copy(generateTrigger = data)
         else -> show
     }
     onUpdate(newShow)

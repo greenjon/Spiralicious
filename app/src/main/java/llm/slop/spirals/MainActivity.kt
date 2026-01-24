@@ -252,6 +252,27 @@ class MainActivity : ComponentActivity() {
                                         HorizontalDivider(color = AppText.copy(alpha = 0.1f))
 
                                         // --- CURRENT ITEM ACTIONS ---
+                                        // Save menu item - ALWAYS SHOW when there's data
+                                        if (hasActiveData) {
+                                            val isDirty = currentLayer.isDirty
+                                            val textColor = if (isDirty) AppAccent else disabledColor
+
+                                            DropdownMenuItem(
+                                                text = {
+                                                    Text("Save", color = textColor)
+                                                },
+                                                onClick = {
+                                                    if (isDirty) {
+                                                        vm.saveLayer(currentLayer)
+                                                        // Optional: Show toast/snackbar feedback
+                                                        showHeaderMenu = false
+                                                    }
+                                                },
+                                                enabled = isDirty  // Only clickable when dirty
+                                            )
+                                            HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                                        }
+
                                         DropdownMenuItem(
                                             text = { Text("Rename", color = if (hasActiveData) AppText else disabledColor) }, 
                                             onClick = { showRenameDialog = true; showHeaderMenu = false },

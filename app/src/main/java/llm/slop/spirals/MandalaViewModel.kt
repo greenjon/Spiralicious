@@ -477,6 +477,19 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
      * 
      * @param layer The NavLayer containing data to persist
      */
+    /**
+     * Convenience method to save the current layer.
+     *
+     * @return true if save was attempted, false if no current layer or no data
+     */
+    fun saveCurrentLayer(): Boolean {
+        val currentLayer = _navStack.value.lastOrNull() ?: return false
+        if (currentLayer.data == null) return false
+
+        saveLayer(currentLayer)
+        return true
+    }
+
     fun saveLayer(layer: NavLayer) {
         val data = layer.data ?: return
         viewModelScope.launch {

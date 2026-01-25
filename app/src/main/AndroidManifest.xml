@@ -22,9 +22,8 @@
             android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:screenOrientation="portrait"
+            android:screenOrientation="fullUser"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
-            tools:ignore="LockedOrientationActivity"
             android:theme="@style/Theme.Spirals">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

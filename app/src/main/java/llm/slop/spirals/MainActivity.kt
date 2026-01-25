@@ -3,6 +3,7 @@ package llm.slop.spirals
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Bundle
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -19,6 +20,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -28,7 +30,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -87,6 +93,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             SpiralsTheme {
                 val vm: MandalaViewModel = viewModel()
+                val configuration = LocalConfiguration.current
+                val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                
                 val navStack by vm.navStack.collectAsState()
                 val currentLayer = navStack.lastOrNull() ?: return@SpiralsTheme
                 val currentPatch by vm.currentPatch.collectAsState()
@@ -95,6 +104,9 @@ class MainActivity : ComponentActivity() {
                 var showCvLab by remember { mutableStateOf(false) }
                 var showSettings by remember { mutableStateOf(false) }
                 var showManager by remember { mutableStateOf(false) }
+                
+                val focusRequester = remember { FocusRequester() }
+                var isFullscreenPreview by remember { mutableStateOf(false) }
 
                 var hasMicPermission by remember { 
                     mutableStateOf(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) 
@@ -120,6 +132,9 @@ class MainActivity : ComponentActivity() {
                 // Back button handler
                 BackHandler {
                     when {
+                        isFullscreenPreview -> {
+                            isFullscreenPreview = false
+                        }
                         // 1. Library open + has active data → Close Library
                         showManager && currentLayer.data != null -> {
                             showManager = false
@@ -160,6 +175,11 @@ class MainActivity : ComponentActivity() {
                 // 1. Start the CV Sync Registry immediately
                 LaunchedEffect(Unit) {
                     ModulationRegistry.startSync(this)
+                }
+                
+                // Ensure focus for keyboard shortcuts
+                LaunchedEffect(Unit) {
+                    focusRequester.requestFocus()
                 }
 
                 // 2. Automatically start/stop Audio Engine based on source selection
@@ -206,228 +226,285 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    Column(
+                    Box(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(AppBackground)
-                            .systemBarsPadding()
-                    ) {
-                        var showHeaderMenu by remember { mutableStateOf(false) }
-
-                        EditorBreadcrumbs(
-                            stack = navStack,
-                            onLayerClick = { index -> vm.popToLayer(index) },
-                            actions = {
-                                IconButton(onClick = { showHeaderMenu = true }) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
-                                }
-                                
-                                if (showHeaderMenu) {
-                                    DropdownMenu(
-                                        expanded = showHeaderMenu, 
-                                        onDismissRequest = { showHeaderMenu = false },
-                                        containerColor = AppBackground
-                                    ) {
-                                        val hasActiveData = currentLayer.data != null
-                                        val disabledColor = AppText.copy(alpha = 0.3f)
-                                        val isAtRoot = navStack.size == 1
-                                        val editorName = when(currentLayer.type) {
-                                            LayerType.MIXER -> "Mixer"
-                                            LayerType.SET -> "Set"
-                                            LayerType.MANDALA -> "Mandala"
-                                            LayerType.SHOW -> "Show"
-                                            LayerType.RANDOM_SET -> "RSet"
+                            .focusRequester(focusRequester)
+                            .focusable()
+                            .onKeyEvent { event ->
+                                if (event.type == KeyEventType.KeyDown) {
+                                    when (event.key) {
+                                        Key.F -> {
+                                            isFullscreenPreview = !isFullscreenPreview
+                                            true
                                         }
-
-                                        // --- TOP GROUP ---
-                                        DropdownMenuItem(
-                                            text = { Text("Library", color = if (isAtRoot) AppAccent else disabledColor) },
-                                            onClick = { 
-                                                if (isAtRoot) {
-                                                    showManager = true
-                                                    showHeaderMenu = false
-                                                }
-                                            },
-                                            enabled = isAtRoot
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("New $editorName", color = if (isAtRoot) AppAccent else disabledColor) },
-                                            onClick = { 
-                                                if (isAtRoot) {
-                                                    vm.startNewPatch(currentLayer.type)
-                                                    showHeaderMenu = false
-                                                }
-                                            },
-                                            enabled = isAtRoot
-                                        )
-
-                                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-
-                                        // --- CURRENT ITEM ACTIONS ---
-                                        // Save menu item - ALWAYS SHOW when there's data
-                                        if (hasActiveData) {
-                                            val isDirty = currentLayer.isDirty
-                                            val textColor = if (isDirty) AppAccent else disabledColor
-
-                                            DropdownMenuItem(
-                                                text = {
-                                                    Text("Save", color = textColor)
-                                                },
-                                                onClick = {
-                                                    if (isDirty) {
-                                                        vm.saveLayer(currentLayer)
-                                                        // Optional: Show toast/snackbar feedback
-                                                        showHeaderMenu = false
-                                                    }
-                                                },
-                                                enabled = isDirty  // Only clickable when dirty
-                                            )
-                                            HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                                        Key.Escape -> {
+                                            if (isFullscreenPreview) {
+                                                isFullscreenPreview = false
+                                                true
+                                            } else false
                                         }
-
-                                        DropdownMenuItem(
-                                            text = { Text("Rename", color = if (hasActiveData) AppText else disabledColor) }, 
-                                            onClick = { showRenameDialog = true; showHeaderMenu = false },
-                                            enabled = hasActiveData
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Delete", color = if (hasActiveData && isAtRoot) Color.Red else disabledColor) }, 
-                                            onClick = { 
-                                                if (isAtRoot) {
-                                                    showDeleteConfirm = true
-                                                    showHeaderMenu = false
-                                                }
-                                            },
-                                            enabled = hasActiveData && isAtRoot
-                                        )
-                                        DropdownMenuItem(
-                                            text = { Text("Discard Changes", color = Color.Red) }, 
-                                            onClick = { 
-                                                vm.popToLayer(navStack.size - 2, save = false)
-                                                showHeaderMenu = false 
-                                            }
-                                        )
-
-                                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-
-                                        // --- SWITCH GROUP ---
-                                        DropdownMenuItem(
-                                            text = { Text("Switch to...", color = AppText) },
-                                            onClick = { /* Section Header */ },
-                                            enabled = false
-                                        )
-                                        
-                                        LayerType.entries.filter { it != currentLayer.type }.forEach { type ->
-                                            val label = when(type) {
-                                                LayerType.MIXER -> "Mixer Editor"
-                                                LayerType.SET -> "Set Editor"
-                                                LayerType.MANDALA -> "Mandala Editor"
-                                                LayerType.SHOW -> "Show Editor"
-                                                LayerType.RANDOM_SET -> "RSet Editor"
-                                            }
-                                            DropdownMenuItem(
-                                                text = { 
-                                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Text("  • ", color = if (isAtRoot) AppAccent else disabledColor)
-                                                        Text(label, color = if (isAtRoot) AppAccent else disabledColor)
-                                                    }
-                                                },
-                                                onClick = { 
-                                                    if (isAtRoot) {
-                                                        vm.createAndResetStack(type, openedFromMenu = true)
-                                                        showHeaderMenu = false
-                                                    }
-                                                },
-                                                enabled = isAtRoot
-                                            )
+                                        // Show Editor Shortcuts
+                                        Key.DirectionLeft -> {
+                                            if (currentLayer.type == LayerType.SHOW) {
+                                                renderer.getMixerParam("SHOW_PREV")?.triggerPulse()
+                                                true
+                                            } else false
                                         }
-
-                                        HorizontalDivider(color = AppText.copy(alpha = 0.1f))
-
-                                        // --- BOTTOM GROUP ---
-                                        DropdownMenuItem(
-                                            text = { Text("CV Lab", color = AppAccent) }, 
-                                            onClick = { showCvLab = true; showHeaderMenu = false }
-                                        )
-                                        DropdownMenuItem(text = { Text("Settings", color = AppText) }, onClick = { 
-                                            showSettings = true
-                                            showHeaderMenu = false 
-                                        })
+                                        Key.DirectionRight -> {
+                                            if (currentLayer.type == LayerType.SHOW) {
+                                                renderer.getMixerParam("SHOW_NEXT")?.triggerPulse()
+                                                true
+                                            } else false
+                                        }
+                                        Key.DirectionUp -> {
+                                            if (currentLayer.type == LayerType.SHOW) {
+                                                renderer.getMixerParam("SHOW_GENERATE")?.triggerPulse()
+                                                true
+                                            } else false
+                                        }
+                                        Key.DirectionDown -> {
+                                            if (currentLayer.type == LayerType.SHOW) {
+                                                renderer.getMixerParam("SHOW_RANDOM")?.triggerPulse()
+                                                true
+                                            } else false
+                                        }
+                                        else -> false
                                     }
-                                }
+                                } else false
                             }
-                        )
+                    ) {
+                        if (isFullscreenPreview) {
+                            previewContent()
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .then(
+                                        if (isLandscape) Modifier.widthIn(max = 600.dp).align(Alignment.TopCenter)
+                                        else Modifier.fillMaxWidth()
+                                    )
+                                    .systemBarsPadding()
+                            ) {
+                                var showHeaderMenu by remember { mutableStateOf(false) }
 
-                        Box(modifier = Modifier.weight(1f)) {
-                            when (currentLayer.type) {
-                                LayerType.SHOW -> {
-                                    ShowEditorScreen(
-                                        vm = vm,
-                                        onNavigateToMixerEditor = { nested ->
-                                            if (nested) vm.createAndPushLayer(LayerType.MIXER)
-                                            else vm.createAndResetStack(LayerType.MIXER)
-                                        },
-                                        previewContent = previewContent,
-                                        showManager = showManager,
-                                        onHideManager = { showManager = false }
-                                    )
-                                }
-                                LayerType.MIXER -> {
-                                    MixerEditorScreen(
-                                        vm = vm, 
-                                        onClose = { /* Root layer usually doesn't close */ },
-                                        onNavigateToSetEditor = { nested ->
-                                            if (nested) vm.createAndPushLayer(LayerType.SET)
-                                            else vm.createAndResetStack(LayerType.SET)
-                                        },
-                                        onNavigateToMandalaEditor = { nested ->
-                                            if (nested) vm.createAndPushLayer(LayerType.MANDALA)
-                                            else vm.createAndResetStack(LayerType.MANDALA)
-                                        },
-                                        onShowCvLab = { showCvLab = true },
-                                        previewContent = previewContent,
-                                        showManager = showManager,
-                                        onHideManager = { showManager = false }
-                                    )
-                                }
-                                LayerType.SET -> {
-                                    MandalaSetEditorScreen(
-                                        vm = vm, 
-                                        onClose = { vm.popToLayer(navStack.size - 2) },
-                                        onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
-                                        onShowCvLab = { showCvLab = true },
-                                        previewContent = previewContent,
-                                        visualSource = manager,
-                                        showManager = showManager,
-                                        onHideManager = { showManager = false }
-                                    )
-                                }
-                                LayerType.MANDALA -> {
-                                    MandalaEditorScreen(
-                                        vm = vm,
-                                        visualSource = manager,
-                                        isDirty = PatchMapper.isDirty(manager, currentPatch),
-                                        lastLoadedPatch = currentPatch,
-                                        onPatchLoaded = { vm.setCurrentPatch(it) },
-                                        onInteraction = { /* Generic interaction trigger */ },
-                                        onNavigateToSetEditor = { /* Navigation handled via breadcrumbs */ },
-                                        onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
-                                        onShowCvLab = { showCvLab = true },
-                                        previewContent = previewContent,
-                                        showHeader = false,
-                                        showManager = showManager,
-                                        onHideManager = { showManager = false }
-                                    )
-                                }
-                                LayerType.RANDOM_SET -> {
-                                    RandomSetEditorScreen(
-                                        vm = vm,
-                                        onClose = { vm.popToLayer(navStack.size - 2) },
-                                        previewContent = previewContent,
-                                        visualSource = manager,
-                                        showManager = showManager,
-                                        onHideManager = { showManager = false }
-                                    )
+                                EditorBreadcrumbs(
+                                    stack = navStack,
+                                    onLayerClick = { index -> vm.popToLayer(index) },
+                                    actions = {
+                                        IconButton(onClick = { showHeaderMenu = true }) {
+                                            Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
+                                        }
+                                        
+                                        if (showHeaderMenu) {
+                                            DropdownMenu(
+                                                expanded = showHeaderMenu, 
+                                                onDismissRequest = { showHeaderMenu = false },
+                                                containerColor = AppBackground
+                                            ) {
+                                                val hasActiveData = currentLayer.data != null
+                                                val disabledColor = AppText.copy(alpha = 0.3f)
+                                                val isAtRoot = navStack.size == 1
+                                                val editorName = when(currentLayer.type) {
+                                                    LayerType.MIXER -> "Mixer"
+                                                    LayerType.SET -> "Set"
+                                                    LayerType.MANDALA -> "Mandala"
+                                                    LayerType.SHOW -> "Show"
+                                                    LayerType.RANDOM_SET -> "RSet"
+                                                }
+
+                                                // --- TOP GROUP ---
+                                                DropdownMenuItem(
+                                                    text = { Text("Library", color = if (isAtRoot) AppAccent else disabledColor) },
+                                                    onClick = { 
+                                                        if (isAtRoot) {
+                                                            showManager = true
+                                                            showHeaderMenu = false
+                                                        }
+                                                    },
+                                                    enabled = isAtRoot
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("New $editorName", color = if (isAtRoot) AppAccent else disabledColor) },
+                                                    onClick = { 
+                                                        if (isAtRoot) {
+                                                            vm.startNewPatch(currentLayer.type)
+                                                            showHeaderMenu = false
+                                                        }
+                                                    },
+                                                    enabled = isAtRoot
+                                                )
+
+                                                HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+
+                                                // --- CURRENT ITEM ACTIONS ---
+                                                // Save menu item - ALWAYS SHOW when there's data
+                                                if (hasActiveData) {
+                                                    val isDirty = currentLayer.isDirty
+                                                    val textColor = if (isDirty) AppAccent else disabledColor
+
+                                                    DropdownMenuItem(
+                                                        text = {
+                                                            Text("Save", color = textColor)
+                                                        },
+                                                        onClick = {
+                                                            if (isDirty) {
+                                                                vm.saveLayer(currentLayer)
+                                                                // Optional: Show toast/snackbar feedback
+                                                                showHeaderMenu = false
+                                                            }
+                                                        },
+                                                        enabled = isDirty  // Only clickable when dirty
+                                                    )
+                                                    HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                                                }
+
+                                                DropdownMenuItem(
+                                                    text = { Text("Rename", color = if (hasActiveData) AppText else disabledColor) }, 
+                                                    onClick = { showRenameDialog = true; showHeaderMenu = false },
+                                                    enabled = hasActiveData
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Delete", color = if (hasActiveData && isAtRoot) Color.Red else disabledColor) }, 
+                                                    onClick = { 
+                                                        if (isAtRoot) {
+                                                            showDeleteConfirm = true
+                                                            showHeaderMenu = false
+                                                        }
+                                                    },
+                                                    enabled = hasActiveData && isAtRoot
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text("Discard Changes", color = Color.Red) }, 
+                                                    onClick = { 
+                                                        vm.popToLayer(navStack.size - 2, save = false)
+                                                        showHeaderMenu = false 
+                                                    }
+                                                )
+
+                                                HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+
+                                                // --- SWITCH GROUP ---
+                                                DropdownMenuItem(
+                                                    text = { Text("Switch to...", color = AppText) },
+                                                    onClick = { /* Section Header */ },
+                                                    enabled = false
+                                                )
+                                                
+                                                LayerType.entries.filter { it != currentLayer.type }.forEach { type ->
+                                                    val label = when(type) {
+                                                        LayerType.MIXER -> "Mixer Editor"
+                                                        LayerType.SET -> "Set Editor"
+                                                        LayerType.MANDALA -> "Mandala Editor"
+                                                        LayerType.SHOW -> "Show Editor"
+                                                        LayerType.RANDOM_SET -> "RSet Editor"
+                                                    }
+                                                    DropdownMenuItem(
+                                                        text = { 
+                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                Text("  • ", color = if (isAtRoot) AppAccent else disabledColor)
+                                                                Text(label, color = if (isAtRoot) AppAccent else disabledColor)
+                                                            }
+                                                        },
+                                                        onClick = { 
+                                                            if (isAtRoot) {
+                                                                vm.createAndResetStack(type, openedFromMenu = true)
+                                                                showHeaderMenu = false
+                                                            }
+                                                        },
+                                                        enabled = isAtRoot
+                                                    )
+                                                }
+
+                                                HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+
+                                                // --- BOTTOM GROUP ---
+                                                DropdownMenuItem(
+                                                    text = { Text("CV Lab", color = AppAccent) }, 
+                                                    onClick = { showCvLab = true; showHeaderMenu = false }
+                                                )
+                                                DropdownMenuItem(text = { Text("Settings", color = AppText) }, onClick = { 
+                                                    showSettings = true
+                                                    showHeaderMenu = false 
+                                                })
+                                            }
+                                        }
+                                    }
+                                )
+
+                                Box(modifier = Modifier.weight(1f)) {
+                                    when (currentLayer.type) {
+                                        LayerType.SHOW -> {
+                                            ShowEditorScreen(
+                                                vm = vm,
+                                                onNavigateToMixerEditor = { nested ->
+                                                    if (nested) vm.createAndPushLayer(LayerType.MIXER)
+                                                    else vm.createAndResetStack(LayerType.MIXER)
+                                                },
+                                                previewContent = previewContent,
+                                                showManager = showManager,
+                                                onHideManager = { showManager = false }
+                                            )
+                                        }
+                                        LayerType.MIXER -> {
+                                            MixerEditorScreen(
+                                                vm = vm, 
+                                                onClose = { /* Root layer usually doesn't close */ },
+                                                onNavigateToSetEditor = { nested ->
+                                                    if (nested) vm.createAndPushLayer(LayerType.SET)
+                                                    else vm.createAndResetStack(LayerType.SET)
+                                                },
+                                                onNavigateToMandalaEditor = { nested ->
+                                                    if (nested) vm.createAndPushLayer(LayerType.MANDALA)
+                                                    else vm.createAndResetStack(LayerType.MANDALA)
+                                                },
+                                                onShowCvLab = { showCvLab = true },
+                                                previewContent = previewContent,
+                                                showManager = showManager,
+                                                onHideManager = { showManager = false }
+                                            )
+                                        }
+                                        LayerType.SET -> {
+                                            MandalaSetEditorScreen(
+                                                vm = vm, 
+                                                onClose = { vm.popToLayer(navStack.size - 2) },
+                                                onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
+                                                onShowCvLab = { showCvLab = true },
+                                                previewContent = previewContent,
+                                                visualSource = manager,
+                                                showManager = showManager,
+                                                onHideManager = { showManager = false }
+                                            )
+                                        }
+                                        LayerType.MANDALA -> {
+                                            MandalaEditorScreen(
+                                                vm = vm,
+                                                visualSource = manager,
+                                                isDirty = PatchMapper.isDirty(manager, currentPatch),
+                                                lastLoadedPatch = currentPatch,
+                                                onPatchLoaded = { vm.setCurrentPatch(it) },
+                                                onInteraction = { /* Generic interaction trigger */ },
+                                                onNavigateToSetEditor = { /* Navigation handled via breadcrumbs */ },
+                                                onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
+                                                onShowCvLab = { showCvLab = true },
+                                                previewContent = previewContent,
+                                                showHeader = false,
+                                                showManager = showManager,
+                                                onHideManager = { showManager = false }
+                                            )
+                                        }
+                                        LayerType.RANDOM_SET -> {
+                                            RandomSetEditorScreen(
+                                                vm = vm,
+                                                onClose = { vm.popToLayer(navStack.size - 2) },
+                                                previewContent = previewContent,
+                                                visualSource = manager,
+                                                showManager = showManager,
+                                                onHideManager = { showManager = false }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1305,4 +1382,3 @@ fun RenamePatchDialog(initialName: String, onRename: (String) -> Unit, onDismiss
         containerColor = AppBackground
     )
 }
-

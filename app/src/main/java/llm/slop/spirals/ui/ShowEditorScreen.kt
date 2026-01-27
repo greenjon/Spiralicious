@@ -43,6 +43,7 @@ fun ShowEditorScreen(
     val allRandomSets by vm.allRandomSets.collectAsState(initial = emptyList())
     val allShowPatches by vm.allShowPatches.collectAsState(initial = emptyList())
     val currentShowIndex by vm.currentShowIndex.collectAsState()
+    val generationTrigger by vm.showGenerationTrigger.collectAsState()
 
     // Initialize from layer data
     val navStack by vm.navStack.collectAsState()
@@ -113,8 +114,8 @@ fun ShowEditorScreen(
     }
 
     // Apply the active random set from the show sequence to the renderer
-    LaunchedEffect(currentShowIndex, currentShow.randomSetIds, allRandomSets, navStack, reRollTick) {
-        Log.d("ShowEditor", "Syncing preview: Index=$currentShowIndex, ShowID=${currentShow.id}, RSetCount=${currentShow.randomSetIds.size}, reRoll=$reRollTick")
+    LaunchedEffect(currentShowIndex, currentShow.randomSetIds, allRandomSets, navStack, reRollTick, generationTrigger) {
+        Log.d("ShowEditor", "Syncing preview: Index=$currentShowIndex, ShowID=${currentShow.id}, RSetCount=${currentShow.randomSetIds.size}, reRoll=$reRollTick, genTrigger=$generationTrigger")
         
         if (currentShow.randomSetIds.isNotEmpty()) {
             val safeIndex = currentShowIndex.coerceIn(0, currentShow.randomSetIds.size - 1)

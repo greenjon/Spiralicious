@@ -181,6 +181,11 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     focusRequester.requestFocus()
                 }
+                
+                // Re-request focus when toggling fullscreen to ensure keyboard capture
+                LaunchedEffect(isFullscreenPreview) {
+                    focusRequester.requestFocus()
+                }
 
                 // 2. Automatically start/stop Audio Engine based on source selection
                 LaunchedEffect(audioSourceType, hasMicPermission) {
@@ -232,7 +237,7 @@ class MainActivity : ComponentActivity() {
                             .background(AppBackground)
                             .focusRequester(focusRequester)
                             .focusable()
-                            .onKeyEvent { event ->
+                            .onPreviewKeyEvent { event ->
                                 if (event.type == KeyEventType.KeyDown) {
                                     when (event.key) {
                                         Key.F -> {
@@ -245,28 +250,32 @@ class MainActivity : ComponentActivity() {
                                                 true
                                             } else false
                                         }
-                                        // Show Editor Shortcuts
-                                        Key.DirectionLeft -> {
+                                        // Show Editor Shortcuts - Always available even in fullscreen
+                                        Key.DirectionLeft, Key.DirectionRight, Key.DirectionUp, Key.DirectionDown -> {
                                             if (currentLayer.type == LayerType.SHOW) {
-                                                renderer.getMixerParam("SHOW_PREV")?.triggerPulse()
-                                                true
-                                            } else false
-                                        }
-                                        Key.DirectionRight -> {
-                                            if (currentLayer.type == LayerType.SHOW) {
-                                                renderer.getMixerParam("SHOW_NEXT")?.triggerPulse()
-                                                true
-                                            } else false
-                                        }
-                                        Key.DirectionUp -> {
-                                            if (currentLayer.type == LayerType.SHOW) {
-                                                renderer.getMixerParam("SHOW_GENERATE")?.triggerPulse()
-                                                true
-                                            } else false
-                                        }
-                                        Key.DirectionDown -> {
-                                            if (currentLayer.type == LayerType.SHOW) {
-                                                renderer.getMixerParam("SHOW_RANDOM")?.triggerPulse()
+                                                val show = (currentLayer.data as? ShowLayerContent)?.show
+                                                when (event.key) {
+                                                    Key.DirectionLeft -> {
+                                                        renderer.getMixerParam("SHOW_PREV")?.triggerPulse()
+                                                        show?.let { vm.triggerPrevMixer(it.randomSetIds.size) }
+                                                    }
+                                                    Key.DirectionRight -> {
+                                                        renderer.getMixerParam("SHOW_NEXT")?.triggerPulse()
+                                                        show?.let { vm.triggerNextMixer(it.randomSetIds.size) }
+                                                    }
+                                                    Key.DirectionUp -> {
+                                                        renderer.getMixerParam("SHOW_GENERATE")?.triggerPulse()
+                                                        vm.triggerShowGenerate()
+                                                    }
+                                                    Key.DirectionDown -> {
+                                                        renderer.getMixerParam("SHOW_RANDOM")?.triggerPulse()
+                                                        show?.let { 
+                                                            if (it.randomSetIds.isNotEmpty()) {
+                                                                vm.jumpToShowIndex(kotlin.random.Random.nextInt(it.randomSetIds.size))
+                                                            }
+                                                        }
+                                                    }
+                                                }
                                                 true
                                             } else false
                                         }
@@ -282,7 +291,7 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier
                                     .fillMaxHeight()
                                     .then(
-                                        if (isLandscape) Modifier.widthIn(max = 600.dp).align(Alignment.TopCenter)
+                                        if (isLandscape) Modifier.widthIn(max = 800.dp).align(Alignment.TopCenter)
                                         else Modifier.fillMaxWidth()
                                     )
                                     .systemBarsPadding()
@@ -428,6 +437,15 @@ class MainActivity : ComponentActivity() {
                                                     showSettings = true
                                                     showHeaderMenu = false 
                                                 })
+
+                                                HorizontalDivider(color = AppText.copy(alpha = 0.1f))
+                                                DropdownMenuItem(
+                                                    text = { Text("Exit", color = Color.Red) },
+                                                    onClick = {
+                                                        showHeaderMenu = false
+                                                        showExitConfirm = true
+                                                    }
+                                                )
                                             }
                                         }
                                     }
@@ -578,9 +596,18 @@ class MainActivity : ComponentActivity() {
                     AlertDialog(
                         onDismissRequest = { showExitConfirm = false },
                         title = { Text("Exit Spirals?", color = AppText) },
-                        text = { Text("All changes have been saved.", color = AppText) },
+                        text = { 
+                            val isAnyDirty = navStack.any { it.isDirty }
+                            Text(if (isAnyDirty) "Save changes and exit?" else "Exit the application?", color = AppText) 
+                        },
                         confirmButton = {
                             TextButton(onClick = { 
+                                // Auto-save all dirty layers before finishing
+                                navStack.forEach { layer ->
+                                    if (layer.isDirty) {
+                                        vm.saveLayer(layer)
+                                    }
+                                }
                                 finish()
                             }) {
                                 Text("EXIT", color = AppText)

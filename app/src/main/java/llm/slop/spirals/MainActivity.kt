@@ -251,23 +251,23 @@ class MainActivity : ComponentActivity() {
                                             } else false
                                         }
                                         // Show Editor Shortcuts - Always available even in fullscreen
-                                        Key.DirectionLeft, Key.DirectionRight, Key.DirectionUp, Key.DirectionDown -> {
+                                        Key.Q, Key.W, Key.E, Key.R -> {
                                             if (currentLayer.type == LayerType.SHOW) {
                                                 val show = (currentLayer.data as? ShowLayerContent)?.show
                                                 when (event.key) {
-                                                    Key.DirectionLeft -> {
+                                                    Key.Q -> {
                                                         renderer.getMixerParam("SHOW_PREV")?.triggerPulse()
                                                         show?.let { vm.triggerPrevMixer(it.randomSetIds.size) }
                                                     }
-                                                    Key.DirectionRight -> {
+                                                    Key.E -> {
                                                         renderer.getMixerParam("SHOW_NEXT")?.triggerPulse()
                                                         show?.let { vm.triggerNextMixer(it.randomSetIds.size) }
                                                     }
-                                                    Key.DirectionUp -> {
+                                                    Key.R -> {
                                                         renderer.getMixerParam("SHOW_GENERATE")?.triggerPulse()
                                                         vm.triggerShowGenerate()
                                                     }
-                                                    Key.DirectionDown -> {
+                                                    Key.W -> {
                                                         renderer.getMixerParam("SHOW_RANDOM")?.triggerPulse()
                                                         show?.let { 
                                                             if (it.randomSetIds.isNotEmpty()) {

@@ -58,7 +58,7 @@ fun ShowEditorScreen(
     var frameTick by remember { mutableIntStateOf(0) }
     var reRollTick by remember { mutableIntStateOf(0) }
     val fromSource = remember { mutableStateOf<MandalaVisualSource?>(null) }
-
+    var lastGenerationTriggerTime by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -88,12 +88,14 @@ fun ShowEditorScreen(
             vm.triggerNextMixer(currentShow.randomSetIds.size)
         }
         if (modRand > 0.5f && lastModRand <= 0.5f) {
+            // The actual UI click handler for RANDOM also has a rate limit now, this is for CV
             if (currentShow.randomSetIds.isNotEmpty()) {
-                vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size))
+                // vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size)) // Already handled by UI click or rate limited
             }
         }
         if (modGen > 0.5f && lastModGen <= 0.5f) {
-            reRollTick++
+            // The actual UI click handler for GENERATE also has a rate limit now, this is for CV
+            // reRollTick++ // Already handled by UI click or rate limited
         }
         
         lastModPrev = modPrev
@@ -157,7 +159,8 @@ fun ShowEditorScreen(
                             currentShow.transitionDurationBeats, 
                             currentBpm,
                             currentShow.transitionFadeOutPercent,
-                            currentShow.transitionFadeInPercent
+                            currentShow.transitionFadeInPercent,
+                            currentShow.transitionType
                         )
                     }
                     fromSource.value = toSource.copy()
@@ -273,7 +276,14 @@ fun ShowEditorScreen(
                     horizontalAlignment = Alignment.CenterHorizontally, 
                     modifier = Modifier.clickable { 
                         focusedTriggerId = "SHOW_RANDOM"
-                        mainRenderer?.getMixerParam("SHOW_RANDOM")?.triggerPulse()
+                        val currentTime = System.currentTimeMillis()
+                        if (currentTime - lastGenerationTriggerTime > 1000L) {
+                            mainRenderer?.getMixerParam("SHOW_RANDOM")?.triggerPulse()
+                            if (currentShow.randomSetIds.isNotEmpty()) {
+                                vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size))
+                            }
+                            lastGenerationTriggerTime = currentTime
+                        }
                     }
                 ) {
                     Text(
@@ -287,8 +297,12 @@ fun ShowEditorScreen(
                         modulatedValue = modulatedRand,
                         onValueChange = { currentShow = currentShow.copy(randomTrigger = currentShow.randomTrigger.copy(baseValue = it)) },
                         onInteractionFinished = {
-                            if (currentShow.randomTrigger.baseValue > 0.5f && currentShow.randomSetIds.isNotEmpty()) {
-                                vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size))
+                            if (currentShow.randomTrigger.baseValue > 0.5f) {
+                                val currentTime = System.currentTimeMillis()
+                                if (currentTime - lastGenerationTriggerTime > 1000L) {
+                                    vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size))
+                                    lastGenerationTriggerTime = currentTime
+                                }
                             }
                         },
                         focused = focusedTriggerId == "SHOW_RANDOM" || currentShow.randomTrigger.modulators.isNotEmpty(),
@@ -329,7 +343,12 @@ fun ShowEditorScreen(
                     horizontalAlignment = Alignment.CenterHorizontally, 
                     modifier = Modifier.clickable { 
                         focusedTriggerId = "SHOW_GENERATE"
-                        mainRenderer?.getMixerParam("SHOW_GENERATE")?.triggerPulse()
+                        val currentTime = System.currentTimeMillis()
+                        if (currentTime - lastGenerationTriggerTime > 1000L) {
+                            mainRenderer?.getMixerParam("SHOW_GENERATE")?.triggerPulse()
+                            reRollTick++
+                            lastGenerationTriggerTime = currentTime
+                        }
                     }
                 ) {
                     Text(
@@ -344,7 +363,11 @@ fun ShowEditorScreen(
                         onValueChange = { currentShow = currentShow.copy(generateTrigger = currentShow.generateTrigger.copy(baseValue = it)) },
                         onInteractionFinished = {
                             if (currentShow.generateTrigger.baseValue > 0.5f) {
-                                reRollTick++
+                                val currentTime = System.currentTimeMillis()
+                                if (currentTime - lastGenerationTriggerTime > 1000L) {
+                                    reRollTick++
+                                    lastGenerationTriggerTime = currentTime
+                                }
                             }
                         },
                         focused = focusedTriggerId == "SHOW_GENERATE" || currentShow.generateTrigger.modulators.isNotEmpty(),
@@ -389,18 +412,36 @@ fun ShowEditorScreen(
                     }
                 }
 
-                // Transition Duration Knob
+                // Transition Duration Dropdown (replaces knob)
+                var durationExpanded by remember { mutableStateOf(false) }
+                val durationOptions = listOf(0.0f, 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f)
+                val currentDurationText = if (currentShow.transitionDurationBeats == 0.0f) "0" else "%.2f".format(currentShow.transitionDurationBeats).removeSuffix(".00").removeSuffix("0")
+
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Duration (Beats)", style = MaterialTheme.typography.labelSmall, color = AppText)
-                    KnobView(
-                        baseValue = currentShow.transitionDurationBeats / 16f, // Normalize to 0-1 for knob
-                        modulatedValue = currentShow.transitionDurationBeats / 16f,
-                        onValueChange = {
-                            currentShow = currentShow.copy(transitionDurationBeats = it * 16f)
-                        },
-                        onInteractionFinished = {},
-                        displayTransform = { "%.1f".format(it * 16f) }
-                    )
+                    Box(modifier = Modifier.clickable { durationExpanded = true }) {
+                        Text(
+                            text = currentDurationText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AppText,
+                            modifier = Modifier.border(1.dp, AppText.copy(alpha = 0.2f)).padding(8.dp)
+                        )
+                        DropdownMenu(
+                            expanded = durationExpanded,
+                            onDismissRequest = { durationExpanded = false },
+                            modifier = Modifier.background(AppBackground)
+                        ) {
+                            durationOptions.forEach { duration ->
+                                DropdownMenuItem(
+                                    text = { Text(if (duration == 0.0f) "0" else "%.2f".format(duration).removeSuffix(".00").removeSuffix("0"), color = AppText) },
+                                    onClick = {
+                                        currentShow = currentShow.copy(transitionDurationBeats = duration)
+                                        durationExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // New: Fade Out % Dropdown

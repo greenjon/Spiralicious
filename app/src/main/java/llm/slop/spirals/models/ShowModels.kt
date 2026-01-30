@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 import java.util.UUID
 
 enum class TransitionType {
-    NONE, IMPLODE_EXPLODE
+    NONE, IMPLODE_EXPLODE, EXPLODE_EXPLODE, IMPLODE_IMPLODE
 }
 
 @Serializable

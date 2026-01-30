@@ -124,8 +124,9 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var transitionState = TransitionState.IDLE
     private var transitionStartTime = 0L
     private var transitionDurationMillis = 0L
-    private var transitionFadeOutPercent = 0.5f // New member variable
-    private var transitionFadeInPercent = 0.5f  // New member variable
+    private var transitionFadeOutPercent = 0.5f 
+    private var transitionFadeInPercent = 0.5f  
+    private var currentTransitionType: TransitionType = TransitionType.NONE 
     private var fromSource: MandalaVisualSource? = null
     private var toSource: MandalaVisualSource? = null
 
@@ -156,7 +157,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         mixerParams["SHOW_GENERATE"] = ModulatableParameter(0.0f)
     }
 
-    fun startTransition(from: MandalaVisualSource, to: MandalaVisualSource, durationBeats: Float, bpm: Float, fadeOutPercent: Float, fadeInPercent: Float) {
+    fun startTransition(from: MandalaVisualSource, to: MandalaVisualSource, durationBeats: Float, bpm: Float, fadeOutPercent: Float, fadeInPercent: Float, transitionType: TransitionType) {
         if (durationBeats > 0f) {
             this.fromSource = from.copy()
             this.toSource = to.copy()
@@ -165,6 +166,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             this.transitionState = TransitionState.IMPLODING
             this.transitionFadeOutPercent = fadeOutPercent
             this.transitionFadeInPercent = fadeInPercent
+            this.currentTransitionType = transitionType
         }
     }
 
@@ -370,16 +372,24 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             // Imploding phase
             if (elapsedTime <= fadeOutMillis) {
                 val progress = if (fadeOutMillis > 0) elapsedTime.toFloat() / fadeOutMillis else 1.0f
-                scale = (1.0f - progress).coerceAtLeast(0f)
                 sourceToRender = fromSource
+                scale = when (currentTransitionType) {
+                    TransitionType.IMPLODE_EXPLODE, TransitionType.IMPLODE_IMPLODE -> (1.0f - progress).coerceAtLeast(0f)
+                    TransitionType.EXPLODE_EXPLODE -> (1.0f + progress * 9.0f).coerceAtMost(10f)
+                    TransitionType.NONE -> 1.0f
+                }
             }
             
             // Exploding phase (starts at transitionDurationMillis - fadeInMillis)
             if (elapsedTime >= (transitionDurationMillis - fadeInMillis)) {
                 val fadeInElapsedTime = elapsedTime - (transitionDurationMillis - fadeInMillis)
                 val progress = if (fadeInMillis > 0) fadeInElapsedTime.toFloat() / fadeInMillis else 1.0f
-                scale = progress.coerceAtMost(1f)
                 sourceToRender = toSource
+                scale = when (currentTransitionType) {
+                    TransitionType.IMPLODE_EXPLODE, TransitionType.EXPLODE_EXPLODE -> progress.coerceAtMost(1f)
+                    TransitionType.IMPLODE_IMPLODE -> (10.0f - progress * 9.0f).coerceAtLeast(1f)
+                    TransitionType.NONE -> 1.0f
+                }
             }
 
             // Transition state management for when animations finish
@@ -392,7 +402,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             if (sourceToRender != null) {
                 compositeWithFeedback(
                     render = { GLES30.glUseProgram(program); renderSource(sourceToRender, scale) },
-                    fx = emptyMap(),
+                    fx = emptyMap(), // Empty map for transitions, as feedback is not applied during transition
                     fbTextures = finalFBTextures,
                     fbFramebuffers = finalFBFramebuffers,
                     fbIndexRef = { finalFBIndex },
@@ -415,13 +425,13 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                         val source = slotSources[i]
                         val fx = source.parameters
                         // Map UI-friendly parameter names to shader uniform names for feedback.
-                        val fxMap = if (fx != null) mapOf(
+                        val fxMap: Map<String, Float> = mapOf(
                             "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f),
                             "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f),
                             "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f),
                             "FB_SHIFT" to (fx["FB Shift"]?.value ?: 0f),
                             "FB_BLUR" to (fx["FB Blur"]?.value ?: 0f)
-                        ) else emptyMap()
+                        )
 
                         compositeWithFeedback(
                             render = { GLES30.glUseProgram(program); renderSource(source) },
@@ -454,13 +464,13 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 val currentSource = visualSource
                 if (currentSource != null) {
                     val fx = currentSource.parameters
-                    val fxMap = if (fx != null) mapOf(
+                    val fxMap: Map<String, Float> = mapOf(
                         "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f),
                         "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f),
                         "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f),
                         "FB_SHIFT" to (fx["FB Shift"]?.value ?: 0f),
                         "FB_BLUR" to (fx["FB Blur"]?.value ?: 0f)
-                    ) else emptyMap()
+                    )
 
                     compositeWithFeedback(
                         render = { GLES30.glUseProgram(program); renderSource(currentSource) },
@@ -487,8 +497,21 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     private fun isSourceStatic(s: MandalaVisualSource?): Boolean {
-        if (s == null) return true; val p = s.parameters; val res = (p["L1"]?.value ?: 0f) == lastL1 && (p["L2"]?.value ?: 0f) == lastL2 && (p["L3"]?.value ?: 0f) == lastL3 && (p["L4"]?.value ?: 0f) == lastL4 && (p["Rotation"]?.value ?: 0f) == lastRotation
-        lastL1 = p["L1"]?.value ?: 0f; lastL2 = p["L2"]?.value ?: 0f; lastL3 = p["L3"]?.value ?: 0f; lastL4 = p["L4"]?.value ?: 0f; lastRotation = p["Rotation"]?.value ?: 0f; return res
+        if (s == null) return true
+        val p = s.parameters
+        val l1Value = p["L1"]?.value ?: 0f
+        val l2Value = p["L2"]?.value ?: 0f
+        val l3Value = p["L3"]?.value ?: 0f
+        val l4Value = p["L4"]?.value ?: 0f
+        val rotationValue = p["Rotation"]?.value ?: 0f
+        
+        val res = l1Value == lastL1 && l2Value == lastL2 && l3Value == lastL3 && l4Value == lastL4 && rotationValue == lastRotation
+        lastL1 = l1Value
+        lastL2 = l2Value
+        lastL3 = l3Value
+        lastL4 = l4Value
+        lastRotation = rotationValue
+        return res
     }
 
     fun drawTextureToCurrentBuffer(tId: Int) {

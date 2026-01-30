@@ -124,6 +124,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private var transitionState = TransitionState.IDLE
     private var transitionStartTime = 0L
     private var transitionDurationMillis = 0L
+    private var transitionFadeOutPercent = 0.5f // New member variable
+    private var transitionFadeInPercent = 0.5f  // New member variable
     private var fromSource: MandalaVisualSource? = null
     private var toSource: MandalaVisualSource? = null
 
@@ -154,13 +156,15 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         mixerParams["SHOW_GENERATE"] = ModulatableParameter(0.0f)
     }
 
-    fun startTransition(from: MandalaVisualSource, to: MandalaVisualSource, durationBeats: Float, bpm: Float) {
+    fun startTransition(from: MandalaVisualSource, to: MandalaVisualSource, durationBeats: Float, bpm: Float, fadeOutPercent: Float, fadeInPercent: Float) {
         if (durationBeats > 0f) {
             this.fromSource = from.copy()
             this.toSource = to.copy()
             this.transitionDurationMillis = (durationBeats / bpm * 60f * 1000f).toLong()
             this.transitionStartTime = System.currentTimeMillis()
             this.transitionState = TransitionState.IMPLODING
+            this.transitionFadeOutPercent = fadeOutPercent
+            this.transitionFadeInPercent = fadeInPercent
         }
     }
 
@@ -356,27 +360,35 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         // Handle transition animation
         if (transitionState != TransitionState.IDLE) {
             val elapsedTime = System.currentTimeMillis() - transitionStartTime
-            val halfDuration = transitionDurationMillis / 2
-            var scale = 1.0f
+            
+            val fadeOutMillis = (transitionDurationMillis * transitionFadeOutPercent).toLong()
+            val fadeInMillis = (transitionDurationMillis * transitionFadeInPercent).toLong()
+            
+            var scale = 0.0f 
             var sourceToRender: MandalaVisualSource? = null
 
-            if (transitionState == TransitionState.IMPLODING) {
-                val progress = elapsedTime.toFloat() / halfDuration
+            // Imploding phase
+            if (elapsedTime <= fadeOutMillis) {
+                val progress = if (fadeOutMillis > 0) elapsedTime.toFloat() / fadeOutMillis else 1.0f
                 scale = (1.0f - progress).coerceAtLeast(0f)
                 sourceToRender = fromSource
-                if (elapsedTime >= halfDuration) {
-                    transitionState = TransitionState.EXPLODING
-                    transitionStartTime = System.currentTimeMillis() // Reset start time for explode phase
-                }
-            } else if (transitionState == TransitionState.EXPLODING) {
-                val progress = elapsedTime.toFloat() / halfDuration
+            }
+            
+            // Exploding phase (starts at transitionDurationMillis - fadeInMillis)
+            if (elapsedTime >= (transitionDurationMillis - fadeInMillis)) {
+                val fadeInElapsedTime = elapsedTime - (transitionDurationMillis - fadeInMillis)
+                val progress = if (fadeInMillis > 0) fadeInElapsedTime.toFloat() / fadeInMillis else 1.0f
                 scale = progress.coerceAtMost(1f)
                 sourceToRender = toSource
-                if (elapsedTime >= halfDuration) {
-                    transitionState = TransitionState.IDLE
-                }
             }
 
+            // Transition state management for when animations finish
+            if (elapsedTime >= transitionDurationMillis) {
+                transitionState = TransitionState.IDLE
+            }
+            
+            // If both fade-out and fade-in are 0%, just use the 'toSource' instantly.
+            // Otherwise, render the active source with its calculated scale.
             if (sourceToRender != null) {
                 compositeWithFeedback(
                     render = { GLES30.glUseProgram(program); renderSource(sourceToRender, scale) },

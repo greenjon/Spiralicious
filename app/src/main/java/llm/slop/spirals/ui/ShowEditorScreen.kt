@@ -151,7 +151,14 @@ fun ShowEditorScreen(
                     
                     if (fromSource.value != null) {
                         val currentBpm = ModulationRegistry.get("bpm")
-                        mainRenderer.startTransition(fromSource.value!!, toSource, currentShow.transitionDurationBeats, currentBpm)
+                        mainRenderer.startTransition(
+                            fromSource.value!!, 
+                            toSource, 
+                            currentShow.transitionDurationBeats, 
+                            currentBpm,
+                            currentShow.transitionFadeOutPercent,
+                            currentShow.transitionFadeInPercent
+                        )
                     }
                     fromSource.value = toSource.copy()
                     
@@ -394,6 +401,67 @@ fun ShowEditorScreen(
                         onInteractionFinished = {},
                         displayTransform = { "%.1f".format(it * 16f) }
                     )
+                }
+
+                // New: Fade Out % Dropdown
+                var fadeOutExpanded by remember { mutableStateOf(false) }
+                val fadePercentages = listOf(0.0f, 0.25f, 0.5f, 0.75f, 1.0f)
+                val currentFadeOutText = "${(currentShow.transitionFadeOutPercent * 100).toInt()}%"
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Fade Out %", style = MaterialTheme.typography.labelSmall, color = AppText)
+                    Box(modifier = Modifier.clickable { fadeOutExpanded = true }) {
+                        Text(
+                            text = currentFadeOutText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AppText,
+                            modifier = Modifier.border(1.dp, AppText.copy(alpha = 0.2f)).padding(8.dp)
+                        )
+                        DropdownMenu(
+                            expanded = fadeOutExpanded,
+                            onDismissRequest = { fadeOutExpanded = false },
+                            modifier = Modifier.background(AppBackground)
+                        ) {
+                            fadePercentages.forEach { percent ->
+                                DropdownMenuItem(
+                                    text = { Text("${(percent * 100).toInt()}%", color = AppText) },
+                                    onClick = {
+                                        currentShow = currentShow.copy(transitionFadeOutPercent = percent)
+                                        fadeOutExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // New: Fade In % Dropdown
+                var fadeInExpanded by remember { mutableStateOf(false) }
+                val currentFadeInText = "${(currentShow.transitionFadeInPercent * 100).toInt()}%"
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Fade In %", style = MaterialTheme.typography.labelSmall, color = AppText)
+                    Box(modifier = Modifier.clickable { fadeInExpanded = true }) {
+                        Text(
+                            text = currentFadeInText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AppText,
+                            modifier = Modifier.border(1.dp, AppText.copy(alpha = 0.2f)).padding(8.dp)
+                        )
+                        DropdownMenu(
+                            expanded = fadeInExpanded,
+                            onDismissRequest = { fadeInExpanded = false },
+                            modifier = Modifier.background(AppBackground)
+                        ) {
+                            fadePercentages.forEach { percent ->
+                                DropdownMenuItem(
+                                    text = { Text("${(percent * 100).toInt()}%", color = AppText) },
+                                    onClick = {
+                                        currentShow = currentShow.copy(transitionFadeInPercent = percent)
+                                        fadeInExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
             }
 

@@ -1,12 +1,11 @@
 package llm.slop.spirals
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.os.Bundle
 import android.media.AudioFormat
 import android.media.AudioRecord
+import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -20,50 +19,47 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.*
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.delay
+import llm.slop.spirals.cv.ModulationRegistry
 import llm.slop.spirals.cv.audio.AudioEngine
 import llm.slop.spirals.cv.audio.AudioSourceType
+import llm.slop.spirals.defaults.DefaultsConfig
+import llm.slop.spirals.display.ExternalDisplayCoordinator
 import llm.slop.spirals.ui.*
+import llm.slop.spirals.ui.components.EditorBreadcrumbs
+import llm.slop.spirals.ui.components.HdmiStatusOverlay
 import llm.slop.spirals.ui.components.MandalaParameterMatrix
 import llm.slop.spirals.ui.components.OscilloscopeView
-import llm.slop.spirals.ui.components.EditorBreadcrumbs
 import llm.slop.spirals.ui.components.PatchManagerOverlay
+import llm.slop.spirals.ui.components.RecipePickerDialog
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.ui.theme.SpiralsTheme
-import llm.slop.spirals.ui.components.RecipePickerDialog
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import llm.slop.spirals.cv.ModulationRegistry
-import llm.slop.spirals.defaults.DefaultsConfig
-import llm.slop.spirals.models.MixerPatch
-import llm.slop.spirals.models.ShowPatch
-import kotlinx.serialization.json.Json
-import llm.slop.spirals.display.ExternalDisplayCoordinator
-import llm.slop.spirals.ui.components.HdmiStatusOverlay
 
 class MainActivity : ComponentActivity() {
+
+    // 1. Add this property to hold the active key listener logic
+    private var onKeyDownListener: ((android.view.KeyEvent) -> Boolean)? = null
 
     private lateinit var audioEngine: AudioEngine
     private var spiralSurfaceView: SpiralSurfaceView? = null
@@ -79,6 +75,22 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        
+        // 2. Wrap Window Callback to intercept keys globally
+        // This avoids Restricted API issues with overriding dispatchKeyEvent directly on ComponentActivity
+        val originalCallback = window.callback
+        if (originalCallback != null) {
+            window.callback = object : android.view.Window.Callback by originalCallback {
+                override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+                    if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+                        if (onKeyDownListener?.invoke(event) == true) {
+                            return true
+                        }
+                    }
+                    return originalCallback.dispatchKeyEvent(event)
+                }
+            }
+        }
         
         displayCoordinator = ExternalDisplayCoordinator(this)
         audioEngine = AudioEngine(applicationContext)
@@ -105,7 +117,6 @@ class MainActivity : ComponentActivity() {
                 var showSettings by remember { mutableStateOf(false) }
                 var showManager by remember { mutableStateOf(false) }
                 
-                val focusRequester = remember { FocusRequester() }
                 var isFullscreenPreview by remember { mutableStateOf(false) }
 
                 var hasMicPermission by remember { 
@@ -176,16 +187,6 @@ class MainActivity : ComponentActivity() {
                 LaunchedEffect(Unit) {
                     ModulationRegistry.startSync(this)
                 }
-                
-                // Ensure focus for keyboard shortcuts
-                LaunchedEffect(Unit) {
-                    focusRequester.requestFocus()
-                }
-                
-                // Re-request focus when toggling fullscreen to ensure keyboard capture
-                LaunchedEffect(isFullscreenPreview) {
-                    focusRequester.requestFocus()
-                }
 
                 // 2. Automatically start/stop Audio Engine based on source selection
                 LaunchedEffect(audioSourceType, hasMicPermission) {
@@ -214,6 +215,59 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                // 3. Update the Activity listener on every composition to capture current state
+                SideEffect {
+                    onKeyDownListener = { event ->
+                        val keyCode = event.keyCode
+                        
+                        when (keyCode) {
+                            android.view.KeyEvent.KEYCODE_F -> {
+                                isFullscreenPreview = !isFullscreenPreview
+                                true
+                            }
+                            android.view.KeyEvent.KEYCODE_ESCAPE -> {
+                                if (isFullscreenPreview) {
+                                    isFullscreenPreview = false
+                                    true
+                                } else false
+                            }
+                            // Editor Shortcuts
+                            android.view.KeyEvent.KEYCODE_Q, 
+                            android.view.KeyEvent.KEYCODE_W, 
+                            android.view.KeyEvent.KEYCODE_E, 
+                            android.view.KeyEvent.KEYCODE_R -> {
+                                if (currentLayer.type == LayerType.SHOW) {
+                                    val show = (currentLayer.data as? ShowLayerContent)?.show
+                                    when (keyCode) {
+                                        android.view.KeyEvent.KEYCODE_Q -> {
+                                            renderer.getMixerParam("SHOW_PREV")?.triggerPulse()
+                                            show?.let { vm.triggerPrevMixer(it.randomSetIds.size) }
+                                        }
+                                        android.view.KeyEvent.KEYCODE_E -> {
+                                            renderer.getMixerParam("SHOW_NEXT")?.triggerPulse()
+                                            show?.let { vm.triggerNextMixer(it.randomSetIds.size) }
+                                        }
+                                        android.view.KeyEvent.KEYCODE_R -> {
+                                            renderer.getMixerParam("SHOW_GENERATE")?.triggerPulse()
+                                            vm.triggerShowGenerate()
+                                        }
+                                        android.view.KeyEvent.KEYCODE_W -> {
+                                            renderer.getMixerParam("SHOW_RANDOM")?.triggerPulse()
+                                            show?.let { 
+                                                if (it.randomSetIds.isNotEmpty()) {
+                                                    vm.jumpToShowIndex(kotlin.random.Random.nextInt(it.randomSetIds.size))
+                                                }
+                                            }
+                                        }
+                                    }
+                                    true // Key Handled
+                                } else false
+                            }
+                            else -> false
+                        }
+                    }
+                }
+
                 CompositionLocalProvider(LocalSpiralRenderer provides renderer) {
                     val previewContent = @Composable {
                         Box(modifier = Modifier.fillMaxSize()) {
@@ -235,67 +289,47 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier
                             .fillMaxSize()
                             .background(AppBackground)
-                            .focusRequester(focusRequester)
-                            .focusable()
-                            .onPreviewKeyEvent { event ->
-                                if (event.type == KeyEventType.KeyDown) {
-                                    when (event.key) {
-                                        Key.F -> {
-                                            isFullscreenPreview = !isFullscreenPreview
-                                            true
-                                        }
-                                        Key.Escape -> {
-                                            if (isFullscreenPreview) {
-                                                isFullscreenPreview = false
-                                                true
-                                            } else false
-                                        }
-                                        // Show Editor Shortcuts - Always available even in fullscreen
-                                        Key.Q, Key.W, Key.E, Key.R -> {
-                                            if (currentLayer.type == LayerType.SHOW) {
-                                                val show = (currentLayer.data as? ShowLayerContent)?.show
-                                                when (event.key) {
-                                                    Key.Q -> {
-                                                        renderer.getMixerParam("SHOW_PREV")?.triggerPulse()
-                                                        show?.let { vm.triggerPrevMixer(it.randomSetIds.size) }
-                                                    }
-                                                    Key.E -> {
-                                                        renderer.getMixerParam("SHOW_NEXT")?.triggerPulse()
-                                                        show?.let { vm.triggerNextMixer(it.randomSetIds.size) }
-                                                    }
-                                                    Key.R -> {
-                                                        renderer.getMixerParam("SHOW_GENERATE")?.triggerPulse()
-                                                        vm.triggerShowGenerate()
-                                                    }
-                                                    Key.W -> {
-                                                        renderer.getMixerParam("SHOW_RANDOM")?.triggerPulse()
-                                                        show?.let { 
-                                                            if (it.randomSetIds.isNotEmpty()) {
-                                                                vm.jumpToShowIndex(kotlin.random.Random.nextInt(it.randomSetIds.size))
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                                true
-                                            } else false
-                                        }
-                                        else -> false
-                                    }
-                                } else false
-                            }
                     ) {
+                        // When in fullscreen, we render previewContent here (at root) to fill the screen.
+                        // We also keep the Editor UI in the tree (but invisible) so its state/effects persist.
                         if (isFullscreenPreview) {
-                            previewContent()
+                            Box(modifier = Modifier.fillMaxSize().zIndex(2f)) {
+                                previewContent()
+                            }
+                        }
+
+                        // The Editor UI
+                        // We pass a dummy/empty preview content to the Editor screens when in fullscreen mode
+                        // because the real SurfaceView has been moved to the root.
+                        val editorPreviewContent: @Composable () -> Unit = if (isFullscreenPreview) {
+                            { Spacer(Modifier.fillMaxSize()) }
                         } else {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .then(
-                                        if (isLandscape) Modifier.widthIn(max = 800.dp).align(Alignment.TopCenter)
-                                        else Modifier.fillMaxWidth()
-                                    )
-                                    .systemBarsPadding()
-                            ) {
+                            previewContent
+                        }
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .then(
+                                    if (isLandscape) Modifier.widthIn(max = 800.dp).align(Alignment.TopCenter)
+                                    else Modifier.fillMaxWidth()
+                                )
+                                .systemBarsPadding()
+                                .graphicsLayer { 
+                                    alpha = if (isFullscreenPreview) 0f else 1f 
+                                }
+                                .zIndex(if (isFullscreenPreview) 0f else 1f)
+                                .pointerInput(isFullscreenPreview) {
+                                     if (isFullscreenPreview) {
+                                         awaitPointerEventScope {
+                                             while (true) {
+                                                 val event = awaitPointerEvent()
+                                                 event.changes.forEach { it.consume() }
+                                             }
+                                         }
+                                     }
+                                }
+                        ) {
                                 var showHeaderMenu by remember { mutableStateOf(false) }
 
                                 EditorBreadcrumbs(
@@ -460,7 +494,7 @@ class MainActivity : ComponentActivity() {
                                                     if (nested) vm.createAndPushLayer(LayerType.MIXER)
                                                     else vm.createAndResetStack(LayerType.MIXER)
                                                 },
-                                                previewContent = previewContent,
+                                                previewContent = editorPreviewContent,
                                                 showManager = showManager,
                                                 onHideManager = { showManager = false }
                                             )
@@ -478,7 +512,7 @@ class MainActivity : ComponentActivity() {
                                                     else vm.createAndResetStack(LayerType.MANDALA)
                                                 },
                                                 onShowCvLab = { showCvLab = true },
-                                                previewContent = previewContent,
+                                                previewContent = editorPreviewContent,
                                                 showManager = showManager,
                                                 onHideManager = { showManager = false }
                                             )
@@ -489,7 +523,7 @@ class MainActivity : ComponentActivity() {
                                                 onClose = { vm.popToLayer(navStack.size - 2) },
                                                 onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
                                                 onShowCvLab = { showCvLab = true },
-                                                previewContent = previewContent,
+                                                previewContent = editorPreviewContent,
                                                 visualSource = manager,
                                                 showManager = showManager,
                                                 onHideManager = { showManager = false }
@@ -506,7 +540,7 @@ class MainActivity : ComponentActivity() {
                                                 onNavigateToSetEditor = { /* Navigation handled via breadcrumbs */ },
                                                 onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
                                                 onShowCvLab = { showCvLab = true },
-                                                previewContent = previewContent,
+                                                previewContent = editorPreviewContent,
                                                 showHeader = false,
                                                 showManager = showManager,
                                                 onHideManager = { showManager = false }
@@ -516,7 +550,7 @@ class MainActivity : ComponentActivity() {
                                             RandomSetEditorScreen(
                                                 vm = vm,
                                                 onClose = { vm.popToLayer(navStack.size - 2) },
-                                                previewContent = previewContent,
+                                                previewContent = editorPreviewContent,
                                                 visualSource = manager,
                                                 showManager = showManager,
                                                 onHideManager = { showManager = false }
@@ -525,7 +559,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
-                        }
+                        
                     }
                 }
 

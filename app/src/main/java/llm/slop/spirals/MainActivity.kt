@@ -272,7 +272,10 @@ class MainActivity : ComponentActivity() {
                     val previewContent = @Composable {
                         Box(modifier = Modifier.fillMaxSize()) {
                             AndroidView(
-                                factory = { surfaceView },
+                                factory = { 
+                                    (surfaceView.parent as? android.view.ViewGroup)?.removeView(surfaceView)
+                                    surfaceView 
+                                },
                                 modifier = Modifier.fillMaxSize(),
                                 update = {}
                             )

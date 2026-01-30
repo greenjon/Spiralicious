@@ -26,6 +26,7 @@ import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.cv.ModulatableParameter
+import llm.slop.spirals.cv.ModulationRegistry
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
 import android.util.Log
@@ -56,6 +57,8 @@ fun ShowEditorScreen(
     var focusedTriggerId by remember { mutableStateOf("SHOW_NEXT") }
     var frameTick by remember { mutableIntStateOf(0) }
     var reRollTick by remember { mutableIntStateOf(0) }
+    val fromSource = remember { mutableStateOf<MandalaVisualSource?>(null) }
+
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -143,7 +146,14 @@ fun ShowEditorScreen(
                     
                     // CRITICAL: Generate the actual mandala configuration for the renderer's visual source.
                     // createTemporaryMixerFromRandomSet puts the RandomSet in slot 0.
-                    generator.generateFromRSet(randomSet, mainRenderer.getSlotSource(0))
+                    val toSource = mainRenderer.getSlotSource(0)
+                    generator.generateFromRSet(randomSet, toSource)
+                    
+                    if (fromSource.value != null) {
+                        val currentBpm = ModulationRegistry.get("bpm")
+                        mainRenderer.startTransition(fromSource.value!!, toSource, currentShow.transitionDurationBeats, currentBpm)
+                    }
+                    fromSource.value = toSource.copy()
                     
                     Log.d("ShowEditor", "Renderer updated with RandomSet: ${randomSet.name}")
                 } catch (e: Exception) {
@@ -332,6 +342,57 @@ fun ShowEditorScreen(
                         },
                         focused = focusedTriggerId == "SHOW_GENERATE" || currentShow.generateTrigger.modulators.isNotEmpty(),
                         tick = frameTick.toLong()
+                    )
+                }
+            }
+
+            // Transition Controls
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Transition Type Dropdown
+                var transitionTypeExpanded by remember { mutableStateOf(false) }
+                Column {
+                    Text("Transition", style = MaterialTheme.typography.labelSmall, color = AppText)
+                    Box(modifier = Modifier.clickable { transitionTypeExpanded = true }) {
+                        Text(
+                            text = currentShow.transitionType.name.replace("_", " "),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AppText,
+                            modifier = Modifier.border(1.dp, AppText.copy(alpha = 0.2f)).padding(8.dp)
+                        )
+                        DropdownMenu(
+                            expanded = transitionTypeExpanded,
+                            onDismissRequest = { transitionTypeExpanded = false }
+                        ) {
+                            TransitionType.entries.forEach { type ->
+                                DropdownMenuItem(
+                                    text = { Text(type.name.replace("_", " ")) },
+                                    onClick = {
+                                        currentShow = currentShow.copy(transitionType = type)
+                                        transitionTypeExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Transition Duration Knob
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Duration (Beats)", style = MaterialTheme.typography.labelSmall, color = AppText)
+                    KnobView(
+                        baseValue = currentShow.transitionDurationBeats / 16f, // Normalize to 0-1 for knob
+                        modulatedValue = currentShow.transitionDurationBeats / 16f,
+                        onValueChange = {
+                            currentShow = currentShow.copy(transitionDurationBeats = it * 16f)
+                        },
+                        onInteractionFinished = {},
+                        displayTransform = { "%.1f".format(it * 16f) }
                     )
                 }
             }

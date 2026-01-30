@@ -18,6 +18,10 @@ import llm.slop.spirals.models.*
 
 val LocalSpiralRenderer = staticCompositionLocalOf<SpiralRenderer?> { null }
 
+enum class TransitionState {
+    IDLE, IMPLODING, EXPLODING
+}
+
 /**
  * Main OpenGL renderer for Spirals app.
  */
@@ -116,6 +120,14 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     private val slotSources = Array(4) { MandalaVisualSource() }
     private val mixerParams = mutableMapOf<String, ModulatableParameter>()
 
+    // Transition State
+    private var transitionState = TransitionState.IDLE
+    private var transitionStartTime = 0L
+    private var transitionDurationMillis = 0L
+    private var fromSource: MandalaVisualSource? = null
+    private var toSource: MandalaVisualSource? = null
+
+
     init {
         for (i in 1..4) {
             mixerParams["PN$i"] = ModulatableParameter(0.0f)
@@ -140,6 +152,16 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         mixerParams["SHOW_NEXT"] = ModulatableParameter(0.0f)
         mixerParams["SHOW_RANDOM"] = ModulatableParameter(0.0f)
         mixerParams["SHOW_GENERATE"] = ModulatableParameter(0.0f)
+    }
+
+    fun startTransition(from: MandalaVisualSource, to: MandalaVisualSource, durationBeats: Float, bpm: Float) {
+        if (durationBeats > 0f) {
+            this.fromSource = from.copy()
+            this.toSource = to.copy()
+            this.transitionDurationMillis = (durationBeats / bpm * 60f * 1000f).toLong()
+            this.transitionStartTime = System.currentTimeMillis()
+            this.transitionState = TransitionState.IMPLODING
+        }
     }
 
     fun getSlotSource(index: Int): MandalaVisualSource = slotSources[index]
@@ -328,20 +350,98 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         for (i in 0..3) slotSources[i].update() // For the 4 mixer slots
         mixerParams.values.forEach { it.evaluate() }
 
-        val p = mixerPatch
+        // Set global viewport
         GLES30.glViewport(0, 0, TARGET_WIDTH, TARGET_HEIGHT)
 
-        // 4. Determine rendering path: Mixer mode or Single Mandala mode.
-        if (p != null) {
-            // --- MIXER MODE ---
+        // Handle transition animation
+        if (transitionState != TransitionState.IDLE) {
+            val elapsedTime = System.currentTimeMillis() - transitionStartTime
+            val halfDuration = transitionDurationMillis / 2
+            var scale = 1.0f
+            var sourceToRender: MandalaVisualSource? = null
 
-            // 4a. Render each of the 4 slots into its master texture (`masterTextures[0-3]`).
-            // Each slot has its own independent feedback loop.
-            for (i in 0..3) {
-                if (p.slots[i].enabled && p.slots[i].isPopulated()) {
-                    val source = slotSources[i]
-                    val fx = source.parameters
-                    // Map UI-friendly parameter names to shader uniform names for feedback.
+            if (transitionState == TransitionState.IMPLODING) {
+                val progress = elapsedTime.toFloat() / halfDuration
+                scale = (1.0f - progress).coerceAtLeast(0f)
+                sourceToRender = fromSource
+                if (elapsedTime >= halfDuration) {
+                    transitionState = TransitionState.EXPLODING
+                    transitionStartTime = System.currentTimeMillis() // Reset start time for explode phase
+                }
+            } else if (transitionState == TransitionState.EXPLODING) {
+                val progress = elapsedTime.toFloat() / halfDuration
+                scale = progress.coerceAtMost(1f)
+                sourceToRender = toSource
+                if (elapsedTime >= halfDuration) {
+                    transitionState = TransitionState.IDLE
+                }
+            }
+
+            if (sourceToRender != null) {
+                compositeWithFeedback(
+                    render = { GLES30.glUseProgram(program); renderSource(sourceToRender, scale) },
+                    fx = emptyMap(),
+                    fbTextures = finalFBTextures,
+                    fbFramebuffers = finalFBFramebuffers,
+                    fbIndexRef = { finalFBIndex },
+                    fbIndexSet = { finalFBIndex = it },
+                    targetFboIdx = 6 // Final output always goes to masterFramebuffers[6]
+                )
+            }
+        } else {
+            // --- NORMAL RENDERING LOGIC ---
+            val p = mixerPatch
+            
+            // 4. Determine rendering path: Mixer mode or Single Mandala mode.
+            if (p != null) {
+                // --- MIXER MODE ---
+
+                // 4a. Render each of the 4 slots into its master texture (`masterTextures[0-3]`).
+                // Each slot has its own independent feedback loop.
+                for (i in 0..3) {
+                    if (p.slots[i].enabled && p.slots[i].isPopulated()) {
+                        val source = slotSources[i]
+                        val fx = source.parameters
+                        // Map UI-friendly parameter names to shader uniform names for feedback.
+                        val fxMap = if (fx != null) mapOf(
+                            "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f),
+                            "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f),
+                            "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f),
+                            "FB_SHIFT" to (fx["FB Shift"]?.value ?: 0f),
+                            "FB_BLUR" to (fx["FB Blur"]?.value ?: 0f)
+                        ) else emptyMap()
+
+                        compositeWithFeedback(
+                            render = { GLES30.glUseProgram(program); renderSource(source) },
+                            fx = fxMap,
+                            fbTextures = slotFBTextures[i],
+                            fbFramebuffers = slotFBFramebuffers[i],
+                            fbIndexRef = { slotFBIndex[i] },
+                            fbIndexSet = { slotFBIndex[i] = it },
+                            targetFboIdx = i // The output is written to masterFramebuffers[i]
+                        )
+                    } else {
+                        // If a slot is disabled or empty, just clear its texture to black.
+                        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, masterFramebuffers[i])
+                        GLES30.glClearColor(0f, 0f, 0f, 0f)
+                        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+                    }
+                }
+                // 4b. Composite the slots into mixer groups A and B.
+                // Mix slots 1 & 2 -> Mixer A (output to masterTextures[4])
+                renderMixerGroup(4, masterTextures[0], masterTextures[1], "A")
+                // Mix slots 3 & 4 -> Mixer B (output to masterTextures[5])
+                renderMixerGroup(5, masterTextures[2], masterTextures[3], "B")
+
+                // 4c. Composite the final output.
+                // This is where the "white blob" issue originates. It mixes Mixer A & B.
+                compositeFinalMixer(masterTextures[4], masterTextures[5])
+            } else {
+                // --- SINGLE MANDALA MODE ---
+                // This mode is simpler, rendering one mandala with one feedback system.
+                val currentSource = visualSource
+                if (currentSource != null) {
+                    val fx = currentSource.parameters
                     val fxMap = if (fx != null) mapOf(
                         "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f),
                         "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f),
@@ -351,53 +451,15 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                     ) else emptyMap()
 
                     compositeWithFeedback(
-                        render = { GLES30.glUseProgram(program); renderSource(source) },
+                        render = { GLES30.glUseProgram(program); renderSource(currentSource) },
                         fx = fxMap,
-                        fbTextures = slotFBTextures[i],
-                        fbFramebuffers = slotFBFramebuffers[i],
-                        fbIndexRef = { slotFBIndex[i] },
-                        fbIndexSet = { slotFBIndex[i] = it },
-                        targetFboIdx = i // The output is written to masterFramebuffers[i]
+                        fbTextures = finalFBTextures,
+                        fbFramebuffers = finalFBFramebuffers,
+                        fbIndexRef = { finalFBIndex },
+                        fbIndexSet = { finalFBIndex = it },
+                        targetFboIdx = 6 // Final output always goes to masterFramebuffers[6]
                     )
-                } else {
-                    // If a slot is disabled or empty, just clear its texture to black.
-                    GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, masterFramebuffers[i])
-                    GLES30.glClearColor(0f, 0f, 0f, 0f)
-                    GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
                 }
-            }
-            // 4b. Composite the slots into mixer groups A and B.
-            // Mix slots 1 & 2 -> Mixer A (output to masterTextures[4])
-            renderMixerGroup(4, masterTextures[0], masterTextures[1], "A")
-            // Mix slots 3 & 4 -> Mixer B (output to masterTextures[5])
-            renderMixerGroup(5, masterTextures[2], masterTextures[3], "B")
-
-            // 4c. Composite the final output.
-            // This is where the "white blob" issue originates. It mixes Mixer A & B.
-            compositeFinalMixer(masterTextures[4], masterTextures[5])
-        } else {
-            // --- SINGLE MANDALA MODE ---
-            // This mode is simpler, rendering one mandala with one feedback system.
-            val currentSource = visualSource
-            if (currentSource != null) {
-                val fx = currentSource.parameters
-                val fxMap = if (fx != null) mapOf(
-                    "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f),
-                    "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f),
-                    "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f),
-                    "FB_SHIFT" to (fx["FB Shift"]?.value ?: 0f),
-                    "FB_BLUR" to (fx["FB Blur"]?.value ?: 0f)
-                ) else emptyMap()
-
-                compositeWithFeedback(
-                    render = { GLES30.glUseProgram(program); renderSource(currentSource) },
-                    fx = fxMap,
-                    fbTextures = finalFBTextures,
-                    fbFramebuffers = finalFBFramebuffers,
-                    fbIndexRef = { finalFBIndex },
-                    fbIndexSet = { finalFBIndex = it },
-                    targetFboIdx = 6 // Final output always goes to masterFramebuffers[6]
-                )
             }
         }
 
@@ -525,7 +587,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
     }
 
-    private fun renderSource(s: MandalaVisualSource) {
+    private fun renderSource(s: MandalaVisualSource, scale: Float = 1.0f) {
         val p = s.parameters
         val hS = ((p["Hue Sweep"]?.value ?: (1f/9f)) * 9f).roundToInt().toFloat()
         
@@ -533,7 +595,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glUniform1f(uHueOffsetLocation, p["Hue Offset"]?.value ?: 0f)
         GLES30.glUniform1f(uHueSweepLocation, hS)
         GLES30.glUniform1f(uAlphaLocation, s.globalAlpha.value)
-        GLES30.glUniform1f(uGlobalScaleLocation, (p["Scale"]?.value ?: 0.125f) * s.globalScale.value * 8f)
+        GLES30.glUniform1f(uGlobalScaleLocation, (p["Scale"]?.value ?: 0.125f) * s.globalScale.value * 8f * scale)
         GLES30.glUniform1f(uGlobalRotationLocation, (p["Rotation"]?.value ?: 0f) * 2f * PI.toFloat())
         GLES30.glUniform1f(uAspectRatioLocation, aspectRatio)
         GLES30.glUniform1f(uDepthLocation, p["Depth"]?.value ?: 0.35f)

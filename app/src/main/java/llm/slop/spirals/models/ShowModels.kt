@@ -3,6 +3,10 @@ package llm.slop.spirals.models
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
+enum class TransitionType {
+    NONE, IMPLODE_EXPLODE
+}
+
 @Serializable
 data class ShowPatch(
     val id: String = UUID.randomUUID().toString(),
@@ -11,5 +15,7 @@ data class ShowPatch(
     val prevTrigger: ModulatableParameterData = ModulatableParameterData(0.0f),
     val nextTrigger: ModulatableParameterData = ModulatableParameterData(0.0f),
     val randomTrigger: ModulatableParameterData = ModulatableParameterData(0.0f),
-    val generateTrigger: ModulatableParameterData = ModulatableParameterData(0.0f)
+    val generateTrigger: ModulatableParameterData = ModulatableParameterData(0.0f),
+    val transitionType: TransitionType = TransitionType.NONE,
+    val transitionDurationBeats: Float = 0.0f
 )

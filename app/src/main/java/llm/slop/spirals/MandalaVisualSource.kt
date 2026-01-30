@@ -182,4 +182,29 @@ class MandalaVisualSource : VisualSource {
 
         canvas.restore()
     }
+
+    fun copy(): MandalaVisualSource {
+        val newSource = MandalaVisualSource()
+        // Deep copy parameters
+        this.parameters.forEach { (key, param) ->
+            newSource.parameters[key]?.baseValue = param.baseValue
+            newSource.parameters[key]?.modulators?.clear()
+            newSource.parameters[key]?.modulators?.addAll(param.modulators)
+        }
+        // Deep copy globalAlpha and globalScale
+        newSource.globalAlpha.baseValue = this.globalAlpha.baseValue
+        newSource.globalAlpha.modulators.clear()
+        newSource.globalAlpha.modulators.addAll(this.globalAlpha.modulators)
+
+        newSource.globalScale.baseValue = this.globalScale.baseValue
+        newSource.globalScale.modulators.clear()
+        newSource.globalScale.modulators.addAll(this.globalScale.modulators)
+
+        newSource.recipe = this.recipe.copy() // Mandala4Arm is a data class, so its copy is deep enough.
+        newSource.minR = this.minR
+        newSource.maxR = this.maxR
+        newSource.isDirty = this.isDirty
+        // Note: expansionBuffer is statically initialized, no need to copy
+        return newSource
+    }
 }

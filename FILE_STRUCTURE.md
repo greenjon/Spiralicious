@@ -238,9 +238,9 @@ Below is a phased approach to improving the codebase organization. These changes
     - [x] Create individual ViewModels for each editor screen (e.g., `MandalaEditorViewModel`, `MixerEditorViewModel`). These will handle screen-specific state and logic, interacting with the repositories and the `NavigationViewModel`.
 
 2.  **Extract Editor Composables from `MainActivity.kt`**:
-    - [ ] Move each primary screen composable (`ShowEditorScreen`, `MixerEditorScreen`, `MandalaSetEditorScreen`, `MandalaEditorScreen`, `RandomSetEditorScreen`, `CvLabScreen`) into its own file within a new `ui/screens` package.
-    - [ ] Move dialogs and overlays (`SettingsOverlay`, `RenamePatchDialog`) into their own files within a `ui/components` package.
-    - [ ] Reduce `MainActivity.kt` to its core responsibility: setting up the theme, navigation host, and top-level state management.
+    - [x] Move each primary screen composable (`ShowEditorScreen`, `MixerEditorScreen`, `MandalaSetEditorScreen`, `MandalaEditorScreen`, `RandomSetEditorScreen`, `CvLabScreen`) into its own file within a new `ui/screens` package.
+    - [x] Move dialogs and overlays (`SettingsOverlay`, `RenamePatchDialog`) into their own files within a `ui/components` package.
+    - [x] Reduce `MainActivity.kt` to its core responsibility: setting up the theme, navigation host, and top-level state management.
 
 
 ### Phase 4: Directory Structure Improvements

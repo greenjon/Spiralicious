@@ -42,15 +42,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import llm.slop.spirals.LocalSpiralRenderer
-import llm.slop.spirals.MandalaLayerContent
-import llm.slop.spirals.LayerType
-import llm.slop.spirals.MandalaLibrary
-import llm.slop.spirals.MandalaViewModel
-import llm.slop.spirals.MandalaVisualSource
-import llm.slop.spirals.PatchData
-import llm.slop.spirals.PatchMapper
-import llm.slop.spirals.RecipeTagManager
+import llm.slop.spirals.*
+import llm.slop.spirals.cv.core.CvModulator
+import llm.slop.spirals.cv.core.ModulationOperator
+import llm.slop.spirals.cv.core.Waveform
+import llm.slop.spirals.models.PatchData
+import llm.slop.spirals.models.STANDARD_BEAT_VALUES
+import llm.slop.spirals.models.SpeedSource
 import llm.slop.spirals.ui.InstrumentEditorScreen
 import llm.slop.spirals.ui.components.MandalaParameterMatrix
 import llm.slop.spirals.ui.components.OscilloscopeView
@@ -464,7 +462,7 @@ private fun randomizeMandala(visualSource: MandalaVisualSource, vm: MandalaViewM
             val subdivision = when (sourceId) {
                 "beatPhase" -> {
                     // Beat division from STANDARD_BEAT_VALUES
-                    val validValues = llm.slop.spirals.models.STANDARD_BEAT_VALUES.filter {
+                    val validValues = STANDARD_BEAT_VALUES.filter {
                         it in armDefaults.beatDivMin..armDefaults.beatDivMax
                     }
                     if (validValues.isNotEmpty()) {
@@ -476,7 +474,7 @@ private fun randomizeMandala(visualSource: MandalaVisualSource, vm: MandalaViewM
                 }
                 "sampleAndHold" -> {
                     // Random CV should also use beat divisions, not arbitrary time
-                    val validValues = llm.slop.spirals.models.STANDARD_BEAT_VALUES.filter {
+                    val validValues = STANDARD_BEAT_VALUES.filter {
                         it in armDefaults.beatDivMin..armDefaults.beatDivMax
                     }
                     if (validValues.isNotEmpty()) {
@@ -496,9 +494,9 @@ private fun randomizeMandala(visualSource: MandalaVisualSource, vm: MandalaViewM
             val phaseOffset = random.nextFloat()
 
             param.modulators.add(
-                llm.slop.spirals.cv.CvModulator(
+                CvModulator(
                     sourceId = sourceId,
-                    operator = llm.slop.spirals.cv.ModulationOperator.ADD,
+                    operator = ModulationOperator.ADD,
                     waveform = waveform,
                     slope = 0.5f,
                     weight = weight,
@@ -520,16 +518,16 @@ private fun randomizeMandala(visualSource: MandalaVisualSource, vm: MandalaViewM
         // Source based on probabilities
         val speedSource = rotationDefaults.getRandomSpeedSource(random)
         val sourceId = when(speedSource) {
-            llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
-            llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
-            llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
+            SpeedSource.BEAT -> "beatPhase"
+            SpeedSource.LFO -> "lfo1"
+            SpeedSource.RANDOM -> "sampleAndHold"
         }
 
         // Subdivision based on source
         val subdivision = when (sourceId) {
             "beatPhase" -> {
                 // Beat division from STANDARD_BEAT_VALUES
-                val validValues = llm.slop.spirals.models.STANDARD_BEAT_VALUES.filter {
+                val validValues = STANDARD_BEAT_VALUES.filter {
                     it in rotationDefaults.beatDivMin..rotationDefaults.beatDivMax
                 }
                 if (validValues.isNotEmpty()) {
@@ -541,7 +539,7 @@ private fun randomizeMandala(visualSource: MandalaVisualSource, vm: MandalaViewM
             }
             "sampleAndHold" -> {
                 // Random CV should also use beat divisions, not arbitrary time
-                val validValues = llm.slop.spirals.models.STANDARD_BEAT_VALUES.filter {
+                val validValues = STANDARD_BEAT_VALUES.filter {
                     it in rotationDefaults.beatDivMin..rotationDefaults.beatDivMax
                 }
                 if (validValues.isNotEmpty()) {
@@ -558,10 +556,10 @@ private fun randomizeMandala(visualSource: MandalaVisualSource, vm: MandalaViewM
         }
 
         param.modulators.add(
-            llm.slop.spirals.cv.CvModulator(
+            CvModulator(
                 sourceId = sourceId,
-                operator = llm.slop.spirals.cv.ModulationOperator.ADD,
-                waveform = llm.slop.spirals.cv.Waveform.TRIANGLE,
+                operator = ModulationOperator.ADD,
+                waveform = Waveform.TRIANGLE,
                 slope = slope,
                 weight = 1.0f,
                 phaseOffset = random.nextFloat(),
@@ -581,16 +579,16 @@ private fun randomizeMandala(visualSource: MandalaVisualSource, vm: MandalaViewM
         // Source based on probabilities
         val speedSource = hueOffsetDefaults.getRandomSpeedSource(random)
         val sourceId = when(speedSource) {
-            llm.slop.spirals.models.SpeedSource.BEAT -> "beatPhase"
-            llm.slop.spirals.models.SpeedSource.LFO -> "lfo1"
-            llm.slop.spirals.models.SpeedSource.RANDOM -> "sampleAndHold"
+            SpeedSource.BEAT -> "beatPhase"
+            SpeedSource.LFO -> "lfo1"
+            SpeedSource.RANDOM -> "sampleAndHold"
         }
 
         // Subdivision based on source
         val subdivision = when (sourceId) {
             "beatPhase" -> {
                 // Beat division from STANDARD_BEAT_VALUES
-                val validValues = llm.slop.spirals.models.STANDARD_BEAT_VALUES.filter {
+                val validValues = STANDARD_BEAT_VALUES.filter {
                     it in hueOffsetDefaults.beatDivMin..hueOffsetDefaults.beatDivMax
                 }
                 if (validValues.isNotEmpty()) {
@@ -602,7 +600,7 @@ private fun randomizeMandala(visualSource: MandalaVisualSource, vm: MandalaViewM
             }
             "sampleAndHold" -> {
                 // Random CV should also use beat divisions, not arbitrary time
-                val validValues = llm.slop.spirals.models.STANDARD_BEAT_VALUES.filter {
+                val validValues = STANDARD_BEAT_VALUES.filter {
                     it in hueOffsetDefaults.beatDivMin..hueOffsetDefaults.beatDivMax
                 }
                 if (validValues.isNotEmpty()) {
@@ -619,10 +617,10 @@ private fun randomizeMandala(visualSource: MandalaVisualSource, vm: MandalaViewM
         }
 
         param.modulators.add(
-            llm.slop.spirals.cv.CvModulator(
+            CvModulator(
                 sourceId = sourceId,
-                operator = llm.slop.spirals.cv.ModulationOperator.ADD,
-                waveform = llm.slop.spirals.cv.Waveform.TRIANGLE,
+                operator = ModulationOperator.ADD,
+                waveform = Waveform.TRIANGLE,
                 slope = slope,
                 weight = 1.0f,
                 phaseOffset = random.nextFloat(),

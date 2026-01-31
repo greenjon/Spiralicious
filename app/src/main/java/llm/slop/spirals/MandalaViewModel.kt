@@ -7,10 +7,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import llm.slop.spirals.models.MixerPatch
-import llm.slop.spirals.models.ShowPatch
-import llm.slop.spirals.models.MixerSlotData
-import llm.slop.spirals.models.VideoSourceType
+import llm.slop.spirals.database.entities.*
+import llm.slop.spirals.models.*
 import java.util.UUID
 
 /**
@@ -38,7 +36,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     // Show state
     private val _currentShowIndex = MutableStateFlow(0)
     val currentShowIndex = _currentShowIndex.asStateFlow()
-    
+
     private val _showGenerationTrigger = MutableStateFlow(0)
     val showGenerationTrigger = _showGenerationTrigger.asStateFlow()
 
@@ -55,7 +53,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             val saved = appConfig.loadNavStack()
             if (!saved.isNullOrEmpty()) return saved
         }
-        
+
         val type = when (mode) {
             StartupMode.MIXER -> LayerType.MIXER
             StartupMode.SET -> LayerType.SET
@@ -63,7 +61,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             StartupMode.SHOW -> LayerType.SHOW
             else -> LayerType.MIXER
         }
-        
+
         return listOf(NavLayer(UUID.randomUUID().toString(), getGenericName(type), type, isDirty = false))
     }
 
@@ -83,12 +81,12 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.SHOW -> "Show" to allShowPatches.value.map { it.name }
             LayerType.RANDOM_SET -> "Rand" to allRandomSets.value.map { it.name }
         }
-        
+
         val regex = Regex("${prefix}(\\d+)")
-        val maxNum = list.mapNotNull { 
-            regex.find(it)?.groupValues?.get(1)?.toIntOrNull() 
+        val maxNum = list.mapNotNull {
+            regex.find(it)?.groupValues?.get(1)?.toIntOrNull()
         }.maxOrNull() ?: 0
-        
+
         return "$prefix${(maxNum + 1).toString().padStart(3, '0')}"
     }
 
@@ -100,28 +98,28 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     fun createAndPushLayer(type: LayerType, parentSlotIndex: Int? = null) {
         val name = generateNextName(type)
         val id = UUID.randomUUID().toString()
-        
+
         val data: LayerContent = when(type) {
             LayerType.MIXER -> MixerLayerContent(MixerPatch(id = id, name = name, slots = List(4) { MixerSlotData() }))
             LayerType.SET -> SetLayerContent(MandalaSet(id = id, name = name, orderedMandalaIds = mutableListOf()))
             LayerType.MANDALA -> MandalaLayerContent(PatchData(name = name, recipeId = MandalaLibrary.MandalaRatios.first().id, parameters = emptyList()))
             LayerType.SHOW -> ShowLayerContent(ShowPatch(id = id, name = name))
-            LayerType.RANDOM_SET -> RandomSetLayerContent(llm.slop.spirals.models.RandomSet(id = id, name = name))
+            LayerType.RANDOM_SET -> RandomSetLayerContent(RandomSet(id = id, name = name))
         }
-        
+
         val newLayer = NavLayer(
-            id = id, 
-            name = name, 
-            type = type, 
-            isDirty = true, 
+            id = id,
+            name = name,
+            type = type,
+            isDirty = true,
             data = data,
             parentSlotIndex = parentSlotIndex,
             createdFromParent = true
         )
-        
+
         pushLayer(newLayer)
         saveLayer(newLayer)
-        
+
         if (type == LayerType.MANDALA) {
             _currentPatch.value = (data as MandalaLayerContent).patch
         }
@@ -142,17 +140,17 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.SET -> SetLayerContent(MandalaSet(id = id, name = name, orderedMandalaIds = mutableListOf()))
             LayerType.SHOW -> ShowLayerContent(ShowPatch(id = id, name = name))
             LayerType.MANDALA -> MandalaLayerContent(PatchData(name = name, recipeId = MandalaLibrary.MandalaRatios.first().id, parameters = emptyList()))
-            LayerType.RANDOM_SET -> RandomSetLayerContent(llm.slop.spirals.models.RandomSet(id = id, name = name))
+            LayerType.RANDOM_SET -> RandomSetLayerContent(RandomSet(id = id, name = name))
         }
-        
+
         val newLayer = NavLayer(id, name, type, isDirty = true, data = data)
-        
-        if (_navStack.value.size == 1 && _navStack.value[0].type == type && _navStack.value[0].data == null) {
+
+        if (_navStack.value.size == 1 && _navStack.value[0].type == type && _navVAlue[0].data == null) {
             _navStack.value = listOf(newLayer)
         } else {
             pushLayer(newLayer)
         }
-        
+
         if (type == LayerType.MANDALA) {
             _currentPatch.value = (data as? MandalaLayerContent)?.patch
         }
@@ -177,7 +175,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         _navStack.value = current
         saveWorkspaceIfEnabled()
     }
-    
+
     fun clearOpenedFromMenuFlag(index: Int) {
         if (index < 0 || index >= _navStack.value.size) return
         val current = _navStack.value.toMutableList()
@@ -188,7 +186,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     fun popToLayer(index: Int, save: Boolean = true) {
         if (index < -1) return
         if (index >= _navStack.value.size) return
-        
+
         if (save) {
             for (i in _navStack.value.lastIndex downTo index + 1) {
                 val child = _navStack.value[i]
@@ -201,13 +199,13 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
         }
-        
+
         val newStack = if (index == -1) {
             emptyList()
         } else {
             _navStack.value.take(index + 1)
         }
-        
+
         _navStack.value = if (newStack.isEmpty()) {
             val id = UUID.randomUUID().toString()
             listOf(NavLayer(id, getGenericName(LayerType.MIXER), LayerType.MIXER, isDirty = false))
@@ -216,12 +214,12 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         }
         saveWorkspaceIfEnabled()
     }
-    
+
     private fun linkChildToParent(child: NavLayer, parentIndex: Int) {
         if (parentIndex < 0 || parentIndex >= _navStack.value.size) return
         val parent = _navStack.value[parentIndex]
         val parentData = parent.data ?: return
-        
+
         when (parent.type) {
             LayerType.SHOW -> {
                 val show = (parentData as? ShowLayerContent)?.show ?: return
@@ -236,7 +234,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             LayerType.MIXER -> {
                 val mixer = (parentData as? MixerLayerContent)?.mixer ?: return
                 val slotIndex = child.parentSlotIndex ?: return
-                
+
                 when (child.type) {
                     LayerType.SET -> {
                         val set = (child.data as? SetLayerContent)?.set ?: return
@@ -334,7 +332,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     fun renameLayer(index: Int, oldName: String, newName: String) {
         if (index < 0 || index >= _navStack.value.size) return
         val layer = _navStack.value[index]
-        
+
         viewModelScope.launch {
             when (val data = layer.data) {
                 is MandalaLayerContent -> deletePatch(oldName)
@@ -344,7 +342,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 is RandomSetLayerContent -> deleteRandomSet(data.randomSet.id)
                 null -> {}
             }
-            
+
             val updatedData: LayerContent? = when (val data = layer.data) {
                 is MandalaLayerContent -> MandalaLayerContent(data.patch.copy(name = newName))
                 is SetLayerContent -> SetLayerContent(data.set.copy(name = newName))
@@ -353,15 +351,15 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                 is RandomSetLayerContent -> RandomSetLayerContent(data.randomSet.copy(name = newName))
                 null -> null
             }
-            
+
             val current = _navStack.value.toMutableList()
             current[index] = current[index].copy(name = newName, data = updatedData)
             _navStack.value = current
-            
+
             if (layer.type == LayerType.MANDALA && updatedData is MandalaLayerContent) {
                 _currentPatch.value = updatedData.patch
             }
-            
+
             saveLayer(_navStack.value[index])
             saveWorkspaceIfEnabled()
         }
@@ -371,10 +369,10 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         if (index < 0 || index >= _navStack.value.size) return
         val layer = _navStack.value[index]
         val data = layer.data ?: return
-        
+
         val newName = NamingUtils.generateCloneName(layer.name, getExistingNames(layer.type))
         val newId = UUID.randomUUID().toString()
-        
+
         val newData: LayerContent = when (data) {
             is MandalaLayerContent -> MandalaLayerContent(data.patch.copy(name = newName))
             is SetLayerContent -> SetLayerContent(data.set.copy(id = newId, name = newName))
@@ -382,7 +380,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             is ShowLayerContent -> ShowLayerContent(data.show.copy(id = newId, name = newName))
             is RandomSetLayerContent -> RandomSetLayerContent(data.randomSet.copy(id = newId, name = newName))
         }
-        
+
         val newLayer = NavLayer(newId, newName, layer.type, isDirty = true, data = newData)
         pushLayer(newLayer)
         saveLayer(newLayer)
@@ -401,7 +399,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
     fun deleteLayerAndPop(index: Int) {
         if (index < 0 || index >= _navStack.value.size) return
         val layer = _navStack.value[index]
-        
+
         viewModelScope.launch {
             when (val data = layer.data) {
                 is MandalaLayerContent -> deletePatch(layer.name)
@@ -484,7 +482,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch { showDao.deleteById(id) }
     }
 
-    fun saveRandomSet(randomSet: llm.slop.spirals.models.RandomSet) {
+    fun saveRandomSet(randomSet: RandomSet) {
         viewModelScope.launch {
             val json = Json.encodeToString(randomSet)
             randomSetDao.insertRandomSet(RandomSetEntity(randomSet.id, randomSet.name, json))
@@ -596,7 +594,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
                     val entity = allRandomSets.value.find { it.name == name }
                     if (entity != null) {
                         val newId = UUID.randomUUID().toString()
-                        val randomSet = Json.decodeFromString<llm.slop.spirals.models.RandomSet>(entity.jsonSettings)
+                        val randomSet = Json.decodeFromString<RandomSet>(entity.jsonSettings)
                         val newRandomSet = randomSet.copy(id = newId, name = newName)
                         randomSetDao.insertRandomSet(RandomSetEntity(newId, newName, Json.encodeToString(newRandomSet)))
                     }
@@ -642,7 +640,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         if (size == 0) return
         _currentShowIndex.value = if (_currentShowIndex.value <= 0) size - 1 else _currentShowIndex.value - 1
     }
-    
+
     fun triggerShowGenerate() {
         _showGenerationTrigger.value++
     }

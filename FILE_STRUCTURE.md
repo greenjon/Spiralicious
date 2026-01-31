@@ -26,6 +26,7 @@ These files represent the core functionality of the application:
 - **MainActivity.kt**: Entry point for the application, sets up navigation and the main UI container.
 - **MandalaViewModel.kt**: Primary view model that coordinates data flow between UI and model/database classes. (Being refactored in Phase 3)
 - **navigation/NavigationViewModel.kt**: Dedicated ViewModel that manages navigation stack and breadcrumb cascade logic.
+- **navigation/NavLayer.kt**: Model representing a navigation layer in the app's hierarchy.
 
 ### Editor-specific ViewModels
 
@@ -34,40 +35,66 @@ These files represent the core functionality of the application:
 - **viewmodels/MixerEditorViewModel.kt**: ViewModel for the Mixer Editor screen.
 - **viewmodels/ShowEditorViewModel.kt**: ViewModel for the Show Editor screen.
 - **viewmodels/RandomSetEditorViewModel.kt**: ViewModel for the Random Set Editor screen.
+
+### Rendering System
+
 - **SpiralSurfaceView.kt**: Custom view for rendering the mandala visualizations.
-- **SpiralRenderer.kt**: OpenGL renderer that handles the actual drawing of mandalas.
-- **SharedEGLContextFactory.kt**: Manages shared OpenGL contexts for efficient rendering across multiple surfaces.
-- **ShaderHelper.kt**: Utility for compiling and managing shaders used in visualization.
+- **display/SpiralRenderer.kt**: OpenGL renderer that handles the actual drawing of mandalas.
+- **display/SharedEGLContextFactory.kt**: Manages shared OpenGL contexts for efficient rendering across multiple surfaces.
+- **display/ShaderHelper.kt**: Utility for compiling and managing shaders used in visualization.
+
+### Core Visuals
+
 - **MandalaVisualSource.kt**: Defines the source of mandala visuals and how they're generated, including the VisualSource interface.
-- **MandalaLibrary.kt**: Contains predefined mandala ratios and templates used throughout the app.
-- **Mandala4Arm.kt**: Implementation of a specific mandala type with 4 symmetrical arms.
+- **models/mandala/MandalaLibrary.kt**: Contains predefined mandala ratios and templates used throughout the app.
 
 ## Model Classes
 
-Files that define the data models and entities for the app:
+Files that define the data models and entities for the app, organized by domain:
 
-- **MandalaParams.kt**: Parameters that define the appearance and behavior of a mandala.
-- **MandalaRatio.kt**: Defines ratio settings for mandala symmetry and proportions.
-- **RandomizationModels.kt**: Data models related to randomized mandala sets.
-- **MixerModels.kt**: Models for the mixer functionality that combines visual sources.
-- **ShowModels.kt**: Data structures for organizing shows/performances.
+### Mandala Models
+- **models/mandala/MandalaParams.kt**: Parameters that define the appearance and behavior of a mandala.
+- **models/mandala/MandalaRatio.kt**: Defines ratio settings for mandala symmetry and proportions.
+- **models/mandala/Mandala4Arm.kt**: Implementation of a specific mandala type with 4 symmetrical arms.
+
+### Set Models
+- **models/set/MandalaSet.kt**: Represents a collection of mandalas that can be sequenced.
+- **models/set/SelectionPolicy.kt**: Rules for selecting items from collections, specific to Mandala Sets.
+
+### Mixer Models
+- **models/MixerModels.kt**: Models for the mixer functionality that combines visual sources.
+
+### Show Models
+- **models/ShowModels.kt**: Data structures for organizing shows/performances.
+
+### Randomization Models
+- **models/RandomizationModels.kt**: Data models related to randomized mandala sets.
+
+### Core Models
 - **Layers.kt**: Defines layer types and content types for the application's hierarchical navigation system.
-- **MandalaSet.kt**: Represents a collection of mandalas that can be sequenced.
-- **NavLayer.kt**: Model representing a navigation layer in the app's hierarchy.
 
 ## Database
 
 Files related to data persistence:
 
 - **MandalaDatabase.kt**: Room database implementation for persisting mandala designs.
-- **MandalaPatch.kt**: Defines a saved mandala configuration (a "patch").
-- **MandalaPatchEntity.kt**: Database entity for storing mandala patches.
-- **MandalaSetEntity.kt**: Database entity for storing mandala sets.
-- **RandomSetEntity.kt**: Database entity for storing randomized sets.
-- **ShowPatchEntity.kt**: Database entity for storing show configurations.
-- **MixerPatchEntity.kt**: Database entity for storing mixer configurations.
-- **MandalaTag.kt**: Defines tags for organizing mandalas.
-- **MandalaTagDao.kt**: Data Access Object for mandala tags.
+
+### Database Entities
+- **database/entities/MandalaPatch.kt**: Defines a saved mandala configuration (a "patch").
+- **database/entities/MandalaPatchEntity.kt**: Room Entity for storing mandala patches.
+- **database/entities/MandalaSetEntity.kt**: Room Entity for storing mandala sets.
+- **database/entities/RandomSetEntity.kt**: Room Entity for storing randomized sets.
+- **database/entities/ShowPatchEntity.kt**: Room Entity for storing show configurations.
+- **database/entities/MixerPatchEntity.kt**: Room Entity for storing mixer configurations.
+- **database/entities/MandalaTag.kt**: Room Entity for defining tags for organizing mandalas.
+
+### Database DAOs
+- **database/daos/MandalaPatchDao.kt**: Data Access Object for mandala patches.
+- **database/daos/MandalaSetDao.kt**: Data Access Object for mandala sets.
+- **database/daos/RandomSetDao.kt**: Data Access Object for random sets.
+- **database/daos/ShowPatchDao.kt**: Data Access Object for show patches.
+- **database/daos/MixerPatchDao.kt**: Data Access Object for mixer patches.
+- **database/daos/MandalaTagDao.kt**: Data Access Object for mandala tags.
 
 ### Repository Classes
 
@@ -83,57 +110,62 @@ Files related to data persistence:
 
 User interface screens and components:
 
-- **MandalaSetEditorScreen.kt**: UI for editing mandala sets.
-- **MixerEditorScreen.kt**: UI for editing mixer configurations.
-- **ShowEditorScreen.kt**: UI for organizing and editing shows.
-- **RandomSetEditorScreen.kt**: UI for creating and editing random set templates.
-- **InstrumentEditorScreen.kt**: UI for editing instrument/control mappings.
-- **CvLabScreen.kt**: UI for experimenting with control voltage signals.
+### UI Screens
+
+- **ui/screens/MandalaEditorScreen.kt**: UI for editing individual mandalas.
+- **ui/screens/MandalaSetEditorScreen.kt**: UI for editing mandala sets.
+- **ui/screens/MixerEditorScreen.kt**: UI for editing mixer configurations.
+- **ui/screens/ShowEditorScreen.kt**: UI for organizing and editing shows.
+- **ui/screens/RandomSetEditorScreen.kt**: UI for creating and editing random set templates.
+- **ui/screens/InstrumentEditorScreen.kt**: UI for editing instrument/control mappings.
+- **ui/screens/CvLabScreen.kt**: UI for experimenting with control voltage signals.
 
 ### UI Components Subpackage
 
-- **components/EditorBreadcrumbs.kt**: Navigation breadcrumb UI component.
-- **components/KnobView.kt**: Rotary knob control for parameter editing.
-- **components/KnobModifier.kt**: Compose modifier for knob behaviors.
-- **components/RotaryKnobMath.kt**: Mathematical functions for rotary knob calculations.
-- **components/MandalaPicker.kt**: UI component for selecting mandalas.
-- **components/MixerComponents.kt**: UI components specific to the mixer editor.
-- **components/ParameterMatrix.kt**: Matrix layout for parameter controls.
-- **components/PatchManagerOverlay.kt**: Overlay UI for managing saved patches.
-- **components/RecipePickerDialog.kt**: Dialog for selecting mandala recipes.
-- **components/SetChipList.kt**: Component for displaying a list of sets as chips.
-- **components/OscilloscopeView.kt**: Visualization component for audio signals.
+- **ui/components/EditorBreadcrumbs.kt**: Navigation breadcrumb UI component.
+- **ui/components/KnobView.kt**: Rotary knob control for parameter editing.
+- **ui/components/KnobModifier.kt**: Compose modifier for knob behaviors.
+- **ui/components/RotaryKnobMath.kt**: Mathematical functions for rotary knob calculations.
+- **ui/components/MandalaPicker.kt**: UI component for selecting mandalas.
+- **ui/components/MixerComponents.kt**: UI components specific to the mixer editor.
+- **ui/components/ParameterMatrix.kt**: Matrix layout for parameter controls.
+- **ui/components/PatchManagerOverlay.kt**: Overlay UI for managing saved patches.
+- **ui/components/RecipePickerDialog.kt**: Dialog for selecting mandala recipes.
+- **ui/components/SetChipList.kt**: Component for displaying a list of sets as chips.
+- **ui/components/OscilloscopeView.kt**: Visualization component for audio signals.
+- **ui/components/SettingsOverlay.kt**: Overlay for application settings.
+- **ui/components/RenamePatchDialog.kt**: Dialog for renaming patches.
+- **ui/components/OpenPatchDialog.kt**: Dialog for opening saved patches.
 
 ### Theme
 
-- **theme/AppTheme.kt**: Consolidated theme configuration including colors, typography, and theme composable.
+- **ui/theme/AppTheme.kt**: Consolidated theme configuration including colors, typography, and theme composable.
 
 ## Control Voltage (CV) System
 
 Files related to the modulation and control voltage system:
 
-- **cv/Modulation.kt**: Base class for modulation sources.
-- **cv/ModulationRegistry.kt**: Registry for available modulation sources in the app.
-- **cv/CvSignal.kt**: Interface for CV signal generators.
-- **cv/CvClock.kt**: Clock signal generator for rhythmic modulation.
-- **cv/BeatClock.kt**: Beat-synchronized clock for rhythmic parameters.
-- **cv/AmplitudeCv.kt**: CV source based on audio amplitude.
+### CV Core
+- **cv/core/Modulation.kt**: Base class for modulation sources, `ModulatableParameter`, and related enums.
+- **cv/core/ModulationRegistry.kt**: Central registry for all Control Voltage signals, managing global state and synchronization.
+- **cv/core/CvSignal.kt**: Interface for all CV signal generators, and `ConstantCv` implementation.
 
-### Audio Processing
+### CV Sources
+- **cv/sources/CvClock.kt**: A clock that maintains CV time, decoupled from system time.
+- **cv/sources/BeatClock.kt**: Logic for tracking beat phase based on BPM, and `BeatPhaseCv` implementation.
+- **cv/sources/AmplitudeCv.kt**: A CV signal that provides smoothed linear energy from an audio stream.
+- **cv/sources/SampleAndHoldCv.kt**: A CV signal that generates new random values on a clock trigger and glides to it.
 
-- **cv/audio/AudioEngine.kt**: Core audio processing system.
-- **cv/audio/AudioSourceManager.kt**: Manages different audio input sources.
-- **cv/audio/Filters.kt**: Audio filtering utilities.
-- **cv/audio/EnvelopeFollower.kt**: Extracts amplitude envelope from audio.
-- **cv/audio/AmplitudeExtractor.kt**: Extracts amplitude data from audio signals.
+### CV Processors
+- **cv/processors/AudioEngine.kt**: Core audio analysis engine for splitting audio, onset detection, and BPM estimation.
+- **cv/processors/AudioSourceManager.kt**: Manages audio source configuration and MediaProjection flow.
+- **cv/processors/Filters.kt**: Simple IIR Filter implementations (BiquadFilter) for frequency splitting.
+- **cv/processors/EnvelopeFollower.kt**: Applies attack and release smoothing to a signal.
+- **cv/processors/AmplitudeExtractor.kt**: Extracts raw RMS amplitude from PCM data.
+- **cv/processors/CvModifiers.kt**: Composite and individual CV signal modifiers including Power, Clip, Offset, and Gain.
 
-### CV Modifiers
-
-- **cv/modifiers/CvModifiers.kt**: Consolidated CV signal modifiers including ModifiedCv, ClipCv, GainCv, OffsetCv, and PowerCv.
-
-### CV UI Components
-
-- **cv/ui/CvHistoryBuffer.kt**: Stores history of CV values for visualization.
+### CV Visualizers
+- **cv/visualizers/CvHistoryBuffer.kt**: A ring buffer to store the last N samples of a CV signal for visualization.
 
 ## Settings and Configuration
 
@@ -153,7 +185,6 @@ Utility and helper classes:
 - **PatchMapper.kt**: Maps between different patch formats/versions.
 - **RandomSetGenerator.kt**: Generates random mandalas based on constraints.
 - **RecipeTagManager.kt**: Manages tags and recipes for mandalas.
-- **SelectionPolicy.kt**: Rules for selecting items from collections.
 
 ## Resources
 
@@ -246,22 +277,18 @@ Below is a phased approach to improving the codebase organization. These changes
 ### Phase 4: Directory Structure Improvements
 
 1.  **Establish a Standard `ui` Package**:
-    - [ ] Create a top-level `ui` package.
-    - [ ] Organize UI files into `ui/screens`, `ui/components`, and `ui/theme`.
+    - [x] Create a top-level `ui` package and organize UI files into `ui/screens`, `ui/components`, and `ui/theme`.
 
 2.  **Create Specialized Packages**:
-     - Move `MandalaRenderer.kt`, `SharedEGLContextFactory.kt`, `ShaderHelper.kt`
-   - [ ] Reorganize models by domain
-     - Create `models/mandala`, `models/mixer`, `models/set`, `models/show` subpackages
+    - [x] Move `SpiralRenderer.kt`, `SharedEGLContextFactory.kt`, `ShaderHelper.kt` into a `display` subpackage.
 
-3.  **Properly Organize Database Components**:
-   - [x] Create a dedicated `database` package.
-   - [ ] Separate into `database/entities` and `database/daos` subpackages.
-   - [x] Place the newly created `Repository` classes from Phase 3 into a `database/repositories` subpackage.
+3.  **Reorganize models by domain**:
+    - [x] Create `models/mandala`, `models/mixer`, `models/set`, `models/show` subpackages and move relevant model files.
+    - [x] Separate into `database/entities` and `database/daos` subpackages and move relevant entity/DAO files.
 
 4.  **Restructure CV System**:
-   - [ ] Reorganize into `cv/sources`, `cv/processors`, `cv/visualizers`
-   - [ ] Group related files into these new subpackages
+   - [x] Reorganize into `cv/sources`, `cv/processors`, `cv/visualizers`
+   - [x] Group related files into these new subpackages
 
 ### Phase 5: Final Refinements
 

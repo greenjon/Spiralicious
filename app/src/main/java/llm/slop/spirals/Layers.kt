@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 import llm.slop.spirals.models.MixerPatch
 import llm.slop.spirals.models.RandomSet
 import llm.slop.spirals.models.ShowPatch
+import llm.slop.spirals.models.set.MandalaSet
+import llm.slop.spirals.PatchData
 
 /**
  * This file contains the core layer type definitions for the Spirals application hierarchy.

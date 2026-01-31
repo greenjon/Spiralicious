@@ -8,6 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import llm.slop.spirals.navigation.NavLayer // Corrected import
 
 @Serializable
 enum class StartupMode {

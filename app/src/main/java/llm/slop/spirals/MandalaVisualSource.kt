@@ -3,7 +3,7 @@ package llm.slop.spirals
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import llm.slop.spirals.cv.ModulatableParameter
+import llm.slop.spirals.cv.core.ModulatableParameter
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.PI
@@ -28,7 +28,7 @@ interface VisualSource {
     val globalScale: ModulatableParameter
 
     /**
-     * Trigger evaluation of all parameters. 
+     * Trigger evaluation of all parameters.
      * Expected to be called at 120Hz or per frame.
      */
     fun update() {
@@ -53,11 +53,11 @@ class MandalaVisualSource : VisualSource {
         "L2" to ModulatableParameter(0.3f),
         "L3" to ModulatableParameter(0.2f),
         "L4" to ModulatableParameter(0.1f),
-        "Scale" to ModulatableParameter(0.125f), 
+        "Scale" to ModulatableParameter(0.125f),
         "Rotation" to ModulatableParameter(0.0f),
         "Thickness" to ModulatableParameter(0.1f),
         "Hue Offset" to ModulatableParameter(0.0f),
-        "Hue Sweep" to ModulatableParameter(1.0f / 9.0f), 
+        "Hue Sweep" to ModulatableParameter(1.0f / 9.0f),
         "Depth" to ModulatableParameter(0.35f),
         // Feedback Engine Parameters
         "FB Gain" to ModulatableParameter(0.0f),
@@ -67,18 +67,18 @@ class MandalaVisualSource : VisualSource {
         "FB Blur" to ModulatableParameter(0.0f)
     )
 
-    override val globalAlpha = ModulatableParameter(1.0f) 
+    override val globalAlpha = ModulatableParameter(1.0f)
     override val globalScale = ModulatableParameter(1.0f)
 
     var recipe: MandalaRatio = MandalaLibrary.MandalaRatios.first()
-    
+
     private val paint = Paint().apply {
         isAntiAlias = true
         style = Paint.Style.STROKE
     }
 
     private val hsvBuffer = FloatArray(3)
-    
+
     private val points = 2048
     // Static buffer for GPU expansion: [Phase, Side] pairs
     val expansionBuffer = FloatArray((points + 1) * 2 * 2)
@@ -98,7 +98,7 @@ class MandalaVisualSource : VisualSource {
             val phase = i.toFloat() / points.toFloat()
             // Left vertex
             expansionBuffer[i * 4 + 0] = phase
-            expansionBuffer[i * 4 + 1] = -1.0f 
+            expansionBuffer[i * 4 + 1] = -1.0f
             // Right vertex
             expansionBuffer[i * 4 + 2] = phase
             expansionBuffer[i * 4 + 3] = 1.0f
@@ -107,14 +107,14 @@ class MandalaVisualSource : VisualSource {
 
     override fun update() {
         super.update()
-        
+
         // Optimization: Use mathematical heuristic for bounds instead of a 2048-point loop
         // maxR is the sum of absolute arm lengths (the maximum possible reach)
         val l1 = abs(parameters["L1"]?.value ?: 0f)
         val l2 = abs(parameters["L2"]?.value ?: 0f)
         val l3 = abs(parameters["L3"]?.value ?: 0f)
         val l4 = abs(parameters["L4"]?.value ?: 0f)
-        
+
         maxR = max(0.001f, l1 + l2 + l3 + l4)
         minR = 0f // Stable base for depth effect
 
@@ -143,7 +143,7 @@ class MandalaVisualSource : VisualSource {
         val l4 = parameters["L4"]?.value ?: 0.1f
 
         paint.strokeWidth = thickness
-        hsvBuffer[1] = 0.8f 
+        hsvBuffer[1] = 0.8f
 
         val cx = width / 2f
         val cy = height / 2f
@@ -160,7 +160,7 @@ class MandalaVisualSource : VisualSource {
         for (i in 1..points) {
             val t = i * dt
             val phase = i.toFloat() / points.toFloat()
-            
+
             val x = (l1 * cos(t * recipe.a) + l2 * cos(t * recipe.b) + l3 * cos(t * recipe.c) + l4 * cos(t * recipe.d)).toFloat()
             val y = (l1 * sin(t * recipe.a) + l2 * sin(t * recipe.b) + l3 * sin(t * recipe.c) + l4 * sin(t * recipe.d)).toFloat()
 
@@ -174,7 +174,7 @@ class MandalaVisualSource : VisualSource {
             hsvBuffer[0] = ((hueOffset + phase * hueSweep) % 1.0f) * 360f
             val color = Color.HSVToColor(hsvBuffer)
             paint.color = Color.argb((alpha * 255).toInt(), Color.red(color), Color.green(color), Color.blue(color))
-            
+
             canvas.drawLine(prevX, prevY, x, y, paint)
             prevX = x
             prevY = y

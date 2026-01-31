@@ -9,7 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import llm.slop.spirals.cv.ModulatableParameter
+import llm.slop.spirals.cv.core.ModulatableParameter
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppText
 import kotlin.math.roundToInt

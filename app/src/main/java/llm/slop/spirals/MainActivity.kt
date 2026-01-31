@@ -33,17 +33,24 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.awaitCancellation
-import llm.slop.spirals.cv.ModulationRegistry
-import llm.slop.spirals.cv.audio.AudioEngine
-import llm.slop.spirals.cv.audio.AudioSourceType
+import llm.slop.spirals.cv.core.ModulationRegistry
+import llm.slop.spirals.cv.processors.AudioEngine
+import llm.slop.spirals.cv.processors.AudioSourceType
 import llm.slop.spirals.display.ExternalDisplayCoordinator
-import llm.slop.spirals.ui.*
+import llm.slop.spirals.display.LocalSpiralRenderer
+import llm.slop.spirals.models.LayerType
+import llm.slop.spirals.models.ShowLayerContent
+import llm.slop.spirals.navigation.NavLayer
+import llm.slop.spirals.ui.CvLabScreen
+import llm.slop.spirals.ui.screens.MandalaEditorScreen
+import llm.slop.spirals.ui.screens.MandalaSetEditorScreen
+import llm.slop.spirals.ui.screens.MixerEditorScreen
+import llm.slop.spirals.ui.screens.RandomSetEditorScreen
+import llm.slop.spirals.ui.screens.ShowEditorScreen
 import llm.slop.spirals.ui.components.EditorBreadcrumbs
 import llm.slop.spirals.ui.components.HdmiStatusOverlay
 import llm.slop.spirals.ui.components.RenamePatchDialog
 import llm.slop.spirals.ui.components.SettingsOverlay
-import llm.slop.spirals.ui.screens.MandalaEditorScreen
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
@@ -51,12 +58,10 @@ import llm.slop.spirals.ui.theme.SpiralsTheme
 
 class MainActivity : ComponentActivity() {
 
-    // 1. Add this property to hold the active key listener logic
     private var onKeyDownListener: ((android.view.KeyEvent) -> Boolean)? = null
 
     private lateinit var audioEngine: AudioEngine
     private var spiralSurfaceView: SpiralSurfaceView? = null
-    private var sourceManager: MandalaVisualSource? = null
     private lateinit var displayCoordinator: ExternalDisplayCoordinator
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -68,9 +73,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        
-        // 2. Wrap Window Callback to intercept keys globally
-        // This avoids Restricted API issues with overriding dispatchKeyEvent directly on ComponentActivity
+
         val originalCallback = window.callback
         if (originalCallback != null) {
             window.callback = object : android.view.Window.Callback by originalCallback {
@@ -84,16 +87,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        
+
         displayCoordinator = ExternalDisplayCoordinator(this)
         audioEngine = AudioEngine(applicationContext)
-        val manager = MandalaVisualSource()
-        sourceManager = manager
         
         val surfaceView = SpiralSurfaceView(applicationContext)
         spiralSurfaceView = surfaceView
         val renderer = surfaceView.renderer
-        renderer.visualSource = manager
 
         setContent {
             SpiralsTheme {
@@ -116,11 +116,9 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) 
                 }
                 
-                // Auto-show Manage overlay when opening from menu
                 LaunchedEffect(currentLayer.id, currentLayer.openedFromMenu) {
                     if (currentLayer.openedFromMenu && !showManager) {
                         showManager = true
-                        // Clear the flag after showing once
                         val index = navStack.indexOfLast { it.id == currentLayer.id }
                         if (index != -1) {
                             vm.clearOpenedFromMenuFlag(index)
@@ -133,55 +131,25 @@ class MainActivity : ComponentActivity() {
                 var showDeleteConfirm by remember { mutableStateOf(false) }
                 var showExitConfirm by remember { mutableStateOf(false) }
 
-                // Back button handler
                 BackHandler {
                     when {
-                        isFullscreenPreview -> {
-                            isFullscreenPreview = false
-                        }
-                        // 1. Library open + has active data → Close Library
-                        showManager && currentLayer.data != null -> {
-                            showManager = false
-                        }
-                        // 2. Library open + no active data → Exit with confirmation
-                        showManager && currentLayer.data == null -> {
-                            showExitConfirm = true
-                        }
-                        // 3. CV Lab open → Close CV Lab
-                        showCvLab -> {
-                            showCvLab = false
-                        }
-                        // 4. Settings open → Close Settings
-                        showSettings -> {
-                            showSettings = false
-                        }
-                        // 5. Any dialog open → Close it
-                        showRenameDialog -> {
-                            showRenameDialog = false
-                        }
-                        showDeleteConfirm -> {
-                            showDeleteConfirm = false
-                        }
-                        showExitConfirm -> {
-                            showExitConfirm = false
-                        }
-                        // 6. In child editor → Pop to parent with cascade save+link
-                        navStack.size > 1 -> {
-                            vm.popToLayer(navStack.size - 2, save = true)
-                        }
-                        // 7. At root → Exit with confirmation
-                        else -> {
-                            showExitConfirm = true
-                        }
+                        isFullscreenPreview -> isFullscreenPreview = false
+                        showManager && currentLayer.data != null -> showManager = false
+                        showManager && currentLayer.data == null -> showExitConfirm = true
+                        showCvLab -> showCvLab = false
+                        showSettings -> showSettings = false
+                        showRenameDialog -> showRenameDialog = false
+                        showDeleteConfirm -> showDeleteConfirm = false
+                        showExitConfirm -> showExitConfirm = false
+                        navStack.size > 1 -> vm.popToLayer(navStack.size - 2, save = true)
+                        else -> showExitConfirm = true
                     }
                 }
 
-                // 1. Start the CV Sync Registry immediately
                 LaunchedEffect(Unit) {
                     ModulationRegistry.startSync(this)
                 }
 
-                // 2. Automatically start/stop Audio Engine based on source selection
                 LaunchedEffect(audioSourceType, hasMicPermission) {
                     if (audioSourceType == AudioSourceType.MIC || audioSourceType == AudioSourceType.UNPROCESSED) {
                         if (hasMicPermission) {
@@ -208,7 +176,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // 3. Update the Activity listener on every composition to capture current state
                 SideEffect {
                     onKeyDownListener = { event ->
                         val keyCode = event.keyCode
@@ -224,7 +191,6 @@ class MainActivity : ComponentActivity() {
                                     true
                                 } else false
                             }
-                            // Editor Shortcuts
                             android.view.KeyEvent.KEYCODE_Q, 
                             android.view.KeyEvent.KEYCODE_W, 
                             android.view.KeyEvent.KEYCODE_E, 
@@ -253,7 +219,7 @@ class MainActivity : ComponentActivity() {
                                             }
                                         }
                                     }
-                                    true // Key Handled
+                                    true
                                 } else false
                             }
                             else -> false
@@ -286,17 +252,12 @@ class MainActivity : ComponentActivity() {
                             .fillMaxSize()
                             .background(AppBackground)
                     ) {
-                        // When in fullscreen, we render previewContent here (at root) to fill the screen.
-                        // We also keep the Editor UI in the tree (but invisible) so its state/effects persist.
                         if (isFullscreenPreview) {
                             Box(modifier = Modifier.fillMaxSize().zIndex(2f)) {
                                 previewContent()
                             }
                         }
 
-                        // The Editor UI
-                        // We pass a dummy/empty preview content to the Editor screens when in fullscreen mode
-                        // because the real SurfaceView has been moved to the root.
                         val editorPreviewContent: @Composable () -> Unit = if (isFullscreenPreview) {
                             { Spacer(Modifier.fillMaxSize()) }
                         } else {
@@ -353,7 +314,6 @@ class MainActivity : ComponentActivity() {
                                                     LayerType.RANDOM_SET -> "RSet"
                                                 }
 
-                                                // --- TOP GROUP ---
                                                 DropdownMenuItem(
                                                     text = { Text("Library", color = if (isAtRoot) AppAccent else disabledColor) },
                                                     onClick = { 
@@ -377,24 +337,19 @@ class MainActivity : ComponentActivity() {
 
                                                 HorizontalDivider(color = AppText.copy(alpha = 0.1f))
 
-                                                // --- CURRENT ITEM ACTIONS ---
-                                                // Save menu item - ALWAYS SHOW when there's data
                                                 if (hasActiveData) {
                                                     val isDirty = currentLayer.isDirty
                                                     val textColor = if (isDirty) AppAccent else disabledColor
 
                                                     DropdownMenuItem(
-                                                        text = {
-                                                            Text("Save", color = textColor)
-                                                        },
+                                                        text = { Text("Save", color = textColor) },
                                                         onClick = {
                                                             if (isDirty) {
                                                                 vm.saveLayer(currentLayer)
-                                                                // Optional: Show toast/snackbar feedback
                                                                 showHeaderMenu = false
                                                             }
                                                         },
-                                                        enabled = isDirty  // Only clickable when dirty
+                                                        enabled = isDirty
                                                     )
                                                     HorizontalDivider(color = AppText.copy(alpha = 0.1f))
                                                 }
@@ -424,7 +379,6 @@ class MainActivity : ComponentActivity() {
 
                                                 HorizontalDivider(color = AppText.copy(alpha = 0.1f))
 
-                                                // --- SWITCH GROUP ---
                                                 DropdownMenuItem(
                                                     text = { Text("Switch to...", color = AppText) },
                                                     onClick = { /* Section Header */ },
@@ -458,7 +412,6 @@ class MainActivity : ComponentActivity() {
 
                                                 HorizontalDivider(color = AppText.copy(alpha = 0.1f))
 
-                                                // --- BOTTOM GROUP ---
                                                 DropdownMenuItem(
                                                     text = { Text("CV Lab", color = AppAccent) }, 
                                                     onClick = { showCvLab = true; showHeaderMenu = false }
@@ -482,6 +435,7 @@ class MainActivity : ComponentActivity() {
                                 )
 
                                 Box(modifier = Modifier.weight(1f)) {
+                                    val manager = remember { MandalaVisualSource() }
                                     when (currentLayer.type) {
                                         LayerType.SHOW -> {
                                             ShowEditorScreen(
@@ -559,7 +513,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // Overlays
                 AnimatedVisibility(
                     visible = showCvLab,
                     enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -632,7 +585,6 @@ class MainActivity : ComponentActivity() {
                         },
                         confirmButton = {
                             TextButton(onClick = { 
-                                // Auto-save all dirty layers before finishing
                                 navStack.forEach { layer ->
                                     if (layer.isDirty) {
                                         vm.saveLayer(layer)
@@ -665,6 +617,6 @@ class MainActivity : ComponentActivity() {
         displayCoordinator.stop()
     }
 
-    override fun onPause() { super.onPause(); spiralSurfaceView?.onPause(); audioEngine.stop() }
+    override fun onPause() { super.onPause(); spiralSurfaceView?.onPause(); }
     override fun onResume() { super.onResume(); spiralSurfaceView?.onResume() }
 }

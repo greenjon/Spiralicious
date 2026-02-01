@@ -15,6 +15,14 @@ dependencies {
     // compose.desktop.currentOs should be used in launcher-sourceSet
     // (in a separate module for instance)
     implementation(compose.desktop.currentOs)
+
+    val lwjglVersion = "3.3.3"
+    val lwjglNatives = "natives-linux" // Or your target OS
+
+    implementation("org.lwjgl:lwjgl:$lwjglVersion")
+    implementation("org.lwjgl:lwjgl-opengl:$lwjglVersion")
+    runtimeOnly("org.lwjgl:lwjgl:$lwjglVersion:$lwjglNatives")
+    runtimeOnly("org.lwjgl:lwjgl-opengl:$lwjglVersion:$lwjglNatives")
 }
 
 compose.desktop {

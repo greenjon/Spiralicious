@@ -9,6 +9,10 @@ plugins {
 group = "llm.slop.spirals"
 version = "1.0"
 
+kotlin {
+    jvmToolchain(17)
+}
+
 dependencies {
     implementation(project(":common"))
     // Note, if you develop a library, you should use compose.desktop.common.

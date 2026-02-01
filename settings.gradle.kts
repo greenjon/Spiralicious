@@ -9,6 +9,7 @@ pluginManagement {
         }
         mavenCentral()
         gradlePluginPortal()
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
     }
 }
 dependencyResolutionManagement {
@@ -21,4 +22,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Spirals"
 include(":app")
- 
+include(":desktop")
+include(":common")

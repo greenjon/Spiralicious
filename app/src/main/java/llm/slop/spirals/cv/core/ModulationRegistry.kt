@@ -1,7 +1,7 @@
 package llm.slop.spirals.cv.core
 
 import androidx.compose.runtime.mutableStateMapOf
-import llm.slop.spirals.cv.ui.CvHistoryBuffer
+import llm.slop.spirals.cv.visualizers.CvHistoryBuffer
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.*
 import llm.slop.spirals.cv.sources.SampleAndHoldCv

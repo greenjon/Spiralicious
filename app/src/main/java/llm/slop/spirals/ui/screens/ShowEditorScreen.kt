@@ -1,5 +1,6 @@
 package llm.slop.spirals.ui.screens
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,22 +17,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import llm.slop.spirals.*
-import llm.slop.spirals.models.*
-import llm.slop.spirals.ui.components.PatchManagerOverlay
-import llm.slop.spirals.ui.components.SetChipList
-import llm.slop.spirals.ui.components.KnobView
-import llm.slop.spirals.ui.components.OscilloscopeView
-import llm.slop.spirals.ui.theme.AppBackground
-import llm.slop.spirals.ui.theme.AppAccent
-import llm.slop.spirals.ui.theme.AppText
-import llm.slop.spirals.cv.ModulatableParameter
-import llm.slop.spirals.cv.ModulationRegistry
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
-import android.util.Log
-import llm.slop.spirals.ui.PickerDialog
-import llm.slop.spirals.ui.ModulatorRow
+import kotlinx.serialization.json.Json
+import llm.slop.spirals.*
+import llm.slop.spirals.cv.core.ModulatableParameter
+import llm.slop.spirals.cv.core.ModulationRegistry
+import llm.slop.spirals.display.LocalSpiralRenderer
+import llm.slop.spirals.models.*
+import llm.slop.spirals.ui.components.*
+import llm.slop.spirals.ui.theme.AppAccent
+import llm.slop.spirals.ui.theme.AppBackground
+import llm.slop.spirals.ui.theme.AppText
 import kotlin.random.Random
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -597,8 +593,6 @@ fun ShowEditorScreen(
                         // Reset to first RandomSet when switching shows
                         if (selected.randomSetIds.isNotEmpty()) {
                             vm.jumpToShowIndex(0)
-                        } else {
-                            mainRenderer?.mixerPatch = null
                         }
                     } catch (e: Exception) {}
                 },

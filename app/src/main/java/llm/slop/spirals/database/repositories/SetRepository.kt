@@ -7,9 +7,9 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import llm.slop.spirals.MandalaDatabase
-import llm.slop.spirals.MandalaSet
-import llm.slop.spirals.MandalaSetEntity
-import llm.slop.spirals.SelectionPolicy
+import llm.slop.spirals.database.entities.MandalaSetEntity
+import llm.slop.spirals.models.set.MandalaSet
+import llm.slop.spirals.models.set.SelectionPolicy
 
 /**
  * Repository for managing Mandala Sets.
@@ -95,7 +95,7 @@ class SetRepository(private val database: MandalaDatabase) : Repository<MandalaS
     /**
      * Clones a mandala set.
      * 
-     * @param id The ID of the set to clone
+     * @param id The ID of the mandala set to clone
      * @param newName The name for the cloned set
      * @param newId The ID for the cloned set (optional)
      * @return the ID of the cloned set if successful, null otherwise

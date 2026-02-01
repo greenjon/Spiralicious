@@ -3,8 +3,7 @@ package llm.slop.spirals.display
 import android.opengl.GLES30
 import android.util.Log
 import android.view.Surface
-import llm.slop.spirals.SharedContextManager
-import llm.slop.spirals.ShaderHelper
+import llm.slop.spirals.display.ShaderHelper
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.microedition.khronos.egl.*

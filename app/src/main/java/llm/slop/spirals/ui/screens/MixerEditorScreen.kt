@@ -16,8 +16,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import llm.slop.spirals.*
 import llm.slop.spirals.models.*
-import llm.slop.spirals.ui.PickerDialog
-import llm.slop.spirals.ui.components.*
+import llm.slop.spirals.display.LocalSpiralRenderer
+import llm.slop.spirals.ui.components.* // Keep existing wildcard import
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText

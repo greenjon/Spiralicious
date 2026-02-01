@@ -1,14 +1,37 @@
-package llm.slop.spirals.ui
+package llm.slop.spirals.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -17,70 +40,17 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import llm.slop.spirals.MandalaVisualSource
-import llm.slop.spirals.MandalaViewModel
-import llm.slop.spirals.cv.*
+import kotlinx.coroutines.delay
 import llm.slop.spirals.R
-import llm.slop.spirals.ui.components.KnobView
+import llm.slop.spirals.cv.core.CvModulator
+import llm.slop.spirals.cv.core.LfoSpeedMode
+import llm.slop.spirals.cv.core.ModulationOperator
+import llm.slop.spirals.cv.core.ModulationRegistry
+import llm.slop.spirals.cv.core.Waveform
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
-import kotlinx.coroutines.delay
 import kotlin.math.sin
-
-@Composable
-fun InstrumentEditorScreen(
-    source: MandalaVisualSource,
-    vm: MandalaViewModel,
-    focusedId: String,
-    onFocusChange: (String) -> Unit,
-    onInteractionFinished: () -> Unit
-) {
-    val scrollState = rememberScrollState()
-    val focusedParam = source.parameters[focusedId] ?: source.globalAlpha
-    
-    var refreshCount by remember { mutableIntStateOf(0) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppBackground)
-            .padding(horizontal = 8.dp)
-    ) {
-        Column(modifier = Modifier.weight(1f).verticalScroll(scrollState)) {
-            key(focusedId, refreshCount) {
-                focusedParam.modulators.forEachIndexed { index, mod ->
-                    ModulatorRow(
-                        mod = mod,
-                        onUpdate = { updatedMod ->
-                            focusedParam.modulators[index] = updatedMod
-                        },
-                        onInteractionFinished = onInteractionFinished,
-                        onRemove = { 
-                            focusedParam.modulators.removeAt(index)
-                            refreshCount++
-                            onInteractionFinished()
-                        }
-                    )
-                    HorizontalDivider(color = AppText.copy(alpha = 0.1f), modifier = Modifier.padding(vertical = 4.dp))
-                }
-
-                ModulatorRow(
-                    mod = null,
-                    onUpdate = { newMod ->
-                        focusedParam.modulators.add(newMod)
-                        refreshCount++
-                        onInteractionFinished()
-                    },
-                    onInteractionFinished = onInteractionFinished,
-                    onRemove = {}
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(100.dp))
-        }
-    }
-}
 
 @Composable
 fun ModulatorRow(
@@ -94,7 +64,7 @@ fun ModulatorRow(
     var operator by remember(mod) { mutableStateOf(mod?.operator ?: ModulationOperator.ADD) }
     var weight by remember(mod) { mutableFloatStateOf(mod?.weight ?: 0f) }
     var bypassed by remember(mod) { mutableStateOf(mod?.bypassed ?: false) }
-    
+
     // Beat/LFO fields
     var waveform by remember(mod) { mutableStateOf(mod?.waveform ?: Waveform.SINE) }
     var subdivision by remember(mod) { mutableFloatStateOf(mod?.subdivision ?: 1.0f) }
@@ -107,7 +77,7 @@ fun ModulatorRow(
     val isSampleAndHold = sourceId == "sampleAndHold"
     val hasAdvancedControls = isBeat || isLfo || isSampleAndHold
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    
+
     var pulseValue by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(sourceId, weight, waveform, subdivision, phaseOffset, slope, lfoSpeedMode) {
         if (sourceId != "none") {
@@ -156,9 +126,9 @@ fun ModulatorRow(
             title = { Text("Remove Modulator", color = AppText) },
             text = { Text("Are you sure you want to remove this modulation source?", color = AppText) },
             confirmButton = {
-                TextButton(onClick = { 
+                TextButton(onClick = {
                     showDeleteConfirm = false
-                    onRemove() 
+                    onRemove()
                 }) {
                     Text("Remove", color = Color.Red)
                 }
@@ -207,8 +177,8 @@ fun ModulatorRow(
                                             "beatPhase" -> "BEAT"
                                             "sampleAndHold" -> "RANDOM"
                                             else -> s.uppercase()
-                                        }) 
-                                    }, onClick = {  
+                                        })
+                                    }, onClick = {
                                         sourceId = s
                                         // Force Square wave for Sample & Hold
                                         val wave = if (s == "sampleAndHold") Waveform.SQUARE else waveform
@@ -225,15 +195,15 @@ fun ModulatorRow(
 
                         if (sourceId != "none") {
                             TextButton(
-                                onClick = { 
+                                onClick = {
                                     val newOp = if (operator == ModulationOperator.ADD) ModulationOperator.MUL else ModulationOperator.ADD
                                     operator = newOp
                                     if (!isNew) { onUpdate(CvModulator(sourceId, newOp, weight, bypassed, waveform, subdivision, phaseOffset, slope, lfoSpeedMode)); onInteractionFinished() }
                                 },
                                 modifier = Modifier.height(32.dp).padding(horizontal = 4.dp),
                                 contentPadding = PaddingValues(0.dp)
-                            ) { 
-                                Text(if (operator == ModulationOperator.ADD) "ADD" else "MUL", color = AppAccent, style = MaterialTheme.typography.labelSmall) 
+                            ) {
+                                Text(if (operator == ModulationOperator.ADD) "ADD" else "MUL", color = AppAccent, style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
@@ -246,21 +216,21 @@ fun ModulatorRow(
                                     .padding(end = 4.dp)
                                     .height(20.dp)
                                     .width(32.dp)
-                                    .clickable { 
+                                    .clickable {
                                         bypassed = !bypassed
                                         onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope, lfoSpeedMode))
-                                        onInteractionFinished() 
+                                        onInteractionFinished()
                                     },
                                 color = AppBackground,
                                 shape = MaterialTheme.shapes.extraSmall,
                                 border = androidx.compose.foundation.BorderStroke(1.dp, if (bypassed) AppText else AppAccent)
                             ) {
-                                Box(contentAlignment = Alignment.Center) { 
+                                Box(contentAlignment = Alignment.Center) {
                                     Text(
-                                        text = if (bypassed) "OFF" else "ON", 
-                                        color = AppText, 
+                                        text = if (bypassed) "OFF" else "ON",
+                                        color = AppText,
                                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp)
-                                    ) 
+                                    )
                                 }
                             }
                         } else {
@@ -271,7 +241,7 @@ fun ModulatorRow(
 
                         if (hasAdvancedControls) {
                             Spacer(modifier = Modifier.width(4.dp))
-                            
+
                             IconButton(
                                 onClick = {
                                     // Only allow changing waveform if not sampleAndHold
@@ -281,7 +251,7 @@ fun ModulatorRow(
                                         onUpdate(CvModulator(sourceId, operator, weight, bypassed, nextWave, subdivision, phaseOffset, slope, lfoSpeedMode))
                                         onInteractionFinished()
                                     }
-                                }, 
+                                },
                                 modifier = Modifier.size(28.dp),
                                 enabled = !isSampleAndHold
                             ) {
@@ -312,13 +282,13 @@ fun ModulatorRow(
                                         modifier = Modifier
                                             .clickable { subExpanded = true }
                                             .padding(horizontal = 4.dp),
-                                        color = AppAccent, 
-                                        style = MaterialTheme.typography.labelSmall, 
+                                        color = AppAccent,
+                                        style = MaterialTheme.typography.labelSmall,
                                         textAlign = TextAlign.Center,
                                         maxLines = 1,
                                         softWrap = false
                                     )
-                                    
+
                                     DropdownMenu(expanded = subExpanded, onDismissRequest = { subExpanded = false }) {
                                         listOf(0.0625f, 0.125f, 0.25f, 0.5f, 1f, 2f, 4f, 8f, 16f, 32f, 64f, 128f, 256f).forEach { sub ->
                                             DropdownMenuItem(text = {
@@ -347,7 +317,7 @@ fun ModulatorRow(
                                 Text(
                                     text = speedLabel,
                                     modifier = Modifier
-                                        .clickable { 
+                                        .clickable {
                                             val nextMode = LfoSpeedMode.entries[(lfoSpeedMode.ordinal + 1) % LfoSpeedMode.entries.size]
                                             lfoSpeedMode = nextMode
                                             onUpdate(CvModulator(sourceId, operator, weight, bypassed, waveform, subdivision, phaseOffset, slope, nextMode))
@@ -452,7 +422,7 @@ fun ModulatorRow(
                                         waveform == Waveform.TRIANGLE -> "Slope"
                                         else -> "Duty"
                                     },
-                                    style = MaterialTheme.typography.labelSmall, 
+                                    style = MaterialTheme.typography.labelSmall,
                                     color = AppText
                                 )
                             }
@@ -489,9 +459,9 @@ fun ModulatorRow(
                     .size(24.dp)
             ) {
                 Icon(
-                    Icons.Default.Close, 
-                    contentDescription = "Remove", 
-                    tint = AppText.copy(alpha = 0.5f), 
+                    Icons.Default.Close,
+                    contentDescription = "Remove",
+                    tint = AppText.copy(alpha = 0.5f),
                     modifier = Modifier.size(16.dp)
                 )
             }

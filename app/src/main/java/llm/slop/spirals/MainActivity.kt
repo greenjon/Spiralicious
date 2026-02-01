@@ -38,10 +38,10 @@ import llm.slop.spirals.cv.processors.AudioEngine
 import llm.slop.spirals.cv.processors.AudioSourceType
 import llm.slop.spirals.display.ExternalDisplayCoordinator
 import llm.slop.spirals.display.LocalSpiralRenderer
-import llm.slop.spirals.models.LayerType
-import llm.slop.spirals.models.ShowLayerContent
+import llm.slop.spirals.LayerType
+import llm.slop.spirals.ShowLayerContent
 import llm.slop.spirals.navigation.NavLayer
-import llm.slop.spirals.ui.CvLabScreen
+import llm.slop.spirals.ui.screens.CvLabScreen
 import llm.slop.spirals.ui.screens.MandalaEditorScreen
 import llm.slop.spirals.ui.screens.MandalaSetEditorScreen
 import llm.slop.spirals.ui.screens.MixerEditorScreen
@@ -55,6 +55,8 @@ import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.ui.theme.SpiralsTheme
+import llm.slop.spirals.SpiralSurfaceView // Added import
+import llm.slop.spirals.PatchMapper // Added import
 
 class MainActivity : ComponentActivity() {
 
@@ -440,7 +442,7 @@ class MainActivity : ComponentActivity() {
                                         LayerType.SHOW -> {
                                             ShowEditorScreen(
                                                 vm = vm,
-                                                onNavigateToMixerEditor = { nested ->
+                                                onNavigateToMixerEditor = { nested: Boolean ->
                                                     if (nested) vm.createAndPushLayer(LayerType.MIXER)
                                                     else vm.createAndResetStack(LayerType.MIXER)
                                                 },
@@ -523,10 +525,10 @@ class MainActivity : ComponentActivity() {
                         audioEngine = audioEngine,
                         sourceManager = audioEngine.sourceManager,
                         audioSourceType = audioSourceType,
-                        onAudioSourceTypeChange = { audioSourceType = it },
+                        onAudioSourceTypeChange = { it: AudioSourceType -> audioSourceType = it },
                         hasMicPermission = hasMicPermission,
                         onMicPermissionGranted = { hasMicPermission = true },
-                        onInternalAudioRecordCreated = { record ->
+                        onInternalAudioRecordCreated = { record: AudioRecord ->
                             audioEngine.start(scope, record)
                         },
                         onClose = { showCvLab = false }

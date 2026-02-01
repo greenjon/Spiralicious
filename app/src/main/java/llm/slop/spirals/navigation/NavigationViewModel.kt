@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.*
 import llm.slop.spirals.AppConfig
 import llm.slop.spirals.LayerType
-import llm.slop.spirals.NavLayer
+import llm.slop.spirals.navigation.NavLayer
 import llm.slop.spirals.StartupMode
 import llm.slop.spirals.LayerContent
 import llm.slop.spirals.MandalaLayerContent

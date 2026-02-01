@@ -1,6 +1,6 @@
 package llm.slop.spirals.cv.sources
 
-import llm.slop.spirals.cv.core.CvSignal
+import llm.slop.spirals.cv.CvSignal
 
 /**
  * Logic for tracking beat phase based on BPM.

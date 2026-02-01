@@ -1,7 +1,7 @@
 package llm.slop.spirals.cv.sources
 
-import llm.slop.spirals.cv.audio.EnvelopeFollower
-import llm.slop.spirals.cv.core.CvSignal
+import llm.slop.spirals.cv.processors.EnvelopeFollower
+import llm.slop.spirals.cv.CvSignal
 
 /**
  * A CV signal that provides a smoothed linear energy value from an audio stream.

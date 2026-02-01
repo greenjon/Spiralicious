@@ -15,7 +15,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import llm.slop.spirals.NavLayer
+import llm.slop.spirals.navigation.NavLayer
+import llm.slop.spirals.MandalaLayerContent
+import llm.slop.spirals.SetLayerContent
+import llm.slop.spirals.MixerLayerContent
+import llm.slop.spirals.ShowLayerContent
+import llm.slop.spirals.RandomSetLayerContent
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
@@ -29,7 +34,6 @@ import llm.slop.spirals.ui.theme.AppText
  * KEY DESIGN DECISIONS:
  * - Uses FlowRow with maxLines=2 to wrap long paths without pushing menu off screen
  * - Each breadcrumb + arrow is a single Row unit (no mid-item line breaks)
- * - Individual names truncated at 100dp to prevent excessive width
  * - Reserves fixed 48dp for menu button (always accessible)
  * - Only shows layers with data (hides generic "Editor" labels)
  * - Extracts name from data (not layer.name) to handle rename timing issues
@@ -72,11 +76,11 @@ fun EditorBreadcrumbs(
 
                 // Get the actual name from the data if available, otherwise use layer.name as fallback
                     val actualName = when (val data = layer.data) {
-                        is llm.slop.spirals.MandalaLayerContent -> data.patch.name
-                        is llm.slop.spirals.SetLayerContent -> data.set.name
-                        is llm.slop.spirals.MixerLayerContent -> data.mixer.name
-                        is llm.slop.spirals.ShowLayerContent -> data.show.name
-                        is llm.slop.spirals.RandomSetLayerContent -> data.randomSet.name
+                        is MandalaLayerContent -> data.patch.name
+                        is SetLayerContent -> data.set.name
+                        is MixerLayerContent -> data.mixer.name
+                        is ShowLayerContent -> data.show.name
+                        is RandomSetLayerContent -> data.randomSet.name
                     null -> layer.name // Use layer name as fallback
                     }
                     

@@ -2,7 +2,7 @@ package llm.slop.spirals.cv.sources
 
 import kotlin.math.floor
 import kotlin.random.Random
-import llm.slop.spirals.cv.core.CvSignal
+import llm.slop.spirals.cv.CvSignal
 
 /**
  * A CV signal that generates a new random value on a clock trigger and glides to it.

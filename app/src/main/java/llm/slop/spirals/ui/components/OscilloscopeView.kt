@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
-import llm.slop.spirals.cv.ui.CvHistoryBuffer
+import llm.slop.spirals.cv.visualizers.CvHistoryBuffer
 
 @Composable
 fun OscilloscopeView(

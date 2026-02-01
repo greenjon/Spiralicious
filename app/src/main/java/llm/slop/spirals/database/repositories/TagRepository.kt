@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import llm.slop.spirals.MandalaDatabase
-import llm.slop.spirals.MandalaTag
+import llm.slop.spirals.database.entities.MandalaTag
 
 /**
  * Repository for managing Mandala tags.

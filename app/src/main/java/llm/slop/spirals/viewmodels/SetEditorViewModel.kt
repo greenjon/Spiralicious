@@ -7,8 +7,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import llm.slop.spirals.LayerType
 import llm.slop.spirals.MandalaDatabase
-import llm.slop.spirals.MandalaSet
-import llm.slop.spirals.SelectionPolicy
+import llm.slop.spirals.models.set.MandalaSet
+import llm.slop.spirals.models.set.SelectionPolicy
 import llm.slop.spirals.SetLayerContent
 import llm.slop.spirals.database.repositories.MandalaRepository
 import llm.slop.spirals.database.repositories.SetRepository

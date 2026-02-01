@@ -10,7 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import llm.slop.spirals.MandalaViewModel
-import llm.slop.spirals.PatchData
+import llm.slop.spirals.models.PatchData
 import llm.slop.spirals.PatchMapper
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText

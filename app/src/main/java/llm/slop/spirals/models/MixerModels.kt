@@ -1,7 +1,7 @@
 package llm.slop.spirals.models
 
 import kotlinx.serialization.Serializable
-import llm.slop.spirals.cv.CvModulator
+import llm.slop.spirals.cv.core.CvModulator
 import java.util.UUID
 
 enum class AdvanceMode {

@@ -18,11 +18,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import llm.slop.spirals.cv.*
-import llm.slop.spirals.cv.audio.AudioEngine
-import llm.slop.spirals.cv.audio.AudioSourceManager
-import llm.slop.spirals.cv.audio.AudioSourceType
-import llm.slop.spirals.cv.ui.CvHistoryBuffer
+import llm.slop.spirals.cv.core.ModulationRegistry
+import llm.slop.spirals.cv.processors.AudioEngine
+import llm.slop.spirals.cv.processors.AudioSourceManager
+import llm.slop.spirals.cv.processors.AudioSourceType
+import llm.slop.spirals.cv.visualizers.CvHistoryBuffer
 import llm.slop.spirals.ui.components.OscilloscopeView
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground

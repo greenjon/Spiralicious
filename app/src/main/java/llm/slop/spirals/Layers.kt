@@ -5,7 +5,7 @@ import llm.slop.spirals.models.MixerPatch
 import llm.slop.spirals.models.RandomSet
 import llm.slop.spirals.models.ShowPatch
 import llm.slop.spirals.models.set.MandalaSet
-import llm.slop.spirals.PatchData
+import llm.slop.spirals.models.PatchData
 
 /**
  * This file contains the core layer type definitions for the Spirals application hierarchy.

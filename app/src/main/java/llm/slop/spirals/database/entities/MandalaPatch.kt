@@ -1,7 +1,7 @@
 package llm.slop.spirals.database.entities
 
-import llm.slop.spirals.cv.CvModulator
-import llm.slop.spirals.cv.ModulationOperator
+import llm.slop.spirals.cv.core.CvModulator
+import llm.slop.spirals.cv.core.ModulationOperator
 
 /**
  * Data model for a complete Mandala configuration (Patch).

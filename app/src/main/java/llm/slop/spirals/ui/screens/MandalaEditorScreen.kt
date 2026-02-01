@@ -49,7 +49,8 @@ import llm.slop.spirals.cv.core.Waveform
 import llm.slop.spirals.models.PatchData
 import llm.slop.spirals.models.STANDARD_BEAT_VALUES
 import llm.slop.spirals.models.SpeedSource
-import llm.slop.spirals.ui.InstrumentEditorScreen
+import llm.slop.spirals.display.LocalSpiralRenderer
+import llm.slop.spirals.ui.screens.InstrumentEditorScreen
 import llm.slop.spirals.ui.components.MandalaParameterMatrix
 import llm.slop.spirals.ui.components.OscilloscopeView
 import llm.slop.spirals.ui.components.PatchManagerOverlay

@@ -13,7 +13,7 @@ import kotlin.math.PI
 import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.math.roundToInt
-import llm.slop.spirals.cv.ModulatableParameter
+import llm.slop.spirals.cv.core.ModulatableParameter
 import llm.slop.spirals.models.*
 import llm.slop.spirals.MandalaVisualSource
 import llm.slop.spirals.R

@@ -9,6 +9,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import llm.slop.spirals.database.entities.*
 import llm.slop.spirals.models.*
+import llm.slop.spirals.models.set.MandalaSet
+import llm.slop.spirals.navigation.NavLayer
 import java.util.UUID
 
 /**
@@ -145,7 +147,7 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
 
         val newLayer = NavLayer(id, name, type, isDirty = true, data = data)
 
-        if (_navStack.value.size == 1 && _navStack.value[0].type == type && _navVAlue[0].data == null) {
+        if (_navStack.value.size == 1 && _navStack.value[0].type == type && _navStack.value[0].data == null) {
             _navStack.value = listOf(newLayer)
         } else {
             pushLayer(newLayer)

@@ -2,11 +2,12 @@ package llm.slop.spirals.database.repositories
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import llm.slop.spirals.MandalaDatabase
-import llm.slop.spirals.RandomSetEntity
+import llm.slop.spirals.database.entities.RandomSetEntity
 import llm.slop.spirals.models.RandomSet
 
 /**

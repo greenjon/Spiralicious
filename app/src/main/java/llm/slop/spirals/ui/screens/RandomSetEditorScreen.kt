@@ -22,18 +22,17 @@ import llm.slop.spirals.RandomSetLayerContent
 import llm.slop.spirals.RandomSetGenerator
 import llm.slop.spirals.display.LocalSpiralRenderer
 import llm.slop.spirals.models.RandomSet
-import llm.slop.spirals.models.RandomizationModels.RecipeFilter
-import llm.slop.spirals.models.RandomizationModels.ArmConstraints
-import llm.slop.spirals.models.RandomizationModels.RotationConstraints
-import llm.slop.spirals.models.RandomizationModels.HueOffsetConstraints
-import llm.slop.spirals.models.RandomizationModels.FeedbackMode
+import llm.slop.spirals.models.RecipeFilter
+import llm.slop.spirals.models.ArmConstraints
+import llm.slop.spirals.models.RotationConstraints
+import llm.slop.spirals.models.HueOffsetConstraints
+import llm.slop.spirals.models.FeedbackMode
 import llm.slop.spirals.models.STANDARD_BEAT_VALUES
 import llm.slop.spirals.ui.components.PatchManagerOverlay
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.ui.theme.AppAccent
 import kotlinx.serialization.json.Json
-import llm.slop.spirals.ui.PickerDialog // Corrected import
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -602,12 +601,12 @@ fun ArmConstraintSection(
                 
                 // Get defaults from settings when no constraints are provided
                 val context = LocalContext.current
-                val defaultsConfig = remember { llm.slop.spirals.defaults.DefaultsConfig.getInstance(context) }
+                val defaultsConfig = llm.slop.spirals.defaults.DefaultsConfig.getInstance(context)
+                val defaults = defaultsConfig.getArmDefaults()
                 val currentConstraints = if (constraints != null) {
                     constraints
                 } else {
                     // Convert from defaults to ArmConstraints
-                    val defaults = defaultsConfig.getArmDefaults()
                     ArmConstraints(
                         baseLengthMin = defaults.baseLengthMin,
                         baseLengthMax = defaults.baseLengthMax,
@@ -886,8 +885,8 @@ fun ArmConstraintSection(
                     },
                     valueRange = -100f..100f,
                     colors = SliderDefaults.colors(
-                        thumbColor = AppAccent,
-                        activeTrackColor = AppAccent
+                            thumbColor = AppAccent,
+                            activeTrackColor = AppAccent
                     )
                 )
                 
@@ -1430,7 +1429,7 @@ fun ColorTab(
                                 )))
                             },
                             valueRange = 0f..(beatValues.size - 1).toFloat(),
-                            steps = beatValues.size - 2,
+                                steps = beatValues.size - 2,
                             colors = SliderDefaults.colors(
                                 thumbColor = AppAccent,
                                 activeTrackColor = AppAccent

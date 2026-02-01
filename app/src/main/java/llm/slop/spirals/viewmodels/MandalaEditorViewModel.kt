@@ -9,7 +9,7 @@ import llm.slop.spirals.LayerType
 import llm.slop.spirals.MandalaDatabase
 import llm.slop.spirals.MandalaLayerContent
 import llm.slop.spirals.MandalaVisualSource
-import llm.slop.spirals.PatchData
+import llm.slop.spirals.models.PatchData
 import llm.slop.spirals.PatchMapper
 import llm.slop.spirals.database.repositories.MandalaRepository
 import llm.slop.spirals.database.repositories.TagRepository

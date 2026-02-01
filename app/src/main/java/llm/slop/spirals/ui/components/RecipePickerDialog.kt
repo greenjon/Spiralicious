@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import llm.slop.spirals.MandalaLibrary
-import llm.slop.spirals.MandalaRatio
+import llm.slop.spirals.models.mandala.MandalaRatio
 import llm.slop.spirals.RecipeTagManager
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground

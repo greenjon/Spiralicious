@@ -26,14 +26,19 @@ import llm.slop.spirals.models.*
 import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
-import llm.slop.spirals.cv.ModulatableParameter
-import llm.slop.spirals.ui.ModulatorRow
+import llm.slop.spirals.cv.core.ModulatableParameter
+import llm.slop.spirals.display.SpiralRenderer
+import llm.slop.spirals.display.SharedEGLContextFactory
+import llm.slop.spirals.ui.components.ModulatorRow
+import llm.slop.spirals.display.LocalSpiralRenderer
 import kotlinx.serialization.json.Json
 import kotlinx.coroutines.delay
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import llm.slop.spirals.database.entities.MandalaSetEntity
+import llm.slop.spirals.database.entities.RandomSetEntity
 
 @Composable
 fun SpiralPreview(sourceId: String, mainRenderer: SpiralRenderer?, modifier: Modifier = Modifier) {
@@ -480,10 +485,20 @@ fun MonitorStrip(
             StripPreview(monitorSource = group, patch = patch, mainRenderer = mainRenderer)
 
             if (hasToggle) {
-                Row(modifier = Modifier.align(Alignment.TopCenter), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                    Text(text = "1/2", style = TextStyle(color = if (viewSet1A2) AppAccent else Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f)))
+                Row(
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = "1/2",
+                        style = TextStyle(color = if (viewSet1A2) AppAccent else Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f))
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "3/4", style = TextStyle(color = if (!viewSet1A2) AppAccent else Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f)))
+                    Text(
+                        text = "3/4",
+                        style = TextStyle(color = if (!viewSet1A2) AppAccent else Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold, shadow = Shadow(color = Color.Black, blurRadius = 3f))
+                    )
                 }
             }
         }
@@ -500,7 +515,9 @@ fun MonitorStrip(
                 color = if (focusedId == modeId) AppAccent else AppText.copy(alpha = 0.7f),
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.clickable { onFocusChange(modeId); modeExpanded = true }.padding(2.dp)
+                modifier = Modifier
+                    .clickable { onFocusChange(modeId); modeExpanded = true }
+                    .padding(2.dp)
             )
             DropdownMenu(expanded = modeExpanded, onDismissRequest = { modeExpanded = false }, containerColor = AppBackground) {
                 MixerMode.entries.forEachIndexed { index, m ->
@@ -606,21 +623,21 @@ fun MixerCvEditor(
             }
             focusedId.startsWith("MF_") -> {
                 val sub = focusedId.removePrefix("MF_")
-                when {
-                    sub == "MODE" -> patch.mixerF.mode
-                    sub == "BAL" -> patch.mixerF.balance
-                    sub == "GAIN" -> patch.finalGain
-                    sub == "FB_DECAY" -> patch.effects.fbDecay
-                    sub == "FB_GAIN" -> patch.effects.fbGain
-                    sub == "FB_ZOOM" -> patch.effects.fbZoom
-                    sub == "FB_ROTATE" -> patch.effects.fbRotate
-                    sub == "FB_SHIFT" -> patch.effects.fbShift
-                    sub == "FB_BLUR" -> patch.effects.fbBlur
-                    sub == "TRAILS" -> patch.effects.trails
-                    sub == "SNAP_COUNT" -> patch.effects.snapCount
-                    sub == "SNAP_MODE" -> patch.effects.snapMode
-                    sub == "SNAP_BLEND" -> patch.effects.snapBlend
-                    sub == "SNAP_TRIG" -> patch.effects.snapTrigger
+                when (sub) {
+                    "MODE" -> patch.mixerF.mode
+                    "BAL" -> patch.mixerF.balance
+                    "GAIN" -> patch.finalGain
+                    "FB_DECAY" -> patch.effects.fbDecay
+                    "FB_GAIN" -> patch.effects.fbGain
+                    "FB_ZOOM" -> patch.effects.fbZoom
+                    "FB_ROTATE" -> patch.effects.fbRotate
+                    "FB_SHIFT" -> patch.effects.fbShift
+                    "FB_BLUR" -> patch.effects.fbBlur
+                    "TRAILS" -> patch.effects.trails
+                    "SNAP_COUNT" -> patch.effects.snapCount
+                    "SNAP_MODE" -> patch.effects.snapMode
+                    "SNAP_BLEND" -> patch.effects.snapBlend
+                    "SNAP_TRIG" -> patch.effects.snapTrigger
                     else -> null
                 }
             }
@@ -721,21 +738,21 @@ private fun syncMixerParam(patch: MixerPatch, id: String, param: ModulatablePara
         }
         id.startsWith("MF_") -> {
             val sub = id.removePrefix("MF_")
-            when {
-                sub == "MODE" -> patch.copy(mixerF = patch.mixerF.copy(mode = data))
-                sub == "BAL" -> patch.copy(mixerF = patch.mixerF.copy(balance = data))
-                sub == "GAIN" -> patch.copy(finalGain = data)
-                sub == "FB_DECAY" -> patch.copy(effects = patch.effects.copy(fbDecay = data))
-                sub == "FB_GAIN" -> patch.copy(effects = patch.effects.copy(fbGain = data))
-                sub == "FB_ZOOM" -> patch.copy(effects = patch.effects.copy(fbZoom = data))
-                sub == "FB_ROTATE" -> patch.copy(effects = patch.effects.copy(fbRotate = data))
-                sub == "FB_SHIFT" -> patch.copy(effects = patch.effects.copy(fbShift = data))
-                sub == "FB_BLUR" -> patch.copy(effects = patch.effects.copy(fbBlur = data))
-                sub == "TRAILS" -> patch.copy(effects = patch.effects.copy(trails = data))
-                sub == "SNAP_COUNT" -> patch.copy(effects = patch.effects.copy(snapCount = data))
-                sub == "SNAP_MODE" -> patch.copy(effects = patch.effects.copy(snapMode = data))
-                sub == "SNAP_BLEND" -> patch.copy(effects = patch.effects.copy(snapBlend = data))
-                sub == "SNAP_TRIG" -> patch.copy(effects = patch.effects.copy(snapTrigger = data))
+            when (sub) {
+                "MODE" -> patch.copy(mixerF = patch.mixerF.copy(mode = data))
+                "BAL" -> patch.copy(mixerF = patch.mixerF.copy(balance = data))
+                "GAIN" -> patch.copy(finalGain = data)
+                "FB_DECAY" -> patch.copy(effects = patch.effects.copy(fbDecay = data))
+                "FB_GAIN" -> patch.copy(effects = patch.effects.copy(fbGain = data))
+                "FB_ZOOM" -> patch.copy(effects = patch.effects.copy(fbZoom = data))
+                "FB_ROTATE" -> patch.copy(effects = patch.effects.copy(fbRotate = data))
+                "FB_SHIFT" -> patch.copy(effects = patch.effects.copy(fbShift = data))
+                "FB_BLUR" -> patch.copy(effects = patch.effects.copy(fbBlur = data))
+                "TRAILS" -> patch.copy(effects = patch.effects.copy(trails = data))
+                "SNAP_COUNT" -> patch.copy(effects = patch.effects.copy(snapCount = data))
+                "SNAP_MODE" -> patch.copy(effects = patch.effects.copy(snapMode = data))
+                "SNAP_BLEND" -> patch.copy(effects = patch.effects.copy(snapBlend = data))
+                "SNAP_TRIG" -> patch.copy(effects = patch.effects.copy(snapTrigger = data))
                 else -> patch
             }
         }

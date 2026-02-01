@@ -3,7 +3,10 @@ package llm.slop.spirals
 import android.content.Context
 import android.opengl.GLSurfaceView
 import android.util.AttributeSet
+import llm.slop.spirals.display.SpiralRenderer
+import llm.slop.spirals.display.SharedEGLContextFactory
 import llm.slop.spirals.models.MixerPatch
+import llm.slop.spirals.models.mandala.MandalaParams
 
 class SpiralSurfaceView(context: Context, attrs: AttributeSet? = null) : GLSurfaceView(context, attrs) {
 

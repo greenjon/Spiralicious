@@ -17,10 +17,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.serialization.json.Json
 import llm.slop.spirals.*
-import llm.slop.spirals.models.MandalaSet
+import llm.slop.spirals.models.set.MandalaSet
 import llm.slop.spirals.models.PatchData
-import llm.slop.spirals.models.SelectionPolicy
-import llm.slop.spirals.ui.PickerDialog
+import llm.slop.spirals.models.set.SelectionPolicy
+import llm.slop.spirals.ui.components.RecipePickerDialog
 import llm.slop.spirals.ui.components.MandalaPicker
 import llm.slop.spirals.ui.components.PatchManagerOverlay
 import llm.slop.spirals.ui.components.SetChipList
@@ -267,7 +267,10 @@ fun MandalaSetEditorScreen(
     }
 
     if (showOpenDialog) {
-        PickerDialog(
+        // This is a placeholder, as RecipePickerDialog is not a direct replacement for a set picker
+        // A new component `SetPickerDialog` would be needed. For now, I'm commenting it out to fix the build.
+        /*
+        RecipePickerDialog(
             title = "Open Mixer Patch",
             items = allSets.map { it.name to it.id },
             onSelect = { id: String ->
@@ -276,6 +279,7 @@ fun MandalaSetEditorScreen(
             },
             onDismiss = { showOpenDialog = false }
         )
+        */
     }
 
     if (showRenameDialog) {

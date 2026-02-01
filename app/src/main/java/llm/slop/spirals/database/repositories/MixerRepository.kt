@@ -7,7 +7,7 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import llm.slop.spirals.MandalaDatabase
-import llm.slop.spirals.MixerPatchEntity
+import llm.slop.spirals.database.entities.MixerPatchEntity
 import llm.slop.spirals.models.MixerPatch
 
 /**

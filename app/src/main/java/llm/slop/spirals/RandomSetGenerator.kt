@@ -1,12 +1,17 @@
 package llm.slop.spirals
 
 import android.content.Context
-import llm.slop.spirals.cv.CvModulator
-import llm.slop.spirals.cv.ModulationOperator
-import llm.slop.spirals.cv.Waveform
+import llm.slop.spirals.cv.core.CvModulator
+import llm.slop.spirals.cv.core.ModulationOperator
+import llm.slop.spirals.cv.core.Waveform
 import llm.slop.spirals.models.RandomSet
 import llm.slop.spirals.models.RecipeFilter
+import llm.slop.spirals.models.ArmConstraints
+import llm.slop.spirals.models.RotationConstraints
+import llm.slop.spirals.models.HueOffsetConstraints
+import llm.slop.spirals.models.FeedbackMode
 import llm.slop.spirals.models.STANDARD_BEAT_VALUES
+import llm.slop.spirals.models.mandala.Mandala4Arm
 import kotlin.math.round
 
 /**
@@ -72,7 +77,7 @@ class RandomSetGenerator(private val context: Context) {
      */
     private fun applyArmConstraints(
         paramName: String,
-        constraints: llm.slop.spirals.models.ArmConstraints?,
+        constraints: ArmConstraints?,
         visualSource: MandalaVisualSource,
         random: kotlin.random.Random
     ) {
@@ -82,7 +87,7 @@ class RandomSetGenerator(private val context: Context) {
                 constraints
             } else {
                 val defaults = defaultsConfig.getArmDefaults()
-                llm.slop.spirals.models.ArmConstraints(
+                ArmConstraints(
                     baseLengthMin = defaults.baseLengthMin,
                     baseLengthMax = defaults.baseLengthMax,
                     enableBeat = defaults.beatProbability > 0,
@@ -213,7 +218,7 @@ class RandomSetGenerator(private val context: Context) {
      * Applies rotation constraints.
      */
     private fun applyRotationConstraints(
-        constraints: llm.slop.spirals.models.RotationConstraints?,
+        constraints: RotationConstraints?,
         visualSource: MandalaVisualSource,
         random: kotlin.random.Random
     ) {
@@ -273,7 +278,7 @@ class RandomSetGenerator(private val context: Context) {
      * Applies hue offset constraints.
      */
     private fun applyHueOffsetConstraints(
-        constraints: llm.slop.spirals.models.HueOffsetConstraints?,
+        constraints: HueOffsetConstraints?,
         visualSource: MandalaVisualSource,
         random: kotlin.random.Random
     ) {
@@ -333,33 +338,33 @@ class RandomSetGenerator(private val context: Context) {
      * Applies feedback mode presets.
      */
     private fun applyFeedbackMode(
-        mode: llm.slop.spirals.models.FeedbackMode,
+        mode: FeedbackMode,
         visualSource: MandalaVisualSource
     ) {
         when (mode) {
-            llm.slop.spirals.models.FeedbackMode.NONE -> {
+            FeedbackMode.NONE -> {
                 visualSource.parameters["FB Decay"]?.baseValue = 0f
                 visualSource.parameters["FB Gain"]?.baseValue = 0f
             }
-            llm.slop.spirals.models.FeedbackMode.LIGHT -> {
+            FeedbackMode.LIGHT -> {
                 visualSource.parameters["FB Decay"]?.baseValue = 0.85f
                 visualSource.parameters["FB Gain"]?.baseValue = 0.45f
                 visualSource.parameters["FB Zoom"]?.baseValue = 0.50f
                 visualSource.parameters["FB Rotate"]?.baseValue = 0.50f
             }
-            llm.slop.spirals.models.FeedbackMode.MEDIUM -> {
+            FeedbackMode.MEDIUM -> {
                 visualSource.parameters["FB Decay"]?.baseValue = 0.85f
                 visualSource.parameters["FB Gain"]?.baseValue = 0.55f
                 visualSource.parameters["FB Zoom"]?.baseValue = 0.7f
                 visualSource.parameters["FB Rotate"]?.baseValue = 0.55f
             }
-            llm.slop.spirals.models.FeedbackMode.HEAVY -> {
+            FeedbackMode.HEAVY -> {
                 visualSource.parameters["FB Decay"]?.baseValue = 0.85f
                 visualSource.parameters["FB Gain"]?.baseValue = 0.6f
                 visualSource.parameters["FB Zoom"]?.baseValue = 0.7f
                 visualSource.parameters["FB Rotate"]?.baseValue = 0.6f
             }
-            llm.slop.spirals.models.FeedbackMode.CUSTOM -> { }
+            FeedbackMode.CUSTOM -> { }
         }
     }
     

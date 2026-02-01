@@ -1,6 +1,6 @@
 package llm.slop.spirals.cv.processors
 
-import llm.slop.spirals.cv.core.CvSignal
+import llm.slop.spirals.cv.CvSignal
 import kotlin.math.pow
 
 /**

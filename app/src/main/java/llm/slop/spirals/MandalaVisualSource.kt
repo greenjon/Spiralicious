@@ -4,6 +4,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import llm.slop.spirals.cv.core.ModulatableParameter
+import llm.slop.spirals.models.mandala.MandalaRatio
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.PI

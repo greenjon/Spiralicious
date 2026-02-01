@@ -1,6 +1,6 @@
 package llm.slop.spirals.cv.core
 
-import llm.slop.spirals.cv.ui.CvHistoryBuffer
+import llm.slop.spirals.cv.visualizers.CvHistoryBuffer
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.PI
 import kotlin.math.sin

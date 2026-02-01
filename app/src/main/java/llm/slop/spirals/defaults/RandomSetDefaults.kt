@@ -1,6 +1,6 @@
 package llm.slop.spirals.defaults
 
-import llm.slop.spirals.cv.Waveform
+import llm.slop.spirals.cv.core.Waveform
 import llm.slop.spirals.models.STANDARD_BEAT_VALUES
 import llm.slop.spirals.models.SpeedSource
 

@@ -1,5 +1,7 @@
 package llm.slop.spirals
 
+import llm.slop.spirals.models.mandala.MandalaRatio
+
 object MandalaLibrary {
     val MandalaRatios = listOf(
         MandalaRatio("15001423042349762156", 26, 23, 14, 14, 3, 4.0f, 2, 3, true, 0, 4.0f, 10.8f),

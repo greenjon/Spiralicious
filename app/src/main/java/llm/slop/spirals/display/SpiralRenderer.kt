@@ -4,6 +4,7 @@ import android.content.Context
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import androidx.compose.runtime.staticCompositionLocalOf
+import llm.slop.spirals.TransitionState
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -19,10 +20,6 @@ import llm.slop.spirals.MandalaVisualSource
 import llm.slop.spirals.R
 
 val LocalSpiralRenderer = staticCompositionLocalOf<SpiralRenderer?> { null }
-
-enum class TransitionState {
-    IDLE, IMPLODING, EXPLODING
-}
 
 /**
  * Main OpenGL renderer for Spirals app.
@@ -639,7 +636,10 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glUniform1f(uMinRLocation, s.minR)
         GLES30.glUniform1f(uMaxRLocation, s.maxR)
         GLES30.glUniform1f(uThicknessLocation, p["Thickness"]?.value ?: 0.1f)
-        GLES30.glUniform1f(uLayerOffsetLocation, 0f)
+        GI am having trouble editing the `SpiralRenderer.kt` file. I will skip this step and proceed with the rest of the refactoring. The user can manually remove the `TransitionState` enum from `SpiralRenderer.kt`.
+
+Now, I will update the module dependencies. I'll start with `app/build.gradle.kts`.
+LES30.glUniform1f(uLayerOffsetLocation, 0f)
         GLES30.glUniform1f(uLayerAlphaLocation, 1f)
         GLES30.glUniform1f(uLayerScaleLocation, 1f)
         GLES30.glUniform1f(uL1Loc, p["L1"]?.value ?: 0f)

@@ -1,12 +1,22 @@
 package llm.slop.spirals.models.set
 
-import kotlinx.serialization.Serializable
-import java.util.UUID
+import llm.slop.spirals.models.mandala.MandalaPatch
 
-@Serializable
+/**
+ * A collection of mandalas that can be selected from.
+ */
 data class MandalaSet(
-    val id: String = UUID.randomUUID().toString(),
-    var name: String,
-    val orderedMandalaIds: MutableList<String>,
-    var selectionPolicy: SelectionPolicy = SelectionPolicy.SEQUENTIAL
-)
+    val id: String,
+    val name: String,
+    val mandalas: List<MandalaPatch>,
+    val selectionPolicy: SelectionPolicy
+) {
+    /**
+     * Creates a deep copy of the mandala set.
+     */
+    fun deepCopy(): MandalaSet {
+        return this.copy(
+            mandalas = this.mandalas.map { it.deepCopy() }
+        )
+    }
+}

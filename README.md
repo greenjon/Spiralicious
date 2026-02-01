@@ -76,5 +76,14 @@ This project values inline documentation. When you learn something new about the
 Active development. This is a performance tool designed for live use.
 
 ---
+## Desktop Migration
+
+This project is being refactored to support both Android and Desktop (Linux).
+
+**Phase 1: Project Restructuring (Complete)**
+- The project has been restructured into `:app`, `:common`, and `:desktop` modules.
+
+**Phase 2: Code Migration (In Progress)**
+- Moving platform-agnostic code from `:app` to `:common`.
 
 **Note:** This README provides a quick overview. For detailed architectural documentation, design decisions, and development notes, see [DESIGN.md](DESIGN.md).

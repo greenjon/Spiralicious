@@ -1,31 +1,44 @@
 package llm.slop.spirals.models
 
-import kotlinx.serialization.Serializable
+import llm.slop.spirals.cv.core.CvSignal
+import llm.slop.spirals.cv.core.Modulator
+import llm.slop.spirals.models.mandala.MandalaPatch
+import llm.slop.spirals.models.set.MandalaSet
 
-@Serializable
+/**
+ * A container for a complete state snapshot of the application,
+ * used for serialization and persistence.
+ */
 data class PatchData(
-    val name: String,
-    val recipeId: String,
-    val parameters: List<ParameterData>,
-    val version: Int = 3 // Incremented version for LFO speed mode
+    val mixer: MixerPatch,
+    val sets: List<MandalaSet>,
+    val mandalas: List<MandalaPatch>
 )
 
-@Serializable
-data class ParameterData(
-    val id: String,
-    val baseValue: Float,
-    val modulators: List<ModulatorData>
-)
+/**
+ * Creates a deep copy of a [PatchData] object.
+ */
+fun PatchData.deepCopy(): PatchData {
+    return PatchData(
+        mixer = this.mixer.deepCopy(),
+        sets = this.sets.map { it.deepCopy() },
+        mandalas = this.mandalas.map { it.deepCopy() }
+    )
+}
 
-@Serializable
-data class ModulatorData(
-    val sourceId: String,
-    val operator: String,
-    val weight: Float,
-    val bypassed: Boolean = false,
-    val waveform: String = "SINE",
-    val subdivision: Float = 1.0f,
-    val phaseOffset: Float = 0.0f,
-    val slope: Float = 0.5f,
-    val lfoSpeedMode: String = "FAST"
-)
+/**
+ * Attaches CV signals to modulators based on a registry.
+ */
+fun PatchData.hydrate(registry: Map<String, CvSignal>): PatchData {
+    val hydratedMandalas = this.mandalas.map { mandala ->
+        val hydratedParameters = mandala.parameters.mapValues { (_, param) ->
+            param.baseValue to param.modulators.map { modulator ->
+                registry[modulator.cvSignal.id]?.let {
+                    Modulator(it, modulator.amount, modulator.isInverted)
+                }
+            }.filterNotNull()
+        }
+        mandala.copy(parameters = hydratedParameters)
+    }
+    return this.copy(mandalas = hydratedMandalas)
+}

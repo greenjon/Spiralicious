@@ -3,7 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     id("com.android.library")
     alias(libs.plugins.jetbrains.compose)
-    alias(libs.plugins.kotlin.compose)
+    // alias(libs.plugins.kotlin.compose) // Removed - handled by JetBrains Compose plugin
 }
 
 kotlin {
@@ -14,7 +14,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+                implementation(libs.kotlinx.serialization.json)
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
                 implementation(compose.runtime)
                 implementation(compose.foundation)
@@ -24,6 +24,10 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 // Android-specific dependencies
+                implementation(libs.androidx.core.ktx)
+                implementation(libs.room.runtime)
+                implementation(libs.room.ktx)
+                implementation(libs.androidx.lifecycle.runtime.ktx)
             }
         }
         val desktopMain by getting {

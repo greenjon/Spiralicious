@@ -3,7 +3,7 @@ import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 plugins {
     kotlin("jvm")
     alias(libs.plugins.jetbrains.compose)
-    alias(libs.plugins.kotlin.compose)
+    // alias(libs.plugins.kotlin.compose) // Removed - handled by JetBrains Compose plugin
 }
 
 group = "llm.slop.spirals"
@@ -34,7 +34,7 @@ dependencies {
 
 compose.desktop {
     application {
-        mainClass = "MainKt"
+        mainClass = "llm.slop.spirals.MainKt"
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "Spirals"

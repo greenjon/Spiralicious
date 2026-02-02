@@ -26,9 +26,11 @@ fun main() {
             }
         }
 
-        // Use LaunchedEffect to set the initial state once the composition is live
         LaunchedEffect(renderer) {
-            renderer.setRatio(MandalaRatio.default) // Use a default recipe
+            // Use the first recipe from your curated library
+            MandalaLibrary.MandalaRatios.firstOrNull()?.let {
+                renderer.setRatio(it)
+            }
         }
 
         Window(
@@ -89,6 +91,7 @@ private fun setupAndRunGL(canvas: java.awt.Canvas, renderer: ISpiralRenderer, ke
         Thread.sleep(16)
     }
 
+    // renderer.cleanup() is called in DisposableEffect
     glfwDestroyWindow(windowHandle)
     glfwTerminate()
 }

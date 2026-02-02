@@ -1,9 +1,34 @@
 package llm.slop.spirals
 
+import llm.slop.spirals.models.mandala.MandalaArm
 import llm.slop.spirals.models.mandala.MandalaRatio
 
 object MandalaLibrary {
+    // These are converted, working examples for the new data model.
+    // The app will use these.
     val MandalaRatios = listOf(
+        MandalaRatio(
+            id = "15001423042349762156",
+            arms = listOf(MandalaArm(26, 0.5f), MandalaArm(23, 0.5f), MandalaArm(14, 0.4f), MandalaArm(14, 0.4f))
+        ),
+        MandalaRatio(
+            id = "923842633253679950",
+            arms = listOf(MandalaArm(26, 0.6f), MandalaArm(23, 0.4f), MandalaArm(17, 0.5f), MandalaArm(14, 0.5f))
+        ),
+        MandalaRatio(
+            id = "12002606287278677742",
+            arms = listOf(MandalaArm(28, 0.7f), MandalaArm(19, 0.3f), MandalaArm(16, 0.5f), MandalaArm(16, 0.5f))
+        )
+    )
+
+    /*
+     !!! PRESERVED ORIGINAL DATA BELOW !!!
+     This is the full, curated list of presets. It is commented out because it uses the
+     old data structure. Each line needs to be converted to the new `MandalaRatio` format
+     like the examples above to become usable by the app.
+    */
+    /*
+    val OriginalMandalaRatios = listOf(
         MandalaRatio("15001423042349762156", 26, 23, 14, 14, 3, 4.0f, 2, 3, true, 0, 4.0f, 10.8f),
         MandalaRatio("923842633253679950", 26, 23, 17, 14, 3, 4.0f, 1, 4, true, 3, 4.0f, 11.0f),
         MandalaRatio("12002606287278677742", 28, 19, 16, 16, 3, 4.0f, 2, 3, true, 0, 4.0f, 16.56f),
@@ -299,6 +324,7 @@ object MandalaLibrary {
         MandalaRatio("11023143554852048121", 51, 7, 7, -15, 22, 3.0f, 2, 3, true, 4, 3.0f, 271.04f),
         MandalaRatio("2620709393157896981", 51, 5, 5, -18, 23, 3.0f, 2, 3, true, 4, 3.0f, 296.24f),
         MandalaRatio("17118896320133666996", 52, 2, 2, -23, 25, 3.0f, 2, 3, true, 4, 3.0f, 350.0f),
-        MandalaRatio("5918343481301128875", 53, 1, 1, -25, 26, 3.0f, 2, 3, true, 4, 3.0f, 378.56f),
+        MandalaRatio("5918343481301128875", 53, 1, 1, -25, 26, 3.0f, 2, 3, true, 4, 3.0f, 378.56f)
     )
+    */
 }

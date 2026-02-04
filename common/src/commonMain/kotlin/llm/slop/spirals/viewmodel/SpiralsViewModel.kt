@@ -13,7 +13,9 @@ import llm.slop.spirals.models.*
 import llm.slop.spirals.models.set.MandalaSet
 import llm.slop.spirals.navigation.NavLayer
 import llm.slop.spirals.platform.AppConfig
-import java.util.UUID
+import llm.slop.spirals.platform.randomUUID
+import llm.slop.spirals.util.NamingUtils
+import llm.slop.spirals.util.PatchMapper
 
 class SpiralsViewModel(
     private val coroutineScope: CoroutineScope,
@@ -65,7 +67,7 @@ class SpiralsViewModel(
             else -> LayerType.MIXER
         }
 
-        return listOf(NavLayer(UUID.randomUUID().toString(), getGenericName(type), type, isDirty = false))
+        return listOf(NavLayer(randomUUID(), getGenericName(type), type, isDirty = false))
     }
 
     fun getGenericName(type: LayerType): String = when(type) {
@@ -100,7 +102,7 @@ class SpiralsViewModel(
 
     fun createAndPushLayer(type: LayerType, parentSlotIndex: Int? = null) {
         val name = generateNextName(type)
-        val id = UUID.randomUUID().toString()
+        val id = randomUUID()
 
         val data: LayerContent = when(type) {
             LayerType.MIXER -> MixerLayerContent(MixerPatch(id = id, name = name, slots = List(4) { MixerSlotData() }))
@@ -130,14 +132,14 @@ class SpiralsViewModel(
 
     fun createAndResetStack(type: LayerType, openedFromMenu: Boolean = false) {
         val name = getGenericName(type)
-        val id = UUID.randomUUID().toString()
+        val id = randomUUID()
         _navStack.value = listOf(NavLayer(id, name, type, isDirty = false, openedFromMenu = openedFromMenu))
         saveWorkspaceIfEnabled()
     }
 
     fun startNewPatch(type: LayerType) {
         val name = generateNextName(type)
-        val id = UUID.randomUUID().toString()
+        val id = randomUUID()
         val data: LayerContent? = when(type) {
             LayerType.MIXER -> MixerLayerContent(MixerPatch(id = id, name = name, slots = List(4) { MixerSlotData() }))
             LayerType.SET -> SetLayerContent(MandalaSet(id = id, name = name, orderedMandalaIds = mutableListOf()))
@@ -210,7 +212,7 @@ class SpiralsViewModel(
         }
 
         _navStack.value = if (newStack.isEmpty()) {
-            val id = UUID.randomUUID().toString()
+            val id = randomUUID()
             listOf(NavLayer(id, getGenericName(LayerType.MIXER), LayerType.MIXER, isDirty = false))
         } else {
             newStack
@@ -374,7 +376,7 @@ class SpiralsViewModel(
         val data = layer.data ?: return
 
         val newName = NamingUtils.generateCloneName(layer.name, getExistingNames(layer.type))
-        val newId = UUID.randomUUID().toString()
+        val newId = randomUUID()
 
         val newData: LayerContent = when (data) {
             is MandalaLayerContent -> MandalaLayerContent(data.patch.copy(name = newName))
@@ -571,14 +573,14 @@ class SpiralsViewModel(
                 LayerType.SET -> {
                     val entity = allSets.value.find { it.name == name }
                     if (entity != null) {
-                        val newId = UUID.randomUUID().toString()
+                        val newId = randomUUID()
                         setDao.insertSet(entity.copy(id = newId, name = newName))
                     }
                 }
                 LayerType.MIXER -> {
                     val entity = allMixerPatches.value.find { it.name == name }
                     if (entity != null) {
-                        val newId = UUID.randomUUID().toString()
+                        val newId = randomUUID()
                         val mixer = Json.decodeFromString<MixerPatch>(entity.jsonSettings)
                         val newMixer = mixer.copy(id = newId, name = newName)
                         mixerDao.insertMixerPatch(MixerPatchEntity(newId, newName, Json.encodeToString(newMixer)))
@@ -587,7 +589,7 @@ class SpiralsViewModel(
                 LayerType.SHOW -> {
                     val entity = allShowPatches.value.find { it.name == name }
                     if (entity != null) {
-                        val newId = UUID.randomUUID().toString()
+                        val newId = randomUUID()
                         val show = Json.decodeFromString<ShowPatch>(entity.jsonSettings)
                         val newShow = show.copy(id = newId, name = newName)
                         showDao.insertShowPatch(ShowPatchEntity(newId, newName, Json.encodeToString(newShow)))
@@ -596,7 +598,7 @@ class SpiralsViewModel(
                 LayerType.RANDOM_SET -> {
                     val entity = allRandomSets.value.find { it.name == name }
                     if (entity != null) {
-                        val newId = UUID.randomUUID().toString()
+                        val newId = randomUUID()
                         val randomSet = Json.decodeFromString<RandomSet>(entity.jsonSettings)
                         val newRandomSet = randomSet.copy(id = newId, name = newName)
                         randomSetDao.insertRandomSet(RandomSetEntity(newId, newName, Json.encodeToString(newRandomSet)))

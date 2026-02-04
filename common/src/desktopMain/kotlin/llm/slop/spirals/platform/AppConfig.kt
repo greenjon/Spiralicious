@@ -14,6 +14,6 @@ actual class AppConfig {
     }
 }
 
-actual fun getAppConfig(): AppConfig {
-    TODO("AppConfig not yet implemented for Desktop")
-}
+private val appConfig = AppConfig()
+
+actual fun getAppConfig(): AppConfig = appConfig

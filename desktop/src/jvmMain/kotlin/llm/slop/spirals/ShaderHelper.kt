@@ -8,10 +8,7 @@ import java.nio.charset.StandardCharsets
 object ShaderHelper {
     private const val TAG = "ShaderHelper"
 
-    fun buildProgram(vertexPath: String, fragmentPath: String): Int {
-        val vertexShaderSource = readTextFileFromResource(vertexPath)
-        val fragmentShaderSource = readTextFileFromResource(fragmentPath)
-
+    fun createProgram(vertexShaderSource: String, fragmentShaderSource: String): Int {
         val vertexShaderId = compileShader(GL_VERTEX_SHADER, vertexShaderSource)
         val fragmentShaderId = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource)
 
@@ -20,14 +17,6 @@ object ShaderHelper {
         }
 
         return linkProgram(vertexShaderId, fragmentShaderId)
-    }
-
-    private fun readTextFileFromResource(path: String): String {
-        val inputStream = ShaderHelper::class.java.getResourceAsStream(path)
-            ?: throw RuntimeException("Resource not found: $path")
-        
-        val reader = BufferedReader(InputStreamReader(inputStream, StandardCharsets.UTF_8))
-        return reader.readText()
     }
 
     private fun compileShader(type: Int, shaderCode: String): Int {
@@ -41,7 +30,7 @@ object ShaderHelper {
         glCompileShader(shaderObjectId)
 
         val compileStatus = IntArray(1)
-        glGetShaderiv(shaderObjectId, GL_COMPILE_STATUS, compileStatus, 0)
+        glGetShaderiv(shaderObjectId, GL_COMPILE_STATUS, compileStatus)
 
         if (compileStatus[0] == 0) {
             println("$TAG: Results of compiling shader:\n$shaderCode\n:${glGetShaderInfoLog(shaderObjectId)}")
@@ -64,7 +53,7 @@ object ShaderHelper {
         glLinkProgram(programObjectId)
 
         val linkStatus = IntArray(1)
-        glGetProgramiv(programObjectId, GL_LINK_STATUS, linkStatus, 0)
+        glGetProgramiv(programObjectId, GL_LINK_STATUS, linkStatus)
 
         if (linkStatus[0] == 0) {
             println("$TAG: Results of linking program:\n${glGetProgramInfoLog(programObjectId)}")

@@ -11,7 +11,6 @@ activityCompose = "1.12.2"
 composeBom = "2024.09.00"
 room = "2.6.1"
 kotlinxSerializationJson = "1.6.3" # DOWNGRADED from 1.7.3 to be compatible with Kotlin 1.9.23
-composePlugin = "1.6.10"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -40,4 +39,4 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version = "2.0.21-1.0.27" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-jetbrains-compose = { id = "org.jetbrains.compose", version.ref = "composePlugin" }
+jetbrains-compose = { id = "org.jetbrains.compose", version.ref = "jetbrainsCompose" }

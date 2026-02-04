@@ -1,97 +1,114 @@
 package llm.slop.spirals
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.awt.SwingPanel
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import llm.slop.spirals.models.mandala.MandalaRatio
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.lwjgl.glfw.GLFW.*
 import org.lwjgl.opengl.GL
-import java.awt.BorderLayout
-import java.awt.Canvas
-import javax.swing.JPanel
+import org.lwjgl.opengl.GL30
+import org.lwjgl.system.MemoryUtil.NULL
+import org.lwjgl.system.MemoryStack
 
-fun main() {
-    System.setProperty("skiko.renderApi", "OPENGL")
-    application {
-        val renderer = remember { DesktopSpiralRenderer() }
-        var isRunning by remember { mutableStateOf(true) }
+fun main() = application {
+    // This is your Control Panel (Compose)
+    Window(onCloseRequest = ::exitApplication, title = "Spirals Controls") {
+        val scope = rememberCoroutineScope()
 
-        DisposableEffect(Unit) {
-            onDispose {
-                isRunning = false
-                renderer.cleanup()
+        // Start the OpenGL Window on a separate thread when the app launches
+        LaunchedEffect(Unit) {
+            scope.launch(Dispatchers.IO) {
+                runOpenGLWindow()
             }
         }
 
-        LaunchedEffect(renderer) {
-            // Use the first recipe from your curated library
-            MandalaLibrary.MandalaRatios.firstOrNull()?.let {
-                renderer.setRatio(it)
-            }
-        }
-
-        Window(
-            onCloseRequest = {
-                isRunning = false
-                exitApplication()
-            },
-            title = "Spirals - Linux Desktop"
-        ) {
-            CompositionLocalProvider(LocalSpiralRenderer provides renderer) {
-                SwingPanel(
-                    modifier = Modifier.fillMaxSize(),
-                    factory = {
-                        JPanel(BorderLayout()).apply {
-                            val canvas = Canvas()
-                            add(canvas, BorderLayout.CENTER)
-
-                            Thread {
-                                setupAndRunGL(canvas, renderer) { isRunning }
-                            }.apply {
-                                name = "Spiral-Render-Thread"
-                                start()
-                            }
-                        }
-                    }
-                )
-            }
+        Column(Modifier.fillMaxSize()) {
+            Text("Controls for your Mandala go here.")
+            Text("Check the other window for the visuals!")
         }
     }
 }
 
-private fun setupAndRunGL(canvas: java.awt.Canvas, renderer: ISpiralRenderer, keepRunning: () -> Boolean) {
-    if (!glfwInit()) throw IllegalStateException("Unable to initialize GLFW")
-    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
-    val windowHandle = glfwCreateWindow(1, 1, "GL_CONTEXT", 0, 0)
-    if (windowHandle == 0L) throw RuntimeException("Failed to create GLFW window")
-    glfwMakeContextCurrent(windowHandle)
-    GL.createCapabilities()
-
-    renderer.onSurfaceCreated()
-
-    var lastWidth = 0
-    var lastHeight = 0
-
-    while (keepRunning()) {
-        val w = canvas.width
-        val h = canvas.height
-        if (w > 0 && h > 0) {
-            if (w != lastWidth || h != lastHeight) {
-                renderer.onSurfaceChanged(w, h)
-                lastWidth = w
-                lastHeight = h
-            }
-            renderer.onDrawFrame()
-            glfwSwapBuffers(windowHandle)
-        }
-        glfwPollEvents()
-        Thread.sleep(16)
+// This function runs the raw LWJGL loop (Replacing your Android GLSurfaceView)
+private fun runOpenGLWindow() {
+    // 1. Initialize GLFW
+    if (!glfwInit()) {
+        throw IllegalStateException("Unable to initialize GLFW")
     }
 
-    // renderer.cleanup() is called in DisposableEffect
+    // 2. Configure the Window
+    glfwDefaultWindowHints()
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE)
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE)
+
+    // 3. Create the Window
+    val windowHandle = glfwCreateWindow(800, 600, "Spirals Renderer", NULL, NULL)
+    if (windowHandle == NULL) {
+        throw RuntimeException("Failed to create the GLFW window")
+    }
+
+    // 4. Center it
+    val vidMode = glfwGetVideoMode(glfwGetPrimaryMonitor())
+    if (vidMode != null) {
+        glfwSetWindowPos(
+            windowHandle,
+            (vidMode.width() - 800) / 2,
+            (vidMode.height() - 600) / 2
+        )
+    }
+
+    // 5. Make the OpenGL context current
+    glfwMakeContextCurrent(windowHandle)
+    // Enable V-Sync
+    glfwSwapInterval(1)
+    glfwShowWindow(windowHandle)
+
+    // CRITICAL: This allows LWJGL to talk to your GPU
+    GL.createCapabilities()
+
+    // --- YOUR RENDERER LOGIC GOES HERE ---
+    val renderer = DesktopSpiralRenderer()
+    renderer.onSurfaceCreated()
+    renderer.onSurfaceChanged(800, 600)
+
+    // 6. The Render Loop
+    while (!glfwWindowShouldClose(windowHandle)) {
+        // Handle Resize using MemoryStack (Safe and efficient)
+        MemoryStack.stackPush().use { stack ->
+            val pWidth = stack.mallocInt(1)
+            val pHeight = stack.mallocInt(1)
+
+            // Get size into the pointers
+            glfwGetWindowSize(windowHandle, pWidth, pHeight)
+
+            val w = pWidth.get(0)
+            val h = pHeight.get(0)
+
+            if (renderer.width != w || renderer.height != h) {
+                renderer.onSurfaceChanged(w, h)
+            }
+        }
+
+        // Draw
+        renderer.onDrawFrame()
+
+        // Swap buffers (Show the frame)
+        glfwSwapBuffers(windowHandle)
+
+        // Poll input events
+        glfwPollEvents()
+    }
+
+    // Cleanup
+    renderer.cleanup()
     glfwDestroyWindow(windowHandle)
     glfwTerminate()
 }

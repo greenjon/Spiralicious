@@ -1,27 +1,19 @@
 package llm.slop.spirals.platform
 
-import androidx.room.Dao
-import androidx.room.Delete
-import androidx.room.Entity
-import androidx.room.Insert
-import androidx.room.PrimaryKey
-import androidx.room.Query
-import androidx.room.OnConflictStrategy as RoomOnConflictStrategy
+import androidx.room.Room
+import llm.slop.spirals.MandalaDatabase
 
+private var database: MandalaDatabase? = null
 
-actual typealias Entity = androidx.room.Entity
-actual typealias PrimaryKey = androidx.room.PrimaryKey
-actual typealias Dao = androidx.room.Dao
-actual typealias Query = androidx.room.Query
-actual typealias Insert = androidx.room.Insert
-actual typealias Delete = androidx.room.Delete
-
-actual enum class OnConflictStrategy {
-    REPLACE
-}
-
-fun OnConflictStrategy.toRoomStrategy(): RoomOnConflictStrategy {
-    return when(this) {
-        OnConflictStrategy.REPLACE -> RoomOnConflictStrategy.REPLACE
+actual fun getDatabase(): MandalaDatabase {
+    if (database == null) {
+        database = Room.databaseBuilder(
+            getAppContext(),
+            MandalaDatabase::class.java,
+            "mandala_database"
+        )
+        .fallbackToDestructiveMigration()
+        .build()
     }
+    return database!!
 }

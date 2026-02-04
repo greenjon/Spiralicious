@@ -32,15 +32,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
 import llm.slop.spirals.cv.core.ModulationRegistry
 import llm.slop.spirals.cv.processors.AudioEngine
 import llm.slop.spirals.cv.processors.AudioSourceType
 import llm.slop.spirals.display.ExternalDisplayCoordinator
 import llm.slop.spirals.display.LocalSpiralRenderer
-import llm.slop.spirals.LayerType
-import llm.slop.spirals.ShowLayerContent
+import llm.slop.spirals.models.ShowLayerContent
 import llm.slop.spirals.navigation.NavLayer
+import llm.slop.spirals.platform.getAppConfig
+import llm.slop.spirals.platform.getDatabase
 import llm.slop.spirals.ui.screens.CvLabScreen
 import llm.slop.spirals.ui.screens.MandalaEditorScreen
 import llm.slop.spirals.ui.screens.MandalaSetEditorScreen
@@ -55,8 +55,8 @@ import llm.slop.spirals.ui.theme.AppAccent
 import llm.slop.spirals.ui.theme.AppBackground
 import llm.slop.spirals.ui.theme.AppText
 import llm.slop.spirals.ui.theme.SpiralsTheme
-import llm.slop.spirals.SpiralSurfaceView // Added import
-import llm.slop.spirals.PatchMapper // Added import
+import llm.slop.spirals.util.PatchMapper
+import llm.slop.spirals.viewmodel.SpiralsViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -92,32 +92,39 @@ class MainActivity : ComponentActivity() {
 
         displayCoordinator = ExternalDisplayCoordinator(this)
         audioEngine = AudioEngine(applicationContext)
-        
+
         val surfaceView = SpiralSurfaceView(applicationContext)
         spiralSurfaceView = surfaceView
         val renderer = surfaceView.renderer
 
         setContent {
             SpiralsTheme {
-                val vm: MandalaViewModel = viewModel()
+                val coroutineScope = rememberCoroutineScope()
+                val vm = remember {
+                    SpiralsViewModel(
+                        coroutineScope = coroutineScope,
+                        db = getDatabase(),
+                        appConfig = getAppConfig()
+                    )
+                }
                 val configuration = LocalConfiguration.current
                 val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-                
+
                 val navStack by vm.navStack.collectAsState()
                 val currentLayer = navStack.lastOrNull() ?: return@SpiralsTheme
                 val currentPatch by vm.currentPatch.collectAsState()
                 val scope = rememberCoroutineScope()
-                
+
                 var showCvLab by remember { mutableStateOf(false) }
                 var showSettings by remember { mutableStateOf(false) }
                 var showManager by remember { mutableStateOf(false) }
-                
+
                 var isFullscreenPreview by remember { mutableStateOf(false) }
 
-                var hasMicPermission by remember { 
-                    mutableStateOf(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) 
+                var hasMicPermission by remember {
+                    mutableStateOf(ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
                 }
-                
+
                 LaunchedEffect(currentLayer.id, currentLayer.openedFromMenu) {
                     if (currentLayer.openedFromMenu && !showManager) {
                         showManager = true
@@ -127,7 +134,7 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
-                
+
                 var audioSourceType by remember { mutableStateOf(AudioSourceType.MIC) }
                 var showRenameDialog by remember { mutableStateOf(false) }
                 var showDeleteConfirm by remember { mutableStateOf(false) }
@@ -159,7 +166,7 @@ class MainActivity : ComponentActivity() {
                             val encoding = AudioFormat.ENCODING_PCM_FLOAT
                             val channelConfig = AudioFormat.CHANNEL_IN_MONO
                             val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, encoding)
-                            
+
                             val record = audioEngine.sourceManager.buildAudioRecord(
                                 type = audioSourceType,
                                 sampleRate = sampleRate,
@@ -181,7 +188,7 @@ class MainActivity : ComponentActivity() {
                 SideEffect {
                     onKeyDownListener = { event ->
                         val keyCode = event.keyCode
-                        
+
                         when (keyCode) {
                             android.view.KeyEvent.KEYCODE_F -> {
                                 isFullscreenPreview = !isFullscreenPreview
@@ -193,9 +200,9 @@ class MainActivity : ComponentActivity() {
                                     true
                                 } else false
                             }
-                            android.view.KeyEvent.KEYCODE_Q, 
-                            android.view.KeyEvent.KEYCODE_W, 
-                            android.view.KeyEvent.KEYCODE_E, 
+                            android.view.KeyEvent.KEYCODE_Q,
+                            android.view.KeyEvent.KEYCODE_W,
+                            android.view.KeyEvent.KEYCODE_E,
                             android.view.KeyEvent.KEYCODE_R -> {
                                 if (currentLayer.type == LayerType.SHOW) {
                                     val show = (currentLayer.data as? ShowLayerContent)?.show
@@ -214,7 +221,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                         android.view.KeyEvent.KEYCODE_W -> {
                                             renderer.getMixerParam("SHOW_RANDOM")?.triggerPulse()
-                                            show?.let { 
+                                            show?.let {
                                                 if (it.randomSetIds.isNotEmpty()) {
                                                     vm.jumpToShowIndex(kotlin.random.Random.nextInt(it.randomSetIds.size))
                                                 }
@@ -233,14 +240,14 @@ class MainActivity : ComponentActivity() {
                     val previewContent = @Composable {
                         Box(modifier = Modifier.fillMaxSize()) {
                             AndroidView(
-                                factory = { 
+                                factory = {
                                     (surfaceView.parent as? android.view.ViewGroup)?.removeView(surfaceView)
-                                    surfaceView 
+                                    surfaceView
                                 },
                                 modifier = Modifier.fillMaxSize(),
                                 update = {}
                             )
-                            
+
                             val isHdmiConnected by displayCoordinator.isConnected.collectAsState()
                             HdmiStatusOverlay(
                                 isConnected = isHdmiConnected,
@@ -274,8 +281,8 @@ class MainActivity : ComponentActivity() {
                                     else Modifier.fillMaxWidth()
                                 )
                                 .systemBarsPadding()
-                                .graphicsLayer { 
-                                    alpha = if (isFullscreenPreview) 0f else 1f 
+                                .graphicsLayer {
+                                    alpha = if (isFullscreenPreview) 0f else 1f
                                 }
                                 .zIndex(if (isFullscreenPreview) 0f else 1f)
                                 .pointerInput(isFullscreenPreview) {
@@ -298,10 +305,10 @@ class MainActivity : ComponentActivity() {
                                         IconButton(onClick = { showHeaderMenu = true }) {
                                             Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = AppText)
                                         }
-                                        
+
                                         if (showHeaderMenu) {
                                             DropdownMenu(
-                                                expanded = showHeaderMenu, 
+                                                expanded = showHeaderMenu,
                                                 onDismissRequest = { showHeaderMenu = false },
                                                 containerColor = AppBackground
                                             ) {
@@ -318,7 +325,7 @@ class MainActivity : ComponentActivity() {
 
                                                 DropdownMenuItem(
                                                     text = { Text("Library", color = if (isAtRoot) AppAccent else disabledColor) },
-                                                    onClick = { 
+                                                    onClick = {
                                                         if (isAtRoot) {
                                                             showManager = true
                                                             showHeaderMenu = false
@@ -328,7 +335,7 @@ class MainActivity : ComponentActivity() {
                                                 )
                                                 DropdownMenuItem(
                                                     text = { Text("New $editorName", color = if (isAtRoot) AppAccent else disabledColor) },
-                                                    onClick = { 
+                                                    onClick = {
                                                         if (isAtRoot) {
                                                             vm.startNewPatch(currentLayer.type)
                                                             showHeaderMenu = false
@@ -357,13 +364,13 @@ class MainActivity : ComponentActivity() {
                                                 }
 
                                                 DropdownMenuItem(
-                                                    text = { Text("Rename", color = if (hasActiveData) AppText else disabledColor) }, 
+                                                    text = { Text("Rename", color = if (hasActiveData) AppText else disabledColor) },
                                                     onClick = { showRenameDialog = true; showHeaderMenu = false },
                                                     enabled = hasActiveData
                                                 )
                                                 DropdownMenuItem(
-                                                    text = { Text("Delete", color = if (hasActiveData && isAtRoot) Color.Red else disabledColor) }, 
-                                                    onClick = { 
+                                                    text = { Text("Delete", color = if (hasActiveData && isAtRoot) Color.Red else disabledColor) },
+                                                    onClick = {
                                                         if (isAtRoot) {
                                                             showDeleteConfirm = true
                                                             showHeaderMenu = false
@@ -372,10 +379,10 @@ class MainActivity : ComponentActivity() {
                                                     enabled = hasActiveData && isAtRoot
                                                 )
                                                 DropdownMenuItem(
-                                                    text = { Text("Discard Changes", color = Color.Red) }, 
-                                                    onClick = { 
+                                                    text = { Text("Discard Changes", color = Color.Red) },
+                                                    onClick = {
                                                         vm.popToLayer(navStack.size - 2, save = false)
-                                                        showHeaderMenu = false 
+                                                        showHeaderMenu = false
                                                     }
                                                 )
 
@@ -386,7 +393,7 @@ class MainActivity : ComponentActivity() {
                                                     onClick = { /* Section Header */ },
                                                     enabled = false
                                                 )
-                                                
+
                                                 LayerType.entries.filter { it != currentLayer.type }.forEach { type ->
                                                     val label = when(type) {
                                                         LayerType.MIXER -> "Mixer Editor"
@@ -396,13 +403,13 @@ class MainActivity : ComponentActivity() {
                                                         LayerType.RANDOM_SET -> "RSet Editor"
                                                     }
                                                     DropdownMenuItem(
-                                                        text = { 
+                                                        text = {
                                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                                 Text("  • ", color = if (isAtRoot) AppAccent else disabledColor)
                                                                 Text(label, color = if (isAtRoot) AppAccent else disabledColor)
                                                             }
                                                         },
-                                                        onClick = { 
+                                                        onClick = {
                                                             if (isAtRoot) {
                                                                 vm.createAndResetStack(type, openedFromMenu = true)
                                                                 showHeaderMenu = false
@@ -415,12 +422,12 @@ class MainActivity : ComponentActivity() {
                                                 HorizontalDivider(color = AppText.copy(alpha = 0.1f))
 
                                                 DropdownMenuItem(
-                                                    text = { Text("CV Lab", color = AppAccent) }, 
+                                                    text = { Text("CV Lab", color = AppAccent) },
                                                     onClick = { showCvLab = true; showHeaderMenu = false }
                                                 )
-                                                DropdownMenuItem(text = { Text("Settings", color = AppText) }, onClick = { 
+                                                DropdownMenuItem(text = { Text("Settings", color = AppText) }, onClick = {
                                                     showSettings = true
-                                                    showHeaderMenu = false 
+                                                    showHeaderMenu = false
                                                 })
 
                                                 HorizontalDivider(color = AppText.copy(alpha = 0.1f))
@@ -453,7 +460,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                         LayerType.MIXER -> {
                                             MixerEditorScreen(
-                                                vm = vm, 
+                                                vm = vm,
                                                 onClose = { /* Root layer usually doesn't close */ },
                                                 onNavigateToSetEditor = { nested ->
                                                     if (nested) vm.createAndPushLayer(LayerType.SET)
@@ -471,7 +478,7 @@ class MainActivity : ComponentActivity() {
                                         }
                                         LayerType.SET -> {
                                             MandalaSetEditorScreen(
-                                                vm = vm, 
+                                                vm = vm,
                                                 onClose = { vm.popToLayer(navStack.size - 2) },
                                                 onNavigateToMixerEditor = { /* Navigation handled via breadcrumbs */ },
                                                 onShowCvLab = { showCvLab = true },
@@ -511,7 +518,7 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                             }
-                        
+
                     }
                 }
 
@@ -543,7 +550,7 @@ class MainActivity : ComponentActivity() {
                         displayCoordinator = displayCoordinator
                     )
                 }
-                
+
                 if (showRenameDialog) {
                     RenamePatchDialog(
                         initialName = currentLayer.name,
@@ -561,9 +568,9 @@ class MainActivity : ComponentActivity() {
                         title = { Text("Delete '${currentLayer.name}'?", color = AppText) },
                         text = { Text("This action cannot be undone.", color = AppText) },
                         confirmButton = {
-                            TextButton(onClick = { 
+                            TextButton(onClick = {
                                 vm.deleteLayerAndPop(navStack.lastIndex)
-                                showDeleteConfirm = false 
+                                showDeleteConfirm = false
                             }) {
                                 Text("DELETE", color = Color.Red)
                             }
@@ -581,12 +588,12 @@ class MainActivity : ComponentActivity() {
                     AlertDialog(
                         onDismissRequest = { showExitConfirm = false },
                         title = { Text("Exit Spirals?", color = AppText) },
-                        text = { 
+                        text = {
                             val isAnyDirty = navStack.any { it.isDirty }
-                            Text(if (isAnyDirty) "Save changes and exit?" else "Exit the application?", color = AppText) 
+                            Text(if (isAnyDirty) "Save changes and exit?" else "Exit the application?", color = AppText)
                         },
                         confirmButton = {
-                            TextButton(onClick = { 
+                            TextButton(onClick = {
                                 navStack.forEach { layer ->
                                     if (layer.isDirty) {
                                         vm.saveLayer(layer)

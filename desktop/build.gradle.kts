@@ -1,35 +1,38 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 
 plugins {
-    kotlin("jvm")
-    alias(libs.plugins.jetbrains.compose)
-    // alias(libs.plugins.kotlin.compose) // Removed - handled by JetBrains Compose plugin
+    kotlin("multiplatform")
+    id("org.jetbrains.compose")
 }
 
 group = "llm.slop.spirals"
 version = "1.0"
 
 kotlin {
-    jvmToolchain(17)
-}
+    jvm {
+        withJava()
+    }
 
-dependencies {
-    implementation(project(":common"))
-    // Note, if you develop a library, you should use compose.desktop.common.
-    // compose.desktop.currentOs should be used in launcher-sourceSet
-    // (in a separate module for instance)
-    implementation(compose.desktop.currentOs)
+    sourceSets {
+        val jvmMain by getting {
+            dependencies {
+                implementation(compose.desktop.currentOs)
+                implementation(project(":common")) // Assuming your logic is here
 
-    val lwjglVersion = "3.3.3"
-    val lwjglNatives = "natives-linux" // Or your target OS
+                // --- VITAL FOR OPENGL PORTING ---
+                // You need these to replace 'android.opengl.*'
+                val lwjglVersion = "3.3.3"
+                implementation("org.lwjgl:lwjgl:$lwjglVersion")
+                implementation("org.lwjgl:lwjgl-opengl:$lwjglVersion")
+                implementation("org.lwjgl:lwjgl-glfw:${lwjglVersion}")
 
-    implementation("org.lwjgl:lwjgl:$lwjglVersion")
-    implementation("org.lwjgl:lwjgl-opengl:$lwjglVersion")
-    implementation("org.lwjgl:lwjgl-glfw:$lwjglVersion")
-
-    runtimeOnly("org.lwjgl:lwjgl:$lwjglVersion:$lwjglNatives")
-    runtimeOnly("org.lwjgl:lwjgl-opengl:$lwjglVersion:$lwjglNatives")
-    runtimeOnly("org.lwjgl:lwjgl-glfw:$lwjglVersion:$lwjglNatives")
+                // Since you are on Linux, you need the natives
+                runtimeOnly("org.lwjgl:lwjgl:$lwjglVersion:natives-linux")
+                runtimeOnly("org.lwjgl:lwjgl-opengl:$lwjglVersion:natives-linux")
+                runtimeOnly("org.lwjgl:lwjgl-glfw:$lwjglVersion:natives-linux")
+            }
+        }
+    }
 }
 
 compose.desktop {

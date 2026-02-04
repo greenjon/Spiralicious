@@ -84,6 +84,16 @@ This project is being refactored to support both Android and Desktop (Linux).
 - The project has been restructured into `:app`, `:common`, and `:desktop` modules.
 
 **Phase 2: Code Migration (In Progress)**
-- Moving platform-agnostic code from `:app` to `:common`.
+- Moving platform-agnostic code from `:app` to `:common`. IN PROGRESS
+- •
+  Next Steps for Desktop Parity:
+  i.
+  Port the MandalaViewModel and NavLayer logic to common so both platforms can share state management.
+  ii.
+  Implement the Compose UI for Desktop (likely using Compose Multiplatform to share the existing Android UI code).
+  iii.
+  Implement a Desktop-compatible AudioEngine (e.g., using javax.sound).
+  iv.
+  Set up a database solution for Desktop (Room now supports SQLite/Desktop, or SQLDelight could be used).
 
 **Note:** This README provides a quick overview. For detailed architectural documentation, design decisions, and development notes, see [DESIGN.md](DESIGN.md).

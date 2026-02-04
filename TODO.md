@@ -47,13 +47,13 @@ The goal is to move the rendering logic to `:common` and have platform-specific 
 -   [x] **Abstract Shader Loading**:
     -   [x] The current `DesktopSpiralRenderer` reads shaders from resources using Java-specific methods. Create an `expect fun readShaderResource(path: String): String` in `commonMain` so each platform can implement its own resource loading.
 
--   [ ] **Create Common UI for Rendering**:
-    -   [ ] **Move Android Rendering Classes to Common**: Move `SpiralRenderer.kt`, `SpiralSurfaceView.kt`, `ShaderHelper.kt`, `SharedEGLContextFactory.kt` from `:app` to `:common/src/androidMain/...`. This allows the common module to implement the `actual` composable using these views.
-    -   [ ] **Define Common Surface Composable**: Create `expect @Composable fun SpiralSurface(modifier: Modifier)` in `commonMain`.
-    -   [ ] **Implement Android Surface**: Implement `actual fun SpiralSurface` in `androidMain`. It should wrap `SpiralSurfaceView` using `AndroidView`.
-    -   [ ] **Implement Desktop Surface**: Implement `actual fun SpiralSurface` in `desktopMain`. This requires setting up an LWJGL `GLCanvas` (or `GLJPanel`) inside a `SwingPanel` (Compose for Desktop interop) and attaching the `DesktopSpiralRenderer`.
-    -   [ ] **Expand Renderer Interface**: Add missing methods to `ISpiralRenderer` needed by the UI: `getMixerParam(name: String): ModulatableParameter?`, `setVisualSource(source: VisualSource)`.
-    -   [ ] **Re-enable Parameter System**: Uncomment `MandalaVisualSource` and related classes in `common`. Ensure the renderer's `onDrawFrame` calls `visualSource.update()` and applies parameters to uniforms.
+-   [x] **Create Common UI for Rendering**:
+    -   [x] **Move Android Rendering Classes to Common**: Move `SpiralRenderer.kt`, `SpiralSurfaceView.kt`, `ShaderHelper.kt`, `SharedEGLContextFactory.kt` from `:app` to `:common/src/androidMain/...`. This allows the common module to implement the `actual` composable using these views.
+    -   [x] **Define Common Surface Composable**: Create `expect @Composable fun SpiralSurface(modifier: Modifier)` in `commonMain`.
+    -   [x] **Implement Android Surface**: Implement `actual fun SpiralSurface` in `androidMain`. It should wrap `SpiralSurfaceView` using `AndroidView`.
+    -   [x] **Implement Desktop Surface**: Implement `actual fun SpiralSurface` in `desktopMain`. This requires setting up an LWJGL `GLCanvas` (or `GLJPanel`) inside a `SwingPanel` (Compose for Desktop interop) and attaching the `DesktopSpiralRenderer`.
+    -   [x] **Expand Renderer Interface**: Add missing methods to `ISpiralRenderer` needed by the UI: `getMixerParam(name: String): ModulatableParameter?`, `setVisualSource(source: VisualSource)`.
+    -   [x] **Re-enable Parameter System**: Uncomment `MandalaVisualSource` and related classes in `common`. Ensure the renderer's `onDrawFrame` calls `visualSource.update()` and applies parameters to uniforms.
 
 ## 2. Audio System Abstraction
 

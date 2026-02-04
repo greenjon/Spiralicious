@@ -3,7 +3,11 @@ package llm.slop.spirals.display
 import android.content.Context
 import android.opengl.GLES30.*
 import android.opengl.GLSurfaceView
+import llm.slop.spirals.VisualSource
+import llm.slop.spirals.ModulatableParameter
+import llm.slop.spirals.cv.core.ModulationRegistry
 import llm.slop.spirals.models.mandala.MandalaRatio
+import llm.slop.spirals.models.MixerPatch
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -37,6 +41,13 @@ class SpiralRenderer(private val context: Context) : ISpiralRenderer, GLSurfaceV
     
     private var currentRatio: MandalaRatio? = null
     private val pendingRatio = AtomicReference<MandalaRatio?>(null)
+    
+    private var visualSource: VisualSource? = null
+    private var mixerPatch: MixerPatch? = null
+    private var monitorSource: String = ""
+    
+    // Placeholder for mixer params
+    private val mixerParams = mutableMapOf<String, ModulatableParameter>()
 
     var width: Int = 0
     var height: Int = 0
@@ -52,6 +63,19 @@ class SpiralRenderer(private val context: Context) : ISpiralRenderer, GLSurfaceV
 
     override fun onDrawFrame(gl: GL10?) {
         onDrawFrame()
+    }
+    
+    override fun setVisualSource(source: VisualSource?) {
+        this.visualSource = source
+    }
+    
+    override fun setMixerState(patch: MixerPatch?, monitor: String) {
+        this.mixerPatch = patch
+        this.monitorSource = monitor
+    }
+    
+    override fun getMixerParam(name: String): ModulatableParameter? {
+        return mixerParams[name]
     }
 
     override fun onSurfaceCreated() {
@@ -99,7 +123,13 @@ class SpiralRenderer(private val context: Context) : ISpiralRenderer, GLSurfaceV
         pendingRatio.getAndSet(null)?.let {
             applyRatio(it)
         }
-        val ratio = currentRatio ?: return
+        
+        // Update visual source with latest modulation values
+        visualSource?.update(ModulationRegistry.signals)
+        
+        // Use ratio from VisualSource if available, else fallback
+        val vsRatio = (visualSource as? llm.slop.spirals.MandalaVisualSource)?.recipe
+        val ratio = vsRatio ?: currentRatio ?: return
         
         // STAGE 1: Draw the fresh Mandala into FBO A
         glBindFramebuffer(GL_FRAMEBUFFER, fboA)
@@ -117,7 +147,10 @@ class SpiralRenderer(private val context: Context) : ISpiralRenderer, GLSurfaceV
         glUniform1f(uL3Loc, ratio.arms[2].length)
         glUniform1f(uL4Loc, ratio.arms[3].length)
         glUniform1f(glGetUniformLocation(mandalaProgram, "uAspectRatio"), this.width.toFloat() / this.height.toFloat())
-        glUniform1f(glGetUniformLocation(mandalaProgram, "uGlobalScale"), ratio.baseScale)
+        
+        val scale = (visualSource as? llm.slop.spirals.MandalaVisualSource)?.evaluatedGlobalScale ?: ratio.baseScale
+        
+        glUniform1f(glGetUniformLocation(mandalaProgram, "uGlobalScale"), scale)
         glUniform1f(glGetUniformLocation(mandalaProgram, "uThickness"), 0.1f)
         
         glBindVertexArray(mandalaVao)

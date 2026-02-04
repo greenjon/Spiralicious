@@ -1,148 +1,81 @@
 package llm.slop.spirals
 
-// import llm.slop.spirals.cv.core.ModulatableParameter
-// import llm.slop.spirals.models.mandala.MandalaRatio
-// import kotlin.math.cos
-// import kotlin.math.sin
-// import kotlin.math.PI
-// import kotlin.math.sqrt
-// import kotlin.math.max
-// import kotlin.math.abs
-// import kotlin.math.roundToInt
+import llm.slop.spirals.models.mandala.MandalaRatio
+import llm.slop.spirals.models.ModulatableParameterData
+import kotlin.math.max
+import kotlin.math.abs
 
-// /**
-//  * Interface for renderable visual objects that consume modulatable parameters.
-//  */
-// interface VisualSource {
-//     /**
-//      * Map of parameter names to their modulatable counterparts.
-//      */
-//     val parameters: Map<String, ModulatableParameter>
+interface VisualSource {
+    val parameters: MutableMap<String, ModulatableParameter>
+    val globalAlpha: ModulatableParameter
+    val globalScale: ModulatableParameter
 
-//     /**
-//      * Top-level parameters for mixing and composition.
-//      */
-//     val globalAlpha: ModulatableParameter
-//     val globalScale: ModulatableParameter
+    fun update(modSources: Map<String, Float>)
+}
 
-//     /**
-//      * Trigger evaluation of all parameters.
-//      * Expected to be called at 120Hz or per frame.
-//      */
-//     fun update() {
-//         parameters.values.forEach { it.evaluate() }
-//         globalAlpha.evaluate()
-//         globalScale.evaluate()
-//     }
+class MandalaVisualSource : VisualSource {
+    override val parameters = linkedMapOf(
+        "L1" to ModulatableParameter(ModulatableParameterData(0.4f)),
+        "L2" to ModulatableParameter(ModulatableParameterData(0.3f)),
+        "L3" to ModulatableParameter(ModulatableParameterData(0.2f)),
+        "L4" to ModulatableParameter(ModulatableParameterData(0.1f)),
+        "Scale" to ModulatableParameter(ModulatableParameterData(0.125f)),
+        "Rotation" to ModulatableParameter(ModulatableParameterData(0.0f)),
+        "Thickness" to ModulatableParameter(ModulatableParameterData(0.1f)),
+        "Hue Offset" to ModulatableParameter(ModulatableParameterData(0.0f)),
+        "Hue Sweep" to ModulatableParameter(ModulatableParameterData(1.0f / 9.0f)),
+        "Depth" to ModulatableParameter(ModulatableParameterData(0.35f)),
+        "FB Gain" to ModulatableParameter(ModulatableParameterData(0.0f)),
+        "FB Zoom" to ModulatableParameter(ModulatableParameterData(0.5f)),
+        "FB Rotate" to ModulatableParameter(ModulatableParameterData(0.5f)),
+        "FB Shift" to ModulatableParameter(ModulatableParameterData(0.0f)),
+        "FB Blur" to ModulatableParameter(ModulatableParameterData(0.0f))
+    )
 
-//     /**
-//      * Render the visual state to the canvas.
-//      */
-//     fun render(canvas: Any, width: Int, height: Int)
-// }
+    override var globalAlpha = ModulatableParameter(ModulatableParameterData(1.0f))
+    override var globalScale = ModulatableParameter(ModulatableParameterData(1.0f))
 
-// /**
-//  * Optimized VisualSource that avoids allocations in the render loop.
-//  * Renders exactly one complete closed loop based on integer frequencies.
-//  */
-// class MandalaVisualSource : VisualSource {
-//     override val parameters = linkedMapOf(
-//         "L1" to ModulatableParameter(0.4f),
-//         "L2" to ModulatableParameter(0.3f),
-//         "L3" to ModulatableParameter(0.2f),
-//         "L4" to ModulatableParameter(0.1f),
-//         "Scale" to ModulatableParameter(0.125f),
-//         "Rotation" to ModulatableParameter(0.0f),
-//         "Thickness" to ModulatableParameter(0.1f),
-//         "Hue Offset" to ModulatableParameter(0.0f),
-//         "Hue Sweep" to ModulatableParameter(1.0f / 9.0f),
-//         "Depth" to ModulatableParameter(0.35f),
-//         // Feedback Engine Parameters
-//         "FB Gain" to ModulatableParameter(0.0f),
-//         "FB Zoom" to ModulatableParameter(0.5f),   // 0.5 = 0%
-//         "FB Rotate" to ModulatableParameter(0.5f), // 0.5 = 0 degrees
-//         "FB Shift" to ModulatableParameter(0.0f),
-//         "FB Blur" to ModulatableParameter(0.0f)
-//     )
+    var recipe: MandalaRatio = MandalaLibrary.MandalaRatios.first()
+    
+    val evaluatedValues = mutableMapOf<String, Float>()
+    var evaluatedGlobalAlpha: Float = 1.0f
+    var evaluatedGlobalScale: Float = 1.0f
 
-//     override val globalAlpha = ModulatableParameter(1.0f)
-//     override val globalScale = ModulatableParameter(1.0f)
+    var minR: Float = 0f
+        private set
+    var maxR: Float = 1f
+        private set
 
-//     var recipe: MandalaRatio = MandalaLibrary.MandalaRatios.first()
+    var isDirty = true
+    private var lastRecipeId = ""
 
-//     private val hsvBuffer = FloatArray(3)
+    override fun update(modSources: Map<String, Float>) {
+        parameters.forEach { (k, v) -> evaluatedValues[k] = v.getValue(modSources) }
+        evaluatedGlobalAlpha = globalAlpha.getValue(modSources)
+        evaluatedGlobalScale = globalScale.getValue(modSources)
 
-//     private val points = 2048
-//     // Static buffer for GPU expansion: [Phase, Side] pairs
-//     val expansionBuffer = FloatArray((points + 1) * 2 * 2)
+        val l1 = abs(evaluatedValues["L1"] ?: 0f)
+        val l2 = abs(evaluatedValues["L2"] ?: 0f)
+        val l3 = abs(evaluatedValues["L3"] ?: 0f)
+        val l4 = abs(evaluatedValues["L4"] ?: 0f)
 
-//     // Radial Brightness tracking
-//     var minR: Float = 0f
-//         private set
-//     var maxR: Float = 1f
-//         private set
+        maxR = max(0.001f, l1 + l2 + l3 + l4)
+        minR = 0f
 
-//     // Optimization flags
-//     var isDirty = true
-//     private var lastRecipeId = ""
+        if (recipe.id != lastRecipeId) {
+            lastRecipeId = recipe.id
+            isDirty = true
+        }
+    }
 
-//     init {
-//         for (i in 0..points) {
-//             val phase = i.toFloat() / points.toFloat()
-//             // Left vertex
-//             expansionBuffer[i * 4 + 0] = phase
-//             expansionBuffer[i * 4 + 1] = -1.0f
-//             // Right vertex
-//             expansionBuffer[i * 4 + 2] = phase
-//             expansionBuffer[i * 4 + 3] = 1.0f
-//         }
-//     }
-
-//     override fun update() {
-//         super.update()
-
-//         // Optimization: Use mathematical heuristic for bounds instead of a 2048-point loop
-//         // maxR is the sum of absolute arm lengths (the maximum possible reach)
-//         val l1 = abs(parameters["L1"]?.value ?: 0f)
-//         val l2 = abs(parameters["L2"]?.value ?: 0f)
-//         val l3 = abs(parameters["L3"]?.value ?: 0f)
-//         val l4 = abs(parameters["L4"]?.value ?: 0f)
-
-//         maxR = max(0.001f, l1 + l2 + l3 + l4)
-//         minR = 0f // Stable base for depth effect
-
-//         if (recipe.id != lastRecipeId) {
-//             lastRecipeId = recipe.id
-//             isDirty = true
-//         }
-//     }
-
-//     override fun render(canvas: Any, width: Int, height: Int) {
-//         // Android-specific rendering code will be handled using expect/actual
-//     }
-
-//     fun copy(): MandalaVisualSource {
-//         val newSource = MandalaVisualSource()
-//         // Deep copy parameters
-//         this.parameters.forEach { (key, param) ->
-//             newSource.parameters[key]?.baseValue = param.baseValue
-//             newSource.parameters[key]?.modulators?.clear()
-//             newSource.parameters[key]?.modulators?.addAll(param.modulators)
-//         }
-//         // Deep copy globalAlpha and globalScale
-//         newSource.globalAlpha.baseValue = this.globalAlpha.baseValue
-//         newSource.globalAlpha.modulators.clear()
-//         newSource.globalAlpha.modulators.addAll(this.globalAlpha.modulators)
-
-//         newSource.globalScale.baseValue = this.globalScale.baseValue
-//         newSource.globalScale.modulators.clear()
-//         newSource.globalScale.modulators.addAll(this.globalScale.modulators)
-
-//         newSource.recipe = this.recipe.copy() // Mandala4Arm is a data class, so its copy is deep enough.
-//         newSource.minR = this.minR
-//         newSource.maxR = this.maxR
-//         newSource.isDirty = this.isDirty
-//         // Note: expansionBuffer is statically initialized, no need to copy
-//         return newSource
-//     }
-// }
+    fun copy(): MandalaVisualSource {
+        val newSource = MandalaVisualSource()
+        this.parameters.forEach { (k, v) ->
+             newSource.parameters[k] = ModulatableParameter(v.data)
+        }
+        newSource.globalAlpha = ModulatableParameter(this.globalAlpha.data)
+        newSource.globalScale = ModulatableParameter(this.globalScale.data)
+        newSource.recipe = this.recipe.copy()
+        return newSource
+    }
+}

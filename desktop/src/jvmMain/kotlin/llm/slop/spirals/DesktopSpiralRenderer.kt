@@ -138,9 +138,9 @@ class DesktopSpiralRenderer : ISpiralRenderer {
         glUniform1i(glGetUniformLocation(feedbackProgram, "uTextureLive"), 0)
         glUniform1i(glGetUniformLocation(feedbackProgram, "uTextureHistory"), 1)
 
-        val finalScale = ratio.feedbackScale.getValue(lfoValues)
-        val finalRotation = ratio.feedbackRotation.getValue(lfoValues)
-        val finalAmount = ratio.feedbackAmount.getValue(lfoValues)
+        val finalScale = ratio.feedbackScale
+        val finalRotation = ratio.feedbackRotation
+        val finalAmount = ratio.feedbackAmount
 
         glUniform1f(glGetUniformLocation(feedbackProgram, "uZoom"), finalScale)
         glUniform1f(glGetUniformLocation(feedbackProgram, "uRotate"), finalRotation)

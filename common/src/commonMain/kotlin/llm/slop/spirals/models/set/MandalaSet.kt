@@ -9,8 +9,3 @@ data class MandalaSet(
     val orderedMandalaIds: MutableList<String>,
     val selectionPolicy: SelectionPolicy = SelectionPolicy.SEQUENTIAL
 )
-
-enum class SelectionPolicy {
-    SEQUENTIAL,
-    RANDOM
-}

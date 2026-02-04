@@ -4,7 +4,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.firstOrNull
 import llm.slop.spirals.database.entities.MandalaPatchEntity
-import llm.slop.spirals.MandalaDatabase
+import llm.slop.spirals.database.MandalaDatabase
 import llm.slop.spirals.models.PatchData
 import llm.slop.spirals.PatchMapper
 

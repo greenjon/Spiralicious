@@ -6,7 +6,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import llm.slop.spirals.LayerType
-import llm.slop.spirals.MandalaDatabase
+import llm.slop.spirals.database.MandalaDatabase
 import llm.slop.spirals.MandalaLibrary
 import llm.slop.spirals.database.entities.*
 import llm.slop.spirals.models.*

@@ -6,14 +6,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import llm.slop.spirals.MandalaDatabase
+import llm.slop.spirals.database.MandalaDatabase
 import llm.slop.spirals.database.entities.MandalaSetEntity
 import llm.slop.spirals.models.set.MandalaSet
 import llm.slop.spirals.models.set.SelectionPolicy
 
 /**
  * Repository for managing Mandala Sets.
- * 
+ *
  * This repository handles CRUD operations for Mandala Sets, abstracting away
  * the database interactions from the ViewModels. It converts between the domain model
  * (MandalaSet) and the database entity (MandalaSetEntity).
@@ -21,10 +21,10 @@ import llm.slop.spirals.models.set.SelectionPolicy
 class SetRepository(private val database: MandalaDatabase) : Repository<MandalaSet, String> {
     private val setDao = database.mandalaSetDao()
     private val jsonConfiguration = Json { ignoreUnknownKeys = true }
-    
+
     /**
      * Gets a flow of all mandala sets.
-     * 
+     *
      * @return A Flow emitting a list of MandalaSet objects converted from database entities
      */
     override fun getAll(): Flow<List<MandalaSet>> {
@@ -34,13 +34,13 @@ class SetRepository(private val database: MandalaDatabase) : Repository<MandalaS
             }
         }
     }
-    
+
     /**
      * Gets a mandala set by its ID.
-     * 
+     *
      * Note: This implementation is inefficient as it needs to load all sets.
      * In a production environment, we would add a dedicated DAO method.
-     * 
+     *
      * @param id The ID of the mandala set to get
      * @return The MandalaSet object if found, or null if not found
      */
@@ -50,10 +50,10 @@ class SetRepository(private val database: MandalaDatabase) : Repository<MandalaS
         val entity = allSets.find { it.id == id } ?: return null
         return fromEntity(entity)
     }
-    
+
     /**
      * Saves a mandala set to the database.
-     * 
+     *
      * @param entity The MandalaSet to save
      */
     override suspend fun save(entity: MandalaSet) {
@@ -67,19 +67,19 @@ class SetRepository(private val database: MandalaDatabase) : Repository<MandalaS
             )
         )
     }
-    
+
     /**
      * Deletes a mandala set by its ID.
-     * 
+     *
      * @param id The ID of the mandala set to delete
      */
     override suspend fun deleteById(id: String) {
         setDao.deleteById(id)
     }
-    
+
     /**
      * Renames a mandala set.
-     * 
+     *
      * @param id The ID of the set to rename
      * @param newName The new name for the set
      * @return true if the set was found and renamed, false otherwise
@@ -87,14 +87,14 @@ class SetRepository(private val database: MandalaDatabase) : Repository<MandalaS
     suspend fun renameSet(id: String, newName: String): Boolean {
         val allSets = setDao.getAllSets().first()
         val entity = allSets.find { it.id == id } ?: return false
-        
+
         setDao.insertSet(entity.copy(name = newName))
         return true
     }
-    
+
     /**
      * Clones a mandala set.
-     * 
+     *
      * @param id The ID of the mandala set to clone
      * @param newName The name for the cloned set
      * @param newId The ID for the cloned set (optional)
@@ -103,16 +103,16 @@ class SetRepository(private val database: MandalaDatabase) : Repository<MandalaS
     suspend fun cloneSet(id: String, newName: String, newId: String = java.util.UUID.randomUUID().toString()): String? {
         val allSets = setDao.getAllSets().first()
         val entity = allSets.find { it.id == id } ?: return null
-        
+
         val newEntity = entity.copy(
             id = newId,
             name = newName
         )
-        
+
         setDao.insertSet(newEntity)
         return newId
     }
-    
+
     /**
      * Convert a MandalaSetEntity to a MandalaSet domain object.
      */
@@ -122,13 +122,13 @@ class SetRepository(private val database: MandalaDatabase) : Repository<MandalaS
         } catch (e: Exception) {
             mutableListOf()
         }
-        
+
         val selectionPolicy = try {
             SelectionPolicy.valueOf(entity.selectionPolicy)
         } catch (e: Exception) {
             SelectionPolicy.SEQUENTIAL
         }
-        
+
         return MandalaSet(
             id = entity.id,
             name = entity.name,

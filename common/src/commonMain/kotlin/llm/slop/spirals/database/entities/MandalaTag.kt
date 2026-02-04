@@ -1,6 +1,6 @@
 package llm.slop.spirals.database.entities
 
-import llm.slop.spirals.platform.Entity
+import androidx.room.Entity
 
 @Entity(tableName = "mandala_tags", primaryKeys = ["id", "tag"])
 data class MandalaTag(

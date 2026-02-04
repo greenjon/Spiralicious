@@ -3,7 +3,9 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     id("com.android.library")
     alias(libs.plugins.jetbrains.compose)
-    // alias(libs.plugins.kotlin.compose) // Removed - handled by JetBrains Compose plugin
+    alias(libs.plugins.kotlin.compose)
+    id("com.google.devtools.ksp")
+    alias(libs.plugins.androidx.room)
 }
 
 kotlin {
@@ -19,20 +21,21 @@ kotlin {
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.material3)
+                implementation(libs.room.runtime)
+                implementation(libs.sqlite.bundled)
             }
         }
         val androidMain by getting {
             dependencies {
                 // Android-specific dependencies
                 implementation(libs.androidx.core.ktx)
-                implementation(libs.room.runtime)
                 implementation(libs.room.ktx)
                 implementation(libs.androidx.lifecycle.runtime.ktx)
             }
         }
         val desktopMain by getting {
             dependencies {
-                // Desktop-specific dependencies
+                implementation(libs.room.ktx)
             }
         }
     }
@@ -48,4 +51,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
+dependencies {
+    add("kspAndroid", libs.room.compiler)
+    add("kspDesktop", libs.room.compiler)
 }

@@ -35,12 +35,13 @@ import androidx.core.content.ContextCompat
 import llm.slop.spirals.cv.core.ModulationRegistry
 import llm.slop.spirals.cv.processors.AudioEngine
 import llm.slop.spirals.cv.processors.AudioSourceType
+import llm.slop.spirals.database.DatabaseDriver
+import llm.slop.spirals.database.createDatabase
 import llm.slop.spirals.display.ExternalDisplayCoordinator
 import llm.slop.spirals.display.LocalSpiralRenderer
 import llm.slop.spirals.models.ShowLayerContent
 import llm.slop.spirals.navigation.NavLayer
 import llm.slop.spirals.platform.getAppConfig
-import llm.slop.spirals.platform.getDatabase
 import llm.slop.spirals.ui.screens.CvLabScreen
 import llm.slop.spirals.ui.screens.MandalaEditorScreen
 import llm.slop.spirals.ui.screens.MandalaSetEditorScreen
@@ -103,7 +104,7 @@ class MainActivity : ComponentActivity() {
                 val vm = remember {
                     SpiralsViewModel(
                         coroutineScope = coroutineScope,
-                        db = getDatabase(),
+                        db = createDatabase(DatabaseDriver(applicationContext)),
                         appConfig = getAppConfig()
                     )
                 }

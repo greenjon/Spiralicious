@@ -1,12 +1,13 @@
 package llm.slop.spirals.database.entities
 
-import llm.slop.spirals.platform.Entity
-import llm.slop.spirals.platform.PrimaryKey
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 
 @Entity(tableName = "mandala_sets")
 data class MandalaSetEntity(
-    @PrimaryKey val id: String,
+    @PrimaryKey
+    val id: String,
     val name: String,
-    val jsonOrderedMandalaIds: String, // Serialized List<String>
+    val jsonOrderedMandalaIds: String,
     val selectionPolicy: String
 )

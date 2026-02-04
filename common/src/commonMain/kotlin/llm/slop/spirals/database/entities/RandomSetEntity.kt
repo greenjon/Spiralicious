@@ -1,11 +1,12 @@
 package llm.slop.spirals.database.entities
 
-import llm.slop.spirals.platform.Entity
-import llm.slop.spirals.platform.PrimaryKey
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 
 @Entity(tableName = "random_sets")
 data class RandomSetEntity(
-    @PrimaryKey val id: String,
+    @PrimaryKey
+    val id: String,
     val name: String,
-    val jsonSettings: String // Serialized RandomSet
+    val jsonSettings: String
 )

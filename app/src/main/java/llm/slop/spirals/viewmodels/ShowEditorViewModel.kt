@@ -6,7 +6,8 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import llm.slop.spirals.LayerType
-import llm.slop.spirals.MandalaDatabase
+import llm.slop.spirals.database.DatabaseDriver
+import llm.slop.spirals.database.createDatabase
 import llm.slop.spirals.ShowLayerContent
 import llm.slop.spirals.database.repositories.RandomSetRepository
 import llm.slop.spirals.database.repositories.ShowRepository
@@ -15,7 +16,7 @@ import llm.slop.spirals.navigation.NavigationViewModel
 
 /**
  * ViewModel for the Show Editor screen.
- * 
+ *
  * This ViewModel manages the state and logic specifically for editing Show patches.
  * It interacts with the NavigationViewModel for navigation and the ShowRepository for data access.
  */
@@ -23,42 +24,42 @@ class ShowEditorViewModel(
     application: Application,
     private val navigationViewModel: NavigationViewModel
 ) : AndroidViewModel(application) {
-    private val database = MandalaDatabase.getDatabase(application)
+    private val database = createDatabase(DatabaseDriver(application))
     private val showRepository = ShowRepository(database)
     private val randomSetRepository = RandomSetRepository(database)
 
     // The current show being edited
     private val _currentShow = MutableStateFlow<ShowPatch?>(null)
     val currentShow: StateFlow<ShowPatch?> = _currentShow.asStateFlow()
-    
+
     // Currently selected random set index in the show
     private val _currentShowIndex = MutableStateFlow(0)
     val currentShowIndex = _currentShowIndex.asStateFlow()
-    
+
     // All available shows for selection
     val allShows = showRepository.getAll()
-    
+
     // All available random sets that can be added to the show
     val allRandomSets = randomSetRepository.getAll()
 
     /**
      * Sets the current show being edited.
-     * 
+     *
      * @param show The show to edit
      */
     fun setCurrentShow(show: ShowPatch?) {
         _currentShow.value = show
     }
-    
+
     /**
      * Updates the current show and the navigation layer.
-     * 
+     *
      * @param show The updated show
      * @param isDirty Whether to mark the show as dirty
      */
     fun updateShow(show: ShowPatch, isDirty: Boolean = true) {
         _currentShow.value = show
-        
+
         // Update the navigation layer data
         val navStack = navigationViewModel.navStack.value
         val index = navStack.indexOfLast { it.type == LayerType.SHOW }
@@ -66,7 +67,7 @@ class ShowEditorViewModel(
             navigationViewModel.updateLayerData(index, ShowLayerContent(show), isDirty)
         }
     }
-    
+
     /**
      * Adds a random set to the show.
      *
@@ -80,7 +81,7 @@ class ShowEditorViewModel(
             updateShow(updatedShow)
         }
     }
-    
+
     /**
      * Removes a random set from the show.
      *
@@ -94,7 +95,7 @@ class ShowEditorViewModel(
             updateShow(updatedShow)
         }
     }
-    
+
     /**
      * Reorders random sets in the show.
      *
@@ -112,7 +113,7 @@ class ShowEditorViewModel(
             updateShow(updatedShow)
         }
     }
-    
+
     /**
      * Saves the current show to the database.
      */
@@ -120,7 +121,7 @@ class ShowEditorViewModel(
         viewModelScope.launch {
             val show = _currentShow.value ?: return@launch
             showRepository.save(show)
-            
+
             // Update the navigation layer to mark it as not dirty
             val navStack = navigationViewModel.navStack.value
             val index = navStack.indexOfLast { it.type == LayerType.SHOW }
@@ -129,10 +130,10 @@ class ShowEditorViewModel(
             }
         }
     }
-    
+
     /**
      * Deletes a show by ID.
-     * 
+     *
      * @param id The ID of the show to delete
      */
     fun deleteShow(id: String) {
@@ -140,10 +141,10 @@ class ShowEditorViewModel(
             showRepository.deleteById(id)
         }
     }
-    
+
     /**
      * Renames a show.
-     * 
+     *
      * @param id The ID of the show to rename
      * @param newName The new name for the show
      */
@@ -154,7 +155,7 @@ class ShowEditorViewModel(
                 val updatedShow = show.copy(name = newName)
                 showRepository.save(updatedShow)
                 _currentShow.value = updatedShow
-                
+
                 // Update the navigation layer
                 val navStack = navigationViewModel.navStack.value
                 val index = navStack.indexOfLast { it.type == LayerType.SHOW }
@@ -167,10 +168,10 @@ class ShowEditorViewModel(
             }
         }
     }
-    
+
     /**
      * Clones a show.
-     * 
+     *
      * @param id The ID of the show to clone
      * @param newName The name for the cloned show
      */
@@ -187,7 +188,7 @@ class ShowEditorViewModel(
             }
         }
     }
-    
+
     /**
      * Jumps to a specific random set in the show.
      *
@@ -198,7 +199,7 @@ class ShowEditorViewModel(
             _currentShowIndex.value = index
         }
     }
-    
+
     /**
      * Moves to the next random set in the show.
      */
@@ -208,7 +209,7 @@ class ShowEditorViewModel(
             _currentShowIndex.value = (_currentShowIndex.value + 1) % size
         }
     }
-    
+
     /**
      * Moves to the previous random set in the show.
      */

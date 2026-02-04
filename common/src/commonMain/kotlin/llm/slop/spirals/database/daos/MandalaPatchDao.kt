@@ -1,12 +1,12 @@
 package llm.slop.spirals.database.daos
 
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 import llm.slop.spirals.database.entities.MandalaPatchEntity
-import llm.slop.spirals.platform.Dao
-import llm.slop.spirals.platform.Delete
-import llm.slop.spirals.platform.Insert
-import llm.slop.spirals.platform.OnConflictStrategy
-import llm.slop.spirals.platform.Query
 
 @Dao
 interface MandalaPatchDao {

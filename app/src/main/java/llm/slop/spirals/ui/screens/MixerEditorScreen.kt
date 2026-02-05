@@ -227,45 +227,43 @@ fun MixerEditorScreen(
         if (showManager) {
             PatchManagerOverlay(
                 title = "Manage Mixers",
-                patches = allMixerPatches.map { it.name to it.jsonSettings },
-                selectedId = Json.encodeToString<MixerPatch>(currentPatch),
-                onSelect = { json ->
-                    // Preview instantly on tap
-                    try {
-                        val selected = Json.decodeFromString<MixerPatch>(json)
-                        currentPatch = selected
-                        val idx = navStack.indexOfLast { it.type == LayerType.MIXER }
-                        if (idx != -1) vm.updateLayerName(idx, selected.name)
-                    } catch (e: Exception) {}
+                patches = allMixerPatches.map { it.name to it.id },
+                selectedId = currentPatch.id,
+                onSelect = { id ->
+                    val entity = allMixerPatches.find { it.id == id }
+                    if (entity != null) {
+                        try {
+                            val selected = Json.decodeFromString<MixerPatch>(entity.jsonSettings)
+                            currentPatch = selected
+                            val idx = navStack.indexOfLast { it.type == LayerType.MIXER }
+                            if (idx != -1) vm.updateLayerName(idx, selected.name)
+                        } catch (e: Exception) {}
+                    }
                 },
-                onOpen = { json ->
-                    // Open and close overlay
-                    try {
-                        val selected = Json.decodeFromString<MixerPatch>(json)
-                        currentPatch = selected
-                        val idx = navStack.indexOfLast { it.type == LayerType.MIXER }
-                        if (idx != -1) vm.updateLayerName(idx, selected.name)
-                        onHideManager()
-                    } catch (e: Exception) {}
+                onOpen = { id ->
+                    val entity = allMixerPatches.find { it.id == id }
+                    if (entity != null) {
+                        try {
+                            val selected = Json.decodeFromString<MixerPatch>(entity.jsonSettings)
+                            currentPatch = selected
+                            val idx = navStack.indexOfLast { it.type == LayerType.MIXER }
+                            if (idx != -1) vm.updateLayerName(idx, selected.name)
+                            onHideManager()
+                        } catch (e: Exception) {}
+                    }
                 },
                 onCreateNew = {
                     vm.startNewPatch(LayerType.MIXER)
                     onHideManager()
                 },
-                onRename = { newName ->
-                    vm.renamePatch(LayerType.MIXER, currentPatch.name, newName)
+                onRename = { id, newName ->
+                    vm.renameSavedPatch(LayerType.MIXER, id, newName)
                 },
-                onClone = { json ->
-                    try {
-                        val p = Json.decodeFromString<MixerPatch>(json)
-                        vm.cloneSavedPatch(LayerType.MIXER, p.name)
-                    } catch (e: Exception) {}
+                onClone = { id ->
+                    vm.cloneSavedPatch(LayerType.MIXER, id)
                 },
-                onDelete = { json ->
-                    try {
-                        val p = Json.decodeFromString<MixerPatch>(json)
-                        vm.deleteSavedPatch(LayerType.MIXER, p.name)
-                    } catch (e: Exception) {}
+                onDelete = { id ->
+                    vm.deleteSavedPatch(LayerType.MIXER, id)
                 }
             )
         }

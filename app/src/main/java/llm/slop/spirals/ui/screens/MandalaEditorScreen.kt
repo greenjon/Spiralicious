@@ -369,8 +369,8 @@ fun MandalaEditorScreen(
                     vm.startNewPatch(LayerType.MANDALA)
                     onHideManager()
                 },
-                onRename = { newName ->
-                    vm.renamePatch(LayerType.MANDALA, patchName, newName)
+                onRename = { id, newName ->
+                    vm.renameSavedPatch(LayerType.MANDALA, id, newName)
                 },
                 onClone = { id ->
                     vm.cloneSavedPatch(LayerType.MANDALA, id)

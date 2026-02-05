@@ -220,16 +220,14 @@ fun MandalaSetEditorScreen(
                     vm.startNewPatch(LayerType.SET)
                     onHideManager()
                 },
-                onRename = { newName ->
-                    currentSet?.let { vm.renamePatch(LayerType.SET, it.name, newName) }
+                onRename = { id, newName ->
+                    vm.renameSavedPatch(LayerType.SET, id, newName)
                 },
                 onClone = { id ->
-                    val set = allSets.find { it.id == id }
-                    if (set != null) vm.cloneSavedPatch(LayerType.SET, set.name)
+                    vm.cloneSavedPatch(LayerType.SET, id)
                 },
                 onDelete = { id ->
-                    val set = allSets.find { it.id == id }
-                    if (set != null) vm.deleteSavedPatch(LayerType.SET, set.name)
+                    vm.deleteSavedPatch(LayerType.SET, id)
                 },
                 // Navigation through mandalas in the set
                 navigationLabel = if (mandalaIds.isNotEmpty()) "Mandala" else null,

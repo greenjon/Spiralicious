@@ -29,7 +29,7 @@ fun PatchManagerOverlay(
     onSelect: (String) -> Unit, // Preview instantly
     onOpen: ((String) -> Unit)? = null, // Open and close overlay
     onCreateNew: () -> Unit, // Create new item
-    onRename: (String) -> Unit,
+    onRename: (id: String, newName: String) -> Unit,
     onClone: (String) -> Unit,
     onDelete: (String) -> Unit,
     // Navigation for Sets/Shows
@@ -246,7 +246,7 @@ fun PatchManagerOverlay(
             },
             confirmButton = {
                 TextButton(onClick = { 
-                    onRename(newName)
+                    onRename(id, newName)
                     showRenameDialog = null 
                 }) {
                     Text("OK", color = AppAccent)

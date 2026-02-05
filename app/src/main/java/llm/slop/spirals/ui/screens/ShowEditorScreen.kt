@@ -575,58 +575,54 @@ fun ShowEditorScreen(
 
             PatchManagerOverlay(
                 title = "Manage Shows",
-                patches = allShowPatches.map { it.name to it.jsonSettings },
-                selectedId = Json.encodeToString<ShowPatch>(currentShow),
-                onSelect = { json ->
-                    // Preview instantly on tap
-                    try {
-                        val selected = Json.decodeFromString<ShowPatch>(json)
-                        currentShow = selected
-                        
-                        // Force a re-fetch of current state if needed by updating the nav layer
-                        val idx = navStack.indexOfLast { it.type == LayerType.SHOW }
-                        if (idx != -1) {
-                            vm.updateLayerName(idx, selected.name)
-                            vm.updateLayerData(idx, ShowLayerContent(selected))
-                        }
-                        
-                        // Reset to first RandomSet when switching shows
-                        if (selected.randomSetIds.isNotEmpty()) {
-                            vm.jumpToShowIndex(0)
-                        }
-                    } catch (e: Exception) {}
+                patches = allShowPatches.map { it.name to it.id },
+                selectedId = currentShow.id,
+                onSelect = { id ->
+                    val entity = allShowPatches.find { it.id == id }
+                    if (entity != null) {
+                        try {
+                            val selected = Json.decodeFromString<ShowPatch>(entity.jsonSettings)
+                            currentShow = selected
+                            
+                            val idx = navStack.indexOfLast { it.type == LayerType.SHOW }
+                            if (idx != -1) {
+                                vm.updateLayerName(idx, selected.name)
+                                vm.updateLayerData(idx, ShowLayerContent(selected))
+                            }
+                            
+                            if (selected.randomSetIds.isNotEmpty()) {
+                                vm.jumpToShowIndex(0)
+                            }
+                        } catch (e: Exception) {}
+                    }
                 },
-                onOpen = { json ->
-                    // Open and close overlay
-                    try {
-                        val selected = Json.decodeFromString<ShowPatch>(json)
-                        currentShow = selected
-                        val idx = navStack.indexOfLast { it.type == LayerType.SHOW }
-                        if (idx != -1) {
-                            vm.updateLayerName(idx, selected.name)
-                            vm.updateLayerData(idx, ShowLayerContent(selected))
-                        }
-                        onHideManager()
-                    } catch (e: Exception) {}
+                onOpen = { id ->
+                    val entity = allShowPatches.find { it.id == id }
+                    if (entity != null) {
+                        try {
+                            val selected = Json.decodeFromString<ShowPatch>(entity.jsonSettings)
+                            currentShow = selected
+                            val idx = navStack.indexOfLast { it.type == LayerType.SHOW }
+                            if (idx != -1) {
+                                vm.updateLayerName(idx, selected.name)
+                                vm.updateLayerData(idx, ShowLayerContent(selected))
+                            }
+                            onHideManager()
+                        } catch (e: Exception) {}
+                    }
                 },
                 onCreateNew = {
                     vm.startNewPatch(LayerType.SHOW)
                     onHideManager()
                 },
-                onRename = { newName ->
-                    vm.renamePatch(LayerType.SHOW, currentShow.name, newName)
+                onRename = { id, newName ->
+                    vm.renameSavedPatch(LayerType.SHOW, id, newName)
                 },
-                onClone = { json ->
-                    try {
-                        val p = Json.decodeFromString<ShowPatch>(json)
-                        vm.cloneSavedPatch(LayerType.SHOW, p.name)
-                    } catch (e: Exception) {}
+                onClone = { id ->
+                    vm.cloneSavedPatch(LayerType.SHOW, id)
                 },
-                onDelete = { json ->
-                    try {
-                        val p = Json.decodeFromString<ShowPatch>(json)
-                        vm.deleteSavedPatch(LayerType.SHOW, p.name)
-                    } catch (e: Exception) {}
+                onDelete = { id ->
+                    vm.deleteSavedPatch(LayerType.SHOW, id)
                 },
                 // Navigation through RandomSets in the show
                 navigationLabel = if (randomSetIds.isNotEmpty()) "RandomSet" else null,

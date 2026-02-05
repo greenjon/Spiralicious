@@ -519,83 +519,104 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         return sb.toString()
     }
 
-    fun renamePatch(type: LayerType, oldName: String, newName: String) {
+    fun renameSavedPatch(type: LayerType, id: String, newName: String) {
         viewModelScope.launch {
             when (type) {
-                LayerType.MANDALA -> {
-                    val entity = allPatches.value.find { it.name == oldName }
+                LayerType.MANDALA -> { // Special case: id is the name
+                    val entity = allPatches.value.find { it.name == id }
                     if (entity != null) {
-                        patchDao.deleteByName(oldName)
-                        patchDao.insertPatch(entity.copy(name = newName))
+                        patchDao.deleteByName(id)
+                        val patch = PatchMapper.fromJson(entity.jsonSettings)?.copy(name = newName)
+                        if (patch != null) {
+                            val newJson = PatchMapper.toJson(patch)
+                            patchDao.insertPatch(entity.copy(name = newName, jsonSettings = newJson))
+                        }
                     }
                 }
                 LayerType.SET -> {
-                    val entity = allSets.value.find { it.name == oldName }
+                    val entity = allSets.value.find { it.id == id }
                     if (entity != null) {
                         setDao.insertSet(entity.copy(name = newName))
                     }
                 }
                 LayerType.MIXER -> {
-                    val entity = allMixerPatches.value.find { it.name == oldName }
+                    val entity = allMixerPatches.value.find { it.id == id }
                     if (entity != null) {
-                        mixerDao.insertMixerPatch(entity.copy(name = newName))
+                        val mixer = Json.decodeFromString<MixerPatch>(entity.jsonSettings)
+                        val newMixer = mixer.copy(name = newName)
+                        mixerDao.insertMixerPatch(entity.copy(name = newName, jsonSettings = Json.encodeToString(newMixer)))
                     }
                 }
                 LayerType.SHOW -> {
-                    val entity = allShowPatches.value.find { it.name == oldName }
+                    val entity = allShowPatches.value.find { it.id == id }
                     if (entity != null) {
-                        showDao.insertShowPatch(entity.copy(name = newName))
+                        val show = Json.decodeFromString<ShowPatch>(entity.jsonSettings)
+                        val newShow = show.copy(name = newName)
+                        showDao.insertShowPatch(entity.copy(name = newName, jsonSettings = Json.encodeToString(newShow)))
                     }
                 }
                 LayerType.RANDOM_SET -> {
-                    val entity = allRandomSets.value.find { it.name == oldName }
+                    val entity = allRandomSets.value.find { it.id == id }
                     if (entity != null) {
-                        randomSetDao.insertRandomSet(entity.copy(name = newName))
+                        val randomSet = Json.decodeFromString<RandomSet>(entity.jsonSettings)
+                        val newRandomSet = randomSet.copy(name = newName)
+                        randomSetDao.insertRandomSet(entity.copy(name = newName, jsonSettings = Json.encodeToString(newRandomSet)))
                     }
                 }
             }
         }
     }
 
-    fun cloneSavedPatch(type: LayerType, name: String) {
+    fun cloneSavedPatch(type: LayerType, id: String) {
         viewModelScope.launch {
-            val newName = NamingUtils.generateCloneName(name, getExistingNames(type))
+            val (name, existingNames) = when (type) {
+                LayerType.MANDALA -> allPatches.value.find { it.name == id }?.name to allPatches.value.map { it.name }
+                LayerType.SET -> allSets.value.find { it.id == id }?.name to allSets.value.map { it.name }
+                LayerType.MIXER -> allMixerPatches.value.find { it.id == id }?.name to allMixerPatches.value.map { it.name }
+                LayerType.SHOW -> allShowPatches.value.find { it.id == id }?.name to allShowPatches.value.map { it.name }
+                LayerType.RANDOM_SET -> allRandomSets.value.find { it.id == id }?.name to allRandomSets.value.map { it.name }
+            }
+            if (name == null) return@launch
+
+            val newName = NamingUtils.generateCloneName(name, existingNames)
+            val newId = UUID.randomUUID().toString()
+
             when (type) {
-                LayerType.MANDALA -> {
-                    val entity = allPatches.value.find { it.name == name }
+                LayerType.MANDALA -> { // id is name
+                    val entity = allPatches.value.find { it.name == id }
                     if (entity != null) {
-                        patchDao.insertPatch(entity.copy(name = newName))
+                        val patch = PatchMapper.fromJson(entity.jsonSettings)?.copy(name = newName)
+                        if (patch != null) {
+                            val newJson = PatchMapper.toJson(patch)
+                            patchDao.insertPatch(entity.copy(name = newName, jsonSettings = newJson))
+                        }
                     }
                 }
                 LayerType.SET -> {
-                    val entity = allSets.value.find { it.name == name }
+                    val entity = allSets.value.find { it.id == id }
                     if (entity != null) {
-                        val newId = UUID.randomUUID().toString()
                         setDao.insertSet(entity.copy(id = newId, name = newName))
                     }
                 }
                 LayerType.MIXER -> {
-                    val entity = allMixerPatches.value.find { it.name == name }
+                    val entity = allMixerPatches.value.find { it.id == id }
                     if (entity != null) {
-                        val newId = UUID.randomUUID().toString()
                         val mixer = Json.decodeFromString<MixerPatch>(entity.jsonSettings)
                         val newMixer = mixer.copy(id = newId, name = newName)
                         mixerDao.insertMixerPatch(MixerPatchEntity(newId, newName, Json.encodeToString(newMixer)))
                     }
                 }
                 LayerType.SHOW -> {
-                    val entity = allShowPatches.value.find { it.name == name }
+                    val entity = allShowPatches.value.find { it.id == id }
                     if (entity != null) {
-                        val newId = UUID.randomUUID().toString()
                         val show = Json.decodeFromString<ShowPatch>(entity.jsonSettings)
                         val newShow = show.copy(id = newId, name = newName)
                         showDao.insertShowPatch(ShowPatchEntity(newId, newName, Json.encodeToString(newShow)))
                     }
                 }
                 LayerType.RANDOM_SET -> {
-                    val entity = allRandomSets.value.find { it.name == name }
+                    val entity = allRandomSets.value.find { it.id == id }
                     if (entity != null) {
-                        val newId = UUID.randomUUID().toString()
                         val randomSet = Json.decodeFromString<RandomSet>(entity.jsonSettings)
                         val newRandomSet = randomSet.copy(id = newId, name = newName)
                         randomSetDao.insertRandomSet(RandomSetEntity(newId, newName, Json.encodeToString(newRandomSet)))
@@ -605,26 +626,14 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun deleteSavedPatch(type: LayerType, name: String) {
+    fun deleteSavedPatch(type: LayerType, id: String) {
         viewModelScope.launch {
             when (type) {
-                LayerType.MANDALA -> patchDao.deleteByName(name)
-                LayerType.SET -> {
-                    val entity = allSets.value.find { it.name == name }
-                    if (entity != null) setDao.deleteById(entity.id)
-                }
-                LayerType.MIXER -> {
-                    val entity = allMixerPatches.value.find { it.name == name }
-                    if (entity != null) mixerDao.deleteById(entity.id)
-                }
-                LayerType.SHOW -> {
-                    val entity = allShowPatches.value.find { it.name == name }
-                    if (entity != null) showDao.deleteById(entity.id)
-                }
-                LayerType.RANDOM_SET -> {
-                    val entity = allRandomSets.value.find { it.name == name }
-                    if (entity != null) randomSetDao.deleteById(entity.id)
-                }
+                LayerType.MANDALA -> patchDao.deleteByName(id) // id is name
+                LayerType.SET -> setDao.deleteById(id)
+                LayerType.MIXER -> mixerDao.deleteById(id)
+                LayerType.SHOW -> showDao.deleteById(id)
+                LayerType.RANDOM_SET -> randomSetDao.deleteById(id)
             }
         }
     }

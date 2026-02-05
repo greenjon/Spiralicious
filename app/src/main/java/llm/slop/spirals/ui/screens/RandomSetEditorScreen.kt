@@ -234,12 +234,11 @@ fun RandomSetEditorScreen(
                 title = "Random Sets",
                 patches = allRandomSets.map { it.name to it.id },
                 selectedId = currentRSet?.id,
-                onSelect = { name ->
-                    val entity = allRandomSets.find { it.name == name }
+                onSelect = { id ->
+                    val entity = allRandomSets.find { it.id == id }
                     entity?.let { selectRSet(it.id) }
                 },
                 onOpen = { id ->
-                    // Directly use the ID that was passed
                     selectRSet(id)
                     onHideManager()
                 },
@@ -247,14 +246,14 @@ fun RandomSetEditorScreen(
                     vm.startNewPatch(LayerType.RANDOM_SET)
                     onHideManager()
                 },
-                onRename = { name ->
-                    // Show rename dialog - for now just skip
+                onRename = { id, newName ->
+                    vm.renameSavedPatch(LayerType.RANDOM_SET, id, newName)
                 },
-                onClone = { name ->
-                    vm.cloneSavedPatch(LayerType.RANDOM_SET, name)
+                onClone = { id ->
+                    vm.cloneSavedPatch(LayerType.RANDOM_SET, id)
                 },
-                onDelete = { name ->
-                    vm.deleteSavedPatch(LayerType.RANDOM_SET, name)
+                onDelete = { id ->
+                    vm.deleteSavedPatch(LayerType.RANDOM_SET, id)
                 }
             )
         }

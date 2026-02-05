@@ -4,7 +4,13 @@ import android.content.Context
 import llm.slop.spirals.cv.core.CvModulator
 import llm.slop.spirals.cv.core.ModulationOperator
 import llm.slop.spirals.cv.core.Waveform
-import llm.slop.spirals.models.*
+import llm.slop.spirals.models.RandomSet
+import llm.slop.spirals.models.RecipeFilter
+import llm.slop.spirals.models.ArmConstraints
+import llm.slop.spirals.models.RotationConstraints
+import llm.slop.spirals.models.HueOffsetConstraints
+import llm.slop.spirals.models.FeedbackMode
+import llm.slop.spirals.models.STANDARD_BEAT_VALUES
 import llm.slop.spirals.models.mandala.Mandala4Arm
 import kotlin.math.round
 
@@ -26,13 +32,8 @@ class RandomSetGenerator(private val context: Context) {
      * 
      * @param rset The Random Set template containing constraints
      * @param visualSource The visual source to configure
-     * @param feedbackOverride Optional override for the feedback mode
      */
-    fun generateFromRSet(
-        rset: RandomSet,
-        visualSource: MandalaVisualSource,
-        feedbackOverride: FeedbackOverrideMode? = null
-    ) {
+    fun generateFromRSet(rset: RandomSet, visualSource: MandalaVisualSource) {
         val random = kotlin.random.Random.Default
         
         // 1. Select recipe based on filter
@@ -68,14 +69,7 @@ class RandomSetGenerator(private val context: Context) {
         applyHueOffsetConstraints(rset.hueOffsetConstraints, visualSource, random)
         
         // 6. Apply feedback mode
-        val finalFeedbackMode = when (feedbackOverride) {
-            FeedbackOverrideMode.RSET, null -> rset.feedbackMode
-            FeedbackOverrideMode.OFF -> FeedbackMode.NONE
-            FeedbackOverrideMode.LIGHT -> FeedbackMode.LIGHT
-            FeedbackOverrideMode.MEDIUM -> FeedbackMode.MEDIUM
-            FeedbackOverrideMode.HEAVY -> FeedbackMode.HEAVY
-        }
-        applyFeedbackMode(finalFeedbackMode, visualSource)
+        applyFeedbackMode(rset.feedbackMode, visualSource)
     }
     
     /**

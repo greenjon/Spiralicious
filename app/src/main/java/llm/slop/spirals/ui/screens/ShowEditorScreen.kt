@@ -147,8 +147,7 @@ fun ShowEditorScreen(
                     // CRITICAL: Generate the actual mandala configuration for the renderer's visual source.
                     // createTemporaryMixerFromRandomSet puts the RandomSet in slot 0.
                     val toSource = mainRenderer.getSlotSource(0)
-                    val override = currentShow.feedbackOverrides[randomSetId]
-                    generator.generateFromRSet(randomSet, toSource, override)
+                    generator.generateFromRSet(randomSet, toSource)
                     
                     if (fromSource.value != null) {
                         val currentBpm = ModulationRegistry.get("bpm")
@@ -505,6 +504,8 @@ fun ShowEditorScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
             // 3. CV Editor for focused parameter
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 ShowCvEditor(
@@ -513,14 +514,12 @@ fun ShowEditorScreen(
                     onShowUpdate = { currentShow = it }
                 )
             }
-            
-            // 4. RandomSet sequence and FX Override
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // 4. RandomSet sequence (Set Editor style)
             Column(modifier = Modifier.padding(horizontal = 12.dp).height(120.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     var showRandomSetPicker by remember { mutableStateOf(false) }
 
                     Button(onClick = { showRandomSetPicker = true }, modifier = Modifier.height(36.dp), contentPadding = PaddingValues(horizontal = 8.dp)) {
@@ -544,56 +543,11 @@ fun ShowEditorScreen(
                             }
                         )
                     }
-
-                    // Feedback Override UI
-                    if (currentShow.randomSetIds.isNotEmpty()) {
-                        val currentRSetId = currentShow.randomSetIds[currentShowIndex]
-                        val currentOverride = currentShow.feedbackOverrides[currentRSetId] ?: FeedbackOverrideMode.RSET
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("FX Override: ", style = MaterialTheme.typography.labelSmall)
-                            // Segmented Button
-                            Row {
-                                val options = listOf("RSet", "Off", "1", "2", "3")
-                                val selected = when (currentOverride) {
-                                    FeedbackOverrideMode.RSET -> "RSet"
-                                    FeedbackOverrideMode.OFF -> "Off"
-                                    FeedbackOverrideMode.LIGHT -> "1"
-                                    FeedbackOverrideMode.MEDIUM -> "2"
-                                    FeedbackOverrideMode.HEAVY -> "3"
-                                }
-                                options.forEach { option ->
-                                    Button(
-                                        onClick = {
-                                            val newOverride = when (option) {
-                                                "Off" -> FeedbackOverrideMode.OFF
-                                                "1" -> FeedbackOverrideMode.LIGHT
-                                                "2" -> FeedbackOverrideMode.MEDIUM
-                                                "3" -> FeedbackOverrideMode.HEAVY
-                                                else -> FeedbackOverrideMode.RSET
-                                            }
-                                            val newOverrides = currentShow.feedbackOverrides.toMutableMap()
-                                            newOverrides[currentRSetId] = newOverride
-                                            currentShow = currentShow.copy(feedbackOverrides = newOverrides)
-                                        },
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (selected == option) AppAccent else AppText.copy(alpha = 0.1f),
-                                            contentColor = if (selected == option) Color.White else AppText
-                                        ),
-                                        shape = MaterialTheme.shapes.extraSmall,
-                                        modifier = Modifier.padding(horizontal = 2.dp)
-                                    ) {
-                                        Text(option, style = MaterialTheme.typography.labelSmall)
-                                    }
-                                }
-                            }
-                        }
-                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
-                
-                // SetChipList for RandomSets
+
+                // Create mapping from RandomSet IDs to (name, id) pairs for display
                 val randomSetItems = remember(currentShow.randomSetIds, allRandomSets) {
                     currentShow.randomSetIds.mapNotNull { randomSetId ->
                         val randomSetEntity = allRandomSets.find { it.id == randomSetId }
@@ -608,6 +562,7 @@ fun ShowEditorScreen(
                         if (idx != -1) vm.jumpToShowIndex(idx)
                     },
                     onChipReordered = { newList ->
+                        // newList contains IDs in the new order
                         currentShow = currentShow.copy(randomSetIds = newList)
                     }
                 )

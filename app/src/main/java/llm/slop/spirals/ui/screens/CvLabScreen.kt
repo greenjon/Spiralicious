@@ -6,6 +6,9 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -120,7 +123,7 @@ fun CvLabScreen(
                             onAudioSourceTypeChange(AudioSourceType.MIC)
                             if (!hasMicPermission) micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) 
                         }
-                        "Raw" -> { 
+                        "Raw" -> {
                             onAudioSourceTypeChange(AudioSourceType.UNPROCESSED)
                             if (!hasMicPermission) micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) 
                         }
@@ -130,6 +133,39 @@ fun CvLabScreen(
                         }
                     }
                 }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // BPM Display and Flashing Beat Circle
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start 
+        ) {
+            val bpm = remember(frameTick) { ModulationRegistry.signals["bpm"] ?: 0f }
+            val formattedBpm = "%.2f BPM".format(bpm)
+            Text(
+                text = formattedBpm,
+                color = AppText,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(end = 8.dp)
+            )
+
+            // Flashing Beat Circle
+            val beatPhase = remember(frameTick) { ModulationRegistry.signals["beatPhase"] ?: 0f }
+            val isBeat = beatPhase < 0.1f // Flash when beat phase is near 0
+            val animatedAlpha by animateFloatAsState(
+                targetValue = if (isBeat) 1f else 0f,
+                animationSpec = tween(durationMillis = 100, easing = LinearEasing),
+                label = "beatAlphaAnimation"
+            )
+
+            Box(
+                modifier = Modifier
+                    .size(16.dp)
+                    .background(AppAccent.copy(alpha = animatedAlpha), shape = MaterialTheme.shapes.extraSmall)
             )
         }
 

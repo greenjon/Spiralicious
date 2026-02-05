@@ -3,11 +3,11 @@ package llm.slop.spirals.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.SwingPanel
+import androidx.compose.ui.graphics.Color
 import llm.slop.spirals.display.ISpiralRenderer
 import javax.swing.JLabel
 import javax.swing.JPanel
 import java.awt.BorderLayout
-import java.awt.Color
 
 @Composable
 actual fun SpiralSurface(
@@ -15,7 +15,7 @@ actual fun SpiralSurface(
     modifier: Modifier
 ) {
     SwingPanel(
-        background = Color.BLACK,
+        background = Color.Black,
         factory = {
             JPanel(BorderLayout()).apply {
                 add(JLabel("OpenGL Surface Placeholder (Desktop)"), BorderLayout.CENTER)

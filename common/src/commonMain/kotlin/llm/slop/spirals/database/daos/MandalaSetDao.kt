@@ -9,16 +9,16 @@ import kotlinx.coroutines.flow.Flow
 import llm.slop.spirals.database.entities.MandalaSetEntity
 
 @Dao
-interface MandalaSetDao {
+public interface MandalaSetDao {
     @Query("SELECT * FROM mandala_sets")
-    fun getAllSets(): Flow<List<MandalaSetEntity>>
+    public fun getAllSets(): Flow<List<MandalaSetEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSet(set: MandalaSetEntity)
+    public suspend fun insertSet(set: MandalaSetEntity)
 
     @Delete
-    suspend fun deleteSet(set: MandalaSetEntity)
+    public suspend fun deleteSet(set: MandalaSetEntity)
 
     @Query("DELETE FROM mandala_sets WHERE id = :id")
-    suspend fun deleteById(id: String)
+    public suspend fun deleteById(id: String)
 }

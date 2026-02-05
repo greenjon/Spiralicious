@@ -17,11 +17,11 @@ import llm.slop.spirals.database.entities.*
     ],
     version = 1
 )
-abstract class MandalaDatabase : RoomDatabase() {
-    abstract fun mandalaPatchDao(): MandalaPatchDao
-    abstract fun mandalaSetDao(): MandalaSetDao
-    abstract fun mixerPatchDao(): MixerPatchDao
-    abstract fun randomSetDao(): RandomSetDao
-    abstract fun showPatchDao(): ShowPatchDao
-    abstract fun mandalaTagDao(): MandalaTagDao
+public abstract class MandalaDatabase : RoomDatabase() {
+    public abstract fun mandalaPatchDao(): MandalaPatchDao
+    public abstract fun mandalaSetDao(): MandalaSetDao
+    public abstract fun mixerPatchDao(): MixerPatchDao
+    public abstract fun randomSetDao(): RandomSetDao
+    public abstract fun showPatchDao(): ShowPatchDao
+    public abstract fun mandalaTagDao(): MandalaTagDao
 }

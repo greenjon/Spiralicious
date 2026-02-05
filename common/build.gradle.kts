@@ -36,6 +36,13 @@ kotlin {
         val desktopMain by getting {
             dependencies {
                 implementation(libs.room.ktx)
+                
+                // LWJGL dependencies for OpenGL abstraction
+                val lwjglVersion = "3.3.3"
+                implementation("org.lwjgl:lwjgl:$lwjglVersion")
+                implementation("org.lwjgl:lwjgl-opengl:$lwjglVersion")
+                runtimeOnly("org.lwjgl:lwjgl:$lwjglVersion:natives-linux")
+                runtimeOnly("org.lwjgl:lwjgl-opengl:$lwjglVersion:natives-linux")
             }
         }
     }

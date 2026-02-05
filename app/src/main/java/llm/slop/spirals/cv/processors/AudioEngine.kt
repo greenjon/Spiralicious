@@ -52,6 +52,8 @@ class AudioEngine(context: Context) {
         stop()
         audioRecord = record
         
+        lastBeatTime = System.nanoTime() // Initialize beat timer
+
         try {
             if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) return
             audioRecord?.startRecording()
@@ -126,7 +128,10 @@ class AudioEngine(context: Context) {
                             lastBeatTime = currentTime
                         }
                         
-                        beatThreshold = (beatThreshold * 0.99f) + (onsetNormalized * 0.01f).coerceAtLeast(0.3f)
+                        // MODIFIED: Replaced the problematic beatThreshold calculation
+                        beatThreshold = (beatThreshold * 0.95f) + (onsetNormalized * 0.05f) 
+                        beatThreshold = beatThreshold.coerceAtLeast(0.1f) // Ensure threshold doesn't drop too low
+
                         lastOnsetNormalized = onsetNormalized
 
                         // Flywheel
@@ -138,6 +143,8 @@ class AudioEngine(context: Context) {
                         // Update Registry with the Anchor point
                         // This provides the source of truth for high-precision interpolation in the renderer
                         ModulationRegistry.updateBeatAnchor(totalBeats, estimatedBpm, currentTime)
+                        ModulationRegistry.update("beatPhase", (totalBeats % 1.0).toFloat())
+                        ModulationRegistry.update("beatThreshold", beatThreshold) 
 
                         val ref = 0.1f
                         ModulationRegistry.update("amp", (amp / ref).coerceIn(0f, 2f))
@@ -147,7 +154,6 @@ class AudioEngine(context: Context) {
                         ModulationRegistry.update("bassFlux", (bassFlux / 0.05f).coerceIn(0f, 2f))
                         ModulationRegistry.update("onset", onsetNormalized)
                         ModulationRegistry.update("accent", accentLevel)
-                        // Note: beatPhase is no longer updated here to prevent conflicts with the precision clock
                     }
                 }
             }

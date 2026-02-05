@@ -167,6 +167,23 @@ fun CvLabScreen(
                     .size(16.dp)
                     .background(AppAccent.copy(alpha = animatedAlpha), shape = MaterialTheme.shapes.extraSmall)
             )
+
+            Spacer(modifier = Modifier.width(16.dp)) // Added space
+
+            val onset = remember(frameTick) { ModulationRegistry.signals["onset"] ?: 0f }
+            Text(
+                text = "Onset: %.2f".format(onset),
+                color = AppText,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(end = 8.dp)
+            )
+
+            val beatThreshold = remember(frameTick) { ModulationRegistry.signals["beatThreshold"] ?: 0f }
+            Text(
+                text = "Threshold: %.2f".format(beatThreshold),
+                color = AppText,
+                style = MaterialTheme.typography.labelSmall
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))

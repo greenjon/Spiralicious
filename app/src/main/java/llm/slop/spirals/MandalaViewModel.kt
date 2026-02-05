@@ -637,6 +637,22 @@ class MandalaViewModel(application: Application) : AndroidViewModel(application)
             }
         }
     }
+    
+    fun updateFeedbackOverrideForCurrentShowItem(override: FeedbackOverrideMode) {
+        val showLayerIndex = _navStack.value.indexOfLast { it.type == LayerType.SHOW }
+        if (showLayerIndex == -1) return
+
+        val showLayer = _navStack.value[showLayerIndex]
+        val show = (showLayer.data as? ShowLayerContent)?.show ?: return
+        if (show.randomSetIds.isEmpty()) return
+
+        val currentRSetId = show.randomSetIds[currentShowIndex.value]
+        val newOverrides = show.feedbackOverrides.toMutableMap()
+        newOverrides[currentRSetId] = override
+        val newShow = show.copy(feedbackOverrides = newOverrides)
+
+        updateLayerData(showLayerIndex, ShowLayerContent(newShow), isDirty = true)
+    }
 
     fun jumpToShowIndex(index: Int) {
         _currentShowIndex.value = index

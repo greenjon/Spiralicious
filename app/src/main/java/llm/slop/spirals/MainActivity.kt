@@ -6,6 +6,7 @@ import android.content.res.Configuration
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -40,6 +41,7 @@ import llm.slop.spirals.display.ExternalDisplayCoordinator
 import llm.slop.spirals.display.LocalSpiralRenderer
 import llm.slop.spirals.LayerType
 import llm.slop.spirals.ShowLayerContent
+import llm.slop.spirals.models.FeedbackOverrideMode
 import llm.slop.spirals.navigation.NavLayer
 import llm.slop.spirals.ui.screens.CvLabScreen
 import llm.slop.spirals.ui.screens.MandalaEditorScreen
@@ -181,51 +183,71 @@ class MainActivity : ComponentActivity() {
                 SideEffect {
                     onKeyDownListener = { event ->
                         val keyCode = event.keyCode
+                        var handled = false
                         
-                        when (keyCode) {
-                            android.view.KeyEvent.KEYCODE_F -> {
-                                isFullscreenPreview = !isFullscreenPreview
-                                true
+                        // FX Override hotkeys for Show mode
+                        if (currentLayer.type == LayerType.SHOW) {
+                            val override = when {
+                                event.isShiftPressed && keyCode == KeyEvent.KEYCODE_0 -> FeedbackOverrideMode.RSET
+                                keyCode == KeyEvent.KEYCODE_0 -> FeedbackOverrideMode.OFF
+                                keyCode == KeyEvent.KEYCODE_1 -> FeedbackOverrideMode.LIGHT
+                                keyCode == KeyEvent.KEYCODE_2 -> FeedbackOverrideMode.MEDIUM
+                                keyCode == KeyEvent.KEYCODE_3 -> FeedbackOverrideMode.HEAVY
+                                else -> null
                             }
-                            android.view.KeyEvent.KEYCODE_ESCAPE -> {
-                                if (isFullscreenPreview) {
-                                    isFullscreenPreview = false
+                            if (override != null) {
+                                vm.updateFeedbackOverrideForCurrentShowItem(override)
+                                handled = true
+                            }
+                        }
+                        
+                        if (!handled) {
+                            handled = when (keyCode) {
+                                android.view.KeyEvent.KEYCODE_F -> {
+                                    isFullscreenPreview = !isFullscreenPreview
                                     true
-                                } else false
-                            }
-                            android.view.KeyEvent.KEYCODE_Q, 
-                            android.view.KeyEvent.KEYCODE_W, 
-                            android.view.KeyEvent.KEYCODE_E, 
-                            android.view.KeyEvent.KEYCODE_R -> {
-                                if (currentLayer.type == LayerType.SHOW) {
-                                    val show = (currentLayer.data as? ShowLayerContent)?.show
-                                    when (keyCode) {
-                                        android.view.KeyEvent.KEYCODE_Q -> {
-                                            renderer.getMixerParam("SHOW_PREV")?.triggerPulse()
-                                            show?.let { vm.triggerPrevMixer(it.randomSetIds.size) }
-                                        }
-                                        android.view.KeyEvent.KEYCODE_E -> {
-                                            renderer.getMixerParam("SHOW_NEXT")?.triggerPulse()
-                                            show?.let { vm.triggerNextMixer(it.randomSetIds.size) }
-                                        }
-                                        android.view.KeyEvent.KEYCODE_R -> {
-                                            renderer.getMixerParam("SHOW_GENERATE")?.triggerPulse()
-                                            vm.triggerShowGenerate()
-                                        }
-                                        android.view.KeyEvent.KEYCODE_W -> {
-                                            renderer.getMixerParam("SHOW_RANDOM")?.triggerPulse()
-                                            show?.let { 
-                                                if (it.randomSetIds.isNotEmpty()) {
-                                                    vm.jumpToShowIndex(kotlin.random.Random.nextInt(it.randomSetIds.size))
+                                }
+                                android.view.KeyEvent.KEYCODE_ESCAPE -> {
+                                    if (isFullscreenPreview) {
+                                        isFullscreenPreview = false
+                                        true
+                                    } else false
+                                }
+                                android.view.KeyEvent.KEYCODE_Q, 
+                                android.view.KeyEvent.KEYCODE_W, 
+                                android.view.KeyEvent.KEYCODE_E, 
+                                android.view.KeyEvent.KEYCODE_R -> {
+                                    if (currentLayer.type == LayerType.SHOW) {
+                                        val show = (currentLayer.data as? ShowLayerContent)?.show
+                                        when (keyCode) {
+                                            android.view.KeyEvent.KEYCODE_Q -> {
+                                                renderer.getMixerParam("SHOW_PREV")?.triggerPulse()
+                                                show?.let { vm.triggerPrevMixer(it.randomSetIds.size) }
+                                            }
+                                            android.view.KeyEvent.KEYCODE_E -> {
+                                                renderer.getMixerParam("SHOW_NEXT")?.triggerPulse()
+                                                show?.let { vm.triggerNextMixer(it.randomSetIds.size) }
+                                            }
+                                            android.view.KeyEvent.KEYCODE_R -> {
+                                                renderer.getMixerParam("SHOW_GENERATE")?.triggerPulse()
+                                                vm.triggerShowGenerate()
+                                            }
+                                            android.view.KeyEvent.KEYCODE_W -> {
+                                                renderer.getMixerParam("SHOW_RANDOM")?.triggerPulse()
+                                                show?.let { 
+                                                    if (it.randomSetIds.isNotEmpty()) {
+                                                        vm.jumpToShowIndex(kotlin.random.Random.nextInt(it.randomSetIds.size))
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
-                                    true
-                                } else false
+                                        true
+                                    } else false
+                                }
+                                else -> false
                             }
-                            else -> false
                         }
+                        handled
                     }
                 }
 

@@ -40,10 +40,7 @@ data class RandomSet(
     val l4Constraints: ArmConstraints? = null,
     
     val rotationConstraints: RotationConstraints? = null,
-    val hueOffsetConstraints: HueOffsetConstraints? = null,
-    
-    // Feedback (if/when implemented)
-    val feedbackMode: FeedbackMode = FeedbackMode.NONE
+    val hueOffsetConstraints: HueOffsetConstraints? = null
 )
 
 @Serializable
@@ -145,13 +142,4 @@ enum class SpeedSource {
     BEAT,
     LFO,
     RANDOM
-}
-
-@Serializable
-enum class FeedbackMode {
-    NONE,
-    LIGHT,
-    MEDIUM,
-    HEAVY,
-    CUSTOM
 }

@@ -25,6 +25,18 @@ enum class TransitionState {
 }
 
 /**
+ * Data class to hold feedback parameters.
+ */
+private data class FeedbackParams(
+    val decay: Float,
+    val gain: Float,
+    val zoom: Float,
+    val rotate: Float,
+    val shift: Float,
+    val blur: Float
+)
+
+/**
  * Main OpenGL renderer for Spirals app.
  */
 class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
@@ -111,8 +123,14 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     var showPatch: ShowPatch? = null
         set(value) {
             field = value
-            value?.let { syncShowParameters(it) }
+            value?.let { 
+                syncShowParameters(it)
+                _feedbackMode = it.feedbackMode
+            }
         }
+
+    @Volatile
+    private var _feedbackMode: FeedbackMode = FeedbackMode.NONE
         
     private var clearFeedbackNextFrame = false
 
@@ -404,7 +422,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             if (sourceToRender != null) {
                 compositeWithFeedback(
                     render = { GLES30.glUseProgram(program); renderSource(sourceToRender, scale) },
-                    fx = emptyMap(), // Empty map for transitions, as feedback is not applied during transition
+                    feedbackMode = FeedbackMode.NONE, // No feedback during transitions
                     fbTextures = finalFBTextures,
                     fbFramebuffers = finalFBFramebuffers,
                     fbIndexRef = { finalFBIndex },
@@ -425,19 +443,12 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 for (i in 0..3) {
                     if (p.slots[i].enabled && p.slots[i].isPopulated()) {
                         val source = slotSources[i]
-                        val fx = source.parameters
-                        // Map UI-friendly parameter names to shader uniform names for feedback.
-                        val fxMap: Map<String, Float> = mapOf(
-                            "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f),
-                            "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f),
-                            "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f),
-                            "FB_SHIFT" to (fx["FB Shift"]?.value ?: 0f),
-                            "FB_BLUR" to (fx["FB Blur"]?.value ?: 0f)
-                        )
+                        // In mixer mode, slot feedback parameters come from the individual slot's settings, not the ShowPatch
+                        val slotFeedbackMode = FeedbackMode.NONE // Assuming no per-slot feedback modes for now, or fetch from MandalaVisualSource if implemented
 
                         compositeWithFeedback(
                             render = { GLES30.glUseProgram(program); renderSource(source) },
-                            fx = fxMap,
+                            feedbackMode = slotFeedbackMode,
                             fbTextures = slotFBTextures[i],
                             fbFramebuffers = slotFBFramebuffers[i],
                             fbIndexRef = { slotFBIndex[i] },
@@ -465,18 +476,10 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 // This mode is simpler, rendering one mandala with one feedback system.
                 val currentSource = visualSource
                 if (currentSource != null) {
-                    val fx = currentSource.parameters
-                    val fxMap: Map<String, Float> = mapOf(
-                        "FB_GAIN" to (fx["FB Gain"]?.value ?: 1f),
-                        "FB_ZOOM" to (fx["FB Zoom"]?.value ?: 0.5f),
-                        "FB_ROTATE" to (fx["FB Rotate"]?.value ?: 0.5f),
-                        "FB_SHIFT" to (fx["FB Shift"]?.value ?: 0f),
-                        "FB_BLUR" to (fx["FB Blur"]?.value ?: 0f)
-                    )
-
+                    // In single mandala mode, the feedback mode comes from the ShowPatch
                     compositeWithFeedback(
                         render = { GLES30.glUseProgram(program); renderSource(currentSource) },
-                        fx = fxMap,
+                        feedbackMode = _feedbackMode, // Use the _feedbackMode property
                         fbTextures = finalFBTextures,
                         fbFramebuffers = finalFBFramebuffers,
                         fbIndexRef = { finalFBIndex },
@@ -527,13 +530,15 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     private fun compositeFinalMixer(tA: Int, tB: Int) {
-        val fx = mapOf(
-            "FB_GAIN" to 0.0f, 
-            "FB_ZOOM" to (mixerParams["MF_FB_ZOOM"]?.value ?: 0.5f), 
-            "FB_ROTATE" to (mixerParams["MF_FB_ROTATE"]?.value ?: 0.5f), 
-            "FB_SHIFT" to (mixerParams["MF_FB_SHIFT"]?.value ?: 0f), 
-            "FB_BLUR" to (mixerParams["MF_FB_BLUR"]?.value ?: 0f)
-        )
+        val fx = mixerPatch?.effects
+
+        val feedbackMode = if (fx != null && (mixerParams["MF_TRAILS"]?.value ?: 0f) > 0.5f) {
+             // If trails are enabled in mixer effects, assume CUSTOM mode to apply mixer's specific FX
+            FeedbackMode.CUSTOM
+        } else {
+            _feedbackMode // Use the show's feedback mode for final mixer output if not overridden by mixer trails
+        }
+
         compositeWithFeedback(
             render = { 
                 GLES30.glUseProgram(mixerProgram); 
@@ -550,7 +555,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4); 
                 GLES30.glEnable(GLES30.GL_BLEND) 
             },
-            fx = fx,
+            feedbackMode = feedbackMode,
             fbTextures = finalFBTextures,
             fbFramebuffers = finalFBFramebuffers,
             fbIndexRef = { finalFBIndex },
@@ -564,7 +569,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
      */
     private fun compositeWithFeedback(
         render: () -> Unit,
-        fx: Map<String, Float>,
+        feedbackMode: FeedbackMode,
         fbTextures: IntArray,
         fbFramebuffers: IntArray,
         fbIndexRef: () -> Int,
@@ -575,11 +580,39 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glClearColor(0f, 0f, 0f, 0f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
         render()
-        
-        val gain = fx["FB_GAIN"] ?: 1f
-        val fbIdx = fbIndexRef()
-        
-        if (gain > 0.01f) {
+
+        val params = when (feedbackMode) {
+            FeedbackMode.NONE -> FeedbackParams(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)
+            FeedbackMode.LIGHT -> FeedbackParams(0.01f, 1.05f, 0.001f, 0.001f, 0.001f, 0.001f)
+            FeedbackMode.MEDIUM -> FeedbackParams(0.05f, 1.10f, 0.005f, 0.005f, 0.005f, 0.005f)
+            FeedbackMode.HEAVY -> FeedbackParams(0.1f, 1.15f, 0.01f, 0.01f, 0.01f, 0.01f)
+            FeedbackMode.CUSTOM -> {
+                // For custom mode, we use the mixerParams for the final feedback stage
+                // For individual slots, assume no custom feedback mode for now (will be implemented later if needed)
+                if (targetFboIdx == 6) { // Only apply custom from mixerParams for the final output
+                    FeedbackParams(
+                        decay = mixerParams["MF_FB_DECAY"]?.value ?: 0.0f,
+                        gain = mixerParams["MF_FB_GAIN"]?.value ?: 1.0f,
+                        zoom = mixerParams["MF_FB_ZOOM"]?.value ?: 0.5f,
+                        rotate = mixerParams["MF_FB_ROTATE"]?.value ?: 0.5f,
+                        shift = mixerParams["MF_FB_SHIFT"]?.value ?: 0f,
+                        blur = mixerParams["MF_FB_BLUR"]?.value ?: 0f
+                    )
+                } else {
+                    // Default to NONE or some other behavior for slots if custom is not handled per slot
+                    FeedbackParams(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)
+                }
+            }
+        }.let { (d, g, z, r, s, b) ->
+            // Map values to shader range if needed
+            val mappedGain = if (g <= 0.01f) 0.0f else 1.1f + (g * 0.15f)
+            val mappedZoom = ((z - 0.5f) * 0.1f)
+            val mappedRotate = ((r - 0.5f) * 10f * (PI.toFloat() / 180f))
+            FeedbackParams(decay = d, gain = mappedGain, zoom = mappedZoom, rotate = mappedRotate, shift = s, blur = b)
+        }
+
+        if (params.gain > 0.01f) {
+            val fbIdx = fbIndexRef()
             val nextIdx = (fbIdx + 1) % 2
             GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, fbFramebuffers[nextIdx])
             GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
@@ -593,18 +626,12 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, fbTextures[fbIdx])
             GLES30.glUniform1i(uFBTextureHistoryLoc, 1)
             
-            GLES30.glUniform1f(uFBDecayLoc, 0.0f)
-            
-            val mappedGain = if (gain <= 0.01f) {
-                0.0f
-            } else {
-                1.1f + (gain * 0.15f)
-            }
-            GLES30.glUniform1f(uFBGainLoc, mappedGain)
-            GLES30.glUniform1f(uFBZoomLoc, ((fx["FB_ZOOM"] ?: 0.5f) - 0.5f) * 0.1f)
-            GLES30.glUniform1f(uFBRotateLoc, ((fx["FB_ROTATE"] ?: 0.5f) - 0.5f) * 10f * (PI.toFloat() / 180f))
-            GLES30.glUniform1f(uFBShiftLoc, fx["FB_SHIFT"] ?: 0f)
-            GLES30.glUniform1f(uFBBlurLoc, fx["FB_BLUR"] ?: 0f)
+            GLES30.glUniform1f(uFBDecayLoc, params.decay)
+            GLES30.glUniform1f(uFBGainLoc, params.gain)
+            GLES30.glUniform1f(uFBZoomLoc, params.zoom)
+            GLES30.glUniform1f(uFBRotateLoc, params.rotate)
+            GLES30.glUniform1f(uFBShiftLoc, params.shift)
+            GLES30.glUniform1f(uFBBlurLoc, params.blur)
             
             GLES30.glDisable(GLES30.GL_BLEND)
             GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
@@ -619,7 +646,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glBindVertexArray(trailVao)
         GLES30.glUniform1f(uTrailAlphaLocation, 1.0f)
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, if (gain > 0.01f) fbTextures[fbIndexRef()] else currentFrameTexture)
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, if (params.gain > 0.01f) fbTextures[fbIndexRef()] else currentFrameTexture)
         GLES30.glUniform1i(uTrailTextureLocation, 0)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
     }

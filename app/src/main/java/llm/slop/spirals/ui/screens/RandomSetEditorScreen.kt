@@ -26,7 +26,6 @@ import llm.slop.spirals.models.RecipeFilter
 import llm.slop.spirals.models.ArmConstraints
 import llm.slop.spirals.models.RotationConstraints
 import llm.slop.spirals.models.HueOffsetConstraints
-import llm.slop.spirals.models.FeedbackMode
 import llm.slop.spirals.models.STANDARD_BEAT_VALUES
 import llm.slop.spirals.ui.components.PatchManagerOverlay
 import llm.slop.spirals.ui.theme.AppBackground
@@ -177,11 +176,6 @@ fun RandomSetEditorScreen(
                     onClick = { selectedTab = 3 },
                     text = { Text("Color") }
                 )
-                Tab(
-                    selected = selectedTab == 4,
-                    onClick = { selectedTab = 4 },
-                    text = { Text("FX") }
-                )
             }
             
             // Tab content
@@ -205,10 +199,6 @@ fun RandomSetEditorScreen(
                             onUpdate = { currentRSet = it }
                         )
                         3 -> ColorTab(
-                            rset = currentRSet!!,
-                            onUpdate = { currentRSet = it }
-                        )
-                        4 -> FXTab(
                             rset = currentRSet!!,
                             onUpdate = { currentRSet = it }
                         )
@@ -1490,68 +1480,5 @@ fun ColorTab(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun FXTab(
-    rset: RandomSet,
-    onUpdate: (RandomSet) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppBackground)
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        Text(
-            text = "Feedback Mode",
-            style = MaterialTheme.typography.titleMedium,
-            color = AppText,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        
-        FeedbackModeOption("None", FeedbackMode.NONE, rset.feedbackMode) {
-            onUpdate(rset.copy(feedbackMode = FeedbackMode.NONE))
-        }
-        
-        FeedbackModeOption("Light (subtle trails)", FeedbackMode.LIGHT, rset.feedbackMode) {
-            onUpdate(rset.copy(feedbackMode = FeedbackMode.LIGHT))
-        }
-        
-        FeedbackModeOption("Medium (noticeable)", FeedbackMode.MEDIUM, rset.feedbackMode) {
-            onUpdate(rset.copy(feedbackMode = FeedbackMode.MEDIUM))
-        }
-        
-        FeedbackModeOption("Heavy (intense)", FeedbackMode.HEAVY, rset.feedbackMode) {
-            onUpdate(rset.copy(feedbackMode = FeedbackMode.HEAVY))
-        }
-    }
-}
-
-@Composable
-fun FeedbackModeOption(
-    label: String,
-    mode: FeedbackMode,
-    currentMode: FeedbackMode,
-    onSelect: () -> Unit
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onSelect)
-            .padding(vertical = 8.dp)
-    ) {
-        RadioButton(
-            selected = currentMode == mode,
-            onClick = onSelect
-        )
-        Text(
-            text = label,
-            modifier = Modifier.padding(start = 8.dp),
-            color = AppText
-        )
     }
 }

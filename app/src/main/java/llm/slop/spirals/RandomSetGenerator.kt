@@ -9,7 +9,6 @@ import llm.slop.spirals.models.RecipeFilter
 import llm.slop.spirals.models.ArmConstraints
 import llm.slop.spirals.models.RotationConstraints
 import llm.slop.spirals.models.HueOffsetConstraints
-import llm.slop.spirals.models.FeedbackMode
 import llm.slop.spirals.models.STANDARD_BEAT_VALUES
 import llm.slop.spirals.models.mandala.Mandala4Arm
 import kotlin.math.round
@@ -68,8 +67,7 @@ class RandomSetGenerator(private val context: Context) {
         // 5. Apply hue offset constraints
         applyHueOffsetConstraints(rset.hueOffsetConstraints, visualSource, random)
         
-        // 6. Apply feedback mode
-        applyFeedbackMode(rset.feedbackMode, visualSource)
+        // Removed: 6. Apply feedback mode (now handled by ShowPatch)
     }
     
     /**
@@ -331,40 +329,6 @@ class RandomSetGenerator(private val context: Context) {
                     )
                 )
             }
-        }
-    }
-    
-    /**
-     * Applies feedback mode presets.
-     */
-    private fun applyFeedbackMode(
-        mode: FeedbackMode,
-        visualSource: MandalaVisualSource
-    ) {
-        when (mode) {
-            FeedbackMode.NONE -> {
-                visualSource.parameters["FB Decay"]?.baseValue = 0f
-                visualSource.parameters["FB Gain"]?.baseValue = 0f
-            }
-            FeedbackMode.LIGHT -> {
-                visualSource.parameters["FB Decay"]?.baseValue = 0.85f
-                visualSource.parameters["FB Gain"]?.baseValue = 0.45f
-                visualSource.parameters["FB Zoom"]?.baseValue = 0.50f
-                visualSource.parameters["FB Rotate"]?.baseValue = 0.50f
-            }
-            FeedbackMode.MEDIUM -> {
-                visualSource.parameters["FB Decay"]?.baseValue = 0.85f
-                visualSource.parameters["FB Gain"]?.baseValue = 0.55f
-                visualSource.parameters["FB Zoom"]?.baseValue = 0.7f
-                visualSource.parameters["FB Rotate"]?.baseValue = 0.55f
-            }
-            FeedbackMode.HEAVY -> {
-                visualSource.parameters["FB Decay"]?.baseValue = 0.85f
-                visualSource.parameters["FB Gain"]?.baseValue = 0.6f
-                visualSource.parameters["FB Zoom"]?.baseValue = 0.7f
-                visualSource.parameters["FB Rotate"]?.baseValue = 0.6f
-            }
-            FeedbackMode.CUSTOM -> { }
         }
     }
     

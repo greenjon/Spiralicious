@@ -194,17 +194,6 @@ class RandomSetEditorViewModel(
     }
     
     /**
-     * Updates feedback mode.
-     * 
-     * @param mode The new feedback mode
-     */
-    fun updateFeedbackMode(mode: FeedbackMode) {
-        val randomSet = _currentRandomSet.value ?: return
-        val updatedSet = randomSet.copy(feedbackMode = mode)
-        updateRandomSet(updatedSet)
-    }
-    
-    /**
      * Saves the current random set to the database.
      */
     fun saveRandomSet() {

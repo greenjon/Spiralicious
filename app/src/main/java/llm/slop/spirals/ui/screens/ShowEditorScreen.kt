@@ -58,6 +58,9 @@ fun ShowEditorScreen(
     val fromSource = remember { mutableStateOf<MandalaVisualSource?>(null) }
     var lastGenerationTriggerTime by remember { mutableLongStateOf(0L) }
 
+    // State for tabs
+    var selectedTab by remember { mutableStateOf(0) }
+
     LaunchedEffect(Unit) {
         while (true) {
             withFrameNanos { frameTick++ }
@@ -135,7 +138,7 @@ fun ShowEditorScreen(
                 }
             }
 
-            Log.d("ShowEditor", "Found RandomSet: ${randomSet?.name ?: "NULL"} (ID=$randomSetId), Renderer=${if (mainRenderer != null) "Ready" else "NULL"}")
+            Log.d("ShowEditor", "Found RandomSet: ${randomSet?.name ?: "NULL"} (ID=$randomSetId), Renderer=${if (mainRenderer != null) "Ready" else "NULL"}\n")
 
             if (randomSet != null && mainRenderer != null) {
                 try {
@@ -163,7 +166,7 @@ fun ShowEditorScreen(
                     }
                     fromSource.value = toSource.copy()
                     
-                    Log.d("ShowEditor", "Renderer updated with RandomSet: ${randomSet.name}")
+                    Log.d("ShowEditor", "Renderer updated with RandomSet: ${randomSet.name}\n")
                 } catch (e: Exception) {
                     Log.e("ShowEditor", "Error applying RandomSet to renderer", e)
                 }
@@ -233,339 +236,395 @@ fun ShowEditorScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 2. Performance Controls (Prev/Random/Next/Generate)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+            // Tabs
+            TabRow(
+                selectedTabIndex = selectedTab,
+                containerColor = AppBackground,
+                contentColor = AppAccent
             ) {
-                // PREV Trigger
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally, 
-                    modifier = Modifier.clickable { 
-                        focusedTriggerId = "SHOW_PREV"
-                        mainRenderer?.getMixerParam("SHOW_PREV")?.triggerPulse()
-                    }
-                ) {
-                    Text(
-                        text = "PREV", 
-                        style = MaterialTheme.typography.labelSmall, 
-                        color = if (focusedTriggerId == "SHOW_PREV") AppAccent else AppText
-                    )
-                    val modulatedPrev = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_PREV")?.value ?: currentShow.prevTrigger.baseValue else 0f
-                    KnobView(
-                        baseValue = currentShow.prevTrigger.baseValue,
-                        modulatedValue = modulatedPrev,
-                        onValueChange = { currentShow = currentShow.copy(prevTrigger = currentShow.prevTrigger.copy(baseValue = it)) },
-                        onInteractionFinished = {
-                            if (currentShow.prevTrigger.baseValue > 0.5f) {
-                                vm.triggerPrevMixer(currentShow.randomSetIds.size)
-                            }
-                        },
-                        focused = focusedTriggerId == "SHOW_PREV" || currentShow.prevTrigger.modulators.isNotEmpty(),
-                        tick = frameTick.toLong()
-                    )
-                }
-
-                // RANDOM Trigger
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally, 
-                    modifier = Modifier.clickable { 
-                        focusedTriggerId = "SHOW_RANDOM"
-                        val currentTime = System.currentTimeMillis()
-                        if (currentTime - lastGenerationTriggerTime > 1000L) {
-                            mainRenderer?.getMixerParam("SHOW_RANDOM")?.triggerPulse()
-                            if (currentShow.randomSetIds.isNotEmpty()) {
-                                vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size))
-                            }
-                            lastGenerationTriggerTime = currentTime
-                        }
-                    }
-                ) {
-                    Text(
-                        text = "RAND", 
-                        style = MaterialTheme.typography.labelSmall, 
-                        color = if (focusedTriggerId == "SHOW_RANDOM") AppAccent else AppText
-                    )
-                    val modulatedRand = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_RANDOM")?.value ?: currentShow.randomTrigger.baseValue else 0f
-                    KnobView(
-                        baseValue = currentShow.randomTrigger.baseValue,
-                        modulatedValue = modulatedRand,
-                        onValueChange = { currentShow = currentShow.copy(randomTrigger = currentShow.randomTrigger.copy(baseValue = it)) },
-                        onInteractionFinished = {
-                            if (currentShow.randomTrigger.baseValue > 0.5f) {
-                                val currentTime = System.currentTimeMillis()
-                                if (currentTime - lastGenerationTriggerTime > 1000L) {
-                                    vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size))
-                                    lastGenerationTriggerTime = currentTime
-                                }
-                            }
-                        },
-                        focused = focusedTriggerId == "SHOW_RANDOM" || currentShow.randomTrigger.modulators.isNotEmpty(),
-                        tick = frameTick.toLong()
-                    )
-                }
-
-                // NEXT Trigger
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally, 
-                    modifier = Modifier.clickable { 
-                        focusedTriggerId = "SHOW_NEXT"
-                        mainRenderer?.getMixerParam("SHOW_NEXT")?.triggerPulse()
-                    }
-                ) {
-                    Text(
-                        text = "NEXT", 
-                        style = MaterialTheme.typography.labelSmall, 
-                        color = if (focusedTriggerId == "SHOW_NEXT") AppAccent else AppText
-                    )
-                    val modulatedNext = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_NEXT")?.value ?: currentShow.nextTrigger.baseValue else 0f
-                    KnobView(
-                        baseValue = currentShow.nextTrigger.baseValue,
-                        modulatedValue = modulatedNext,
-                        onValueChange = { currentShow = currentShow.copy(nextTrigger = currentShow.nextTrigger.copy(baseValue = it)) },
-                        onInteractionFinished = {
-                            if (currentShow.nextTrigger.baseValue > 0.5f) {
-                                vm.triggerNextMixer(currentShow.randomSetIds.size)
-                            }
-                        },
-                        focused = focusedTriggerId == "SHOW_NEXT" || currentShow.nextTrigger.modulators.isNotEmpty(),
-                        tick = frameTick.toLong()
-                    )
-                }
-
-                // GENERATE Trigger
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally, 
-                    modifier = Modifier.clickable { 
-                        focusedTriggerId = "SHOW_GENERATE"
-                        val currentTime = System.currentTimeMillis()
-                        if (currentTime - lastGenerationTriggerTime > 1000L) {
-                            mainRenderer?.getMixerParam("SHOW_GENERATE")?.triggerPulse()
-                            reRollTick++
-                            lastGenerationTriggerTime = currentTime
-                        }
-                    }
-                ) {
-                    Text(
-                        text = "GEN", 
-                        style = MaterialTheme.typography.labelSmall, 
-                        color = if (focusedTriggerId == "SHOW_GENERATE") AppAccent else AppText
-                    )
-                    val modulatedGen = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_GENERATE")?.value ?: currentShow.generateTrigger.baseValue else 0f
-                    KnobView(
-                        baseValue = currentShow.generateTrigger.baseValue,
-                        modulatedValue = modulatedGen,
-                        onValueChange = { currentShow = currentShow.copy(generateTrigger = currentShow.generateTrigger.copy(baseValue = it)) },
-                        onInteractionFinished = {
-                            if (currentShow.generateTrigger.baseValue > 0.5f) {
-                                val currentTime = System.currentTimeMillis()
-                                if (currentTime - lastGenerationTriggerTime > 1000L) {
-                                    reRollTick++
-                                    lastGenerationTriggerTime = currentTime
-                                }
-                            }
-                        },
-                        focused = focusedTriggerId == "SHOW_GENERATE" || currentShow.generateTrigger.modulators.isNotEmpty(),
-                        tick = frameTick.toLong()
-                    )
-                }
-            }
-
-            // Transition Controls
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Transition Type Dropdown
-                var transitionTypeExpanded by remember { mutableStateOf(false) }
-                Column {
-                    Text("Transition", style = MaterialTheme.typography.labelSmall, color = AppText)
-                    Box(modifier = Modifier.clickable { transitionTypeExpanded = true }) {
-                        Text(
-                            text = currentShow.transitionType.name.replace("_", " "),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = AppText,
-                            modifier = Modifier.border(1.dp, AppText.copy(alpha = 0.2f)).padding(8.dp)
-                        )
-                        DropdownMenu(
-                            expanded = transitionTypeExpanded,
-                            onDismissRequest = { transitionTypeExpanded = false }
-                        ) {
-                            TransitionType.entries.forEach { type ->
-                                DropdownMenuItem(
-                                    text = { Text(type.name.replace("_", " ")) },
-                                    onClick = {
-                                        currentShow = currentShow.copy(transitionType = type)
-                                        transitionTypeExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Transition Duration Dropdown (replaces knob)
-                var durationExpanded by remember { mutableStateOf(false) }
-                val durationOptions = listOf(0.0f, 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f)
-                val currentDurationText = if (currentShow.transitionDurationBeats == 0.0f) "0" else "%.2f".format(currentShow.transitionDurationBeats).removeSuffix(".00").removeSuffix("0")
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Duration (Beats)", style = MaterialTheme.typography.labelSmall, color = AppText)
-                    Box(modifier = Modifier.clickable { durationExpanded = true }) {
-                        Text(
-                            text = currentDurationText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = AppText,
-                            modifier = Modifier.border(1.dp, AppText.copy(alpha = 0.2f)).padding(8.dp)
-                        )
-                        DropdownMenu(
-                            expanded = durationExpanded,
-                            onDismissRequest = { durationExpanded = false },
-                            modifier = Modifier.background(AppBackground)
-                        ) {
-                            durationOptions.forEach { duration ->
-                                DropdownMenuItem(
-                                    text = { Text(if (duration == 0.0f) "0" else "%.2f".format(duration).removeSuffix(".00").removeSuffix("0"), color = AppText) },
-                                    onClick = {
-                                        currentShow = currentShow.copy(transitionDurationBeats = duration)
-                                        durationExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // New: Fade Out % Dropdown
-                var fadeOutExpanded by remember { mutableStateOf(false) }
-                val fadePercentages = listOf(0.0f, 0.25f, 0.5f, 0.75f, 1.0f)
-                val currentFadeOutText = "${(currentShow.transitionFadeOutPercent * 100).toInt()}%"
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Fade Out %", style = MaterialTheme.typography.labelSmall, color = AppText)
-                    Box(modifier = Modifier.clickable { fadeOutExpanded = true }) {
-                        Text(
-                            text = currentFadeOutText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = AppText,
-                            modifier = Modifier.border(1.dp, AppText.copy(alpha = 0.2f)).padding(8.dp)
-                        )
-                        DropdownMenu(
-                            expanded = fadeOutExpanded,
-                            onDismissRequest = { fadeOutExpanded = false },
-                            modifier = Modifier.background(AppBackground)
-                        ) {
-                            fadePercentages.forEach { percent ->
-                                DropdownMenuItem(
-                                    text = { Text("${(percent * 100).toInt()}%", color = AppText) },
-                                    onClick = {
-                                        currentShow = currentShow.copy(transitionFadeOutPercent = percent)
-                                        fadeOutExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // New: Fade In % Dropdown
-                var fadeInExpanded by remember { mutableStateOf(false) }
-                val currentFadeInText = "${(currentShow.transitionFadeInPercent * 100).toInt()}%"
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Fade In %", style = MaterialTheme.typography.labelSmall, color = AppText)
-                    Box(modifier = Modifier.clickable { fadeInExpanded = true }) {
-                        Text(
-                            text = currentFadeInText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = AppText,
-                            modifier = Modifier.border(1.dp, AppText.copy(alpha = 0.2f)).padding(8.dp)
-                        )
-                        DropdownMenu(
-                            expanded = fadeInExpanded,
-                            onDismissRequest = { fadeInExpanded = false },
-                            modifier = Modifier.background(AppBackground)
-                        ) {
-                            fadePercentages.forEach { percent ->
-                                DropdownMenuItem(
-                                    text = { Text("${(percent * 100).toInt()}%", color = AppText) },
-                                    onClick = {
-                                        currentShow = currentShow.copy(transitionFadeInPercent = percent)
-                                        fadeInExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // 3. CV Editor for focused parameter
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                ShowCvEditor(
-                    show = currentShow,
-                    focusedId = focusedTriggerId,
-                    onShowUpdate = { currentShow = it }
+                Tab(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    text = { Text("Triggers") }
+                )
+                Tab(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    text = { Text("Transitions") }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = { Text("FX") } // New tab
+                )
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    text = { Text("CV") }
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            // Tab content
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                when (selectedTab) {
+                    0 -> // Original performance controls and randomset list
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            // 2. Performance Controls (Prev/Random/Next/Generate)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // PREV Trigger
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally, 
+                                    modifier = Modifier.clickable { 
+                                        focusedTriggerId = "SHOW_PREV"
+                                        mainRenderer?.getMixerParam("SHOW_PREV")?.triggerPulse()
+                                    }
+                                ) {
+                                    Text(
+                                        text = "PREV", 
+                                        style = MaterialTheme.typography.labelSmall, 
+                                        color = if (focusedTriggerId == "SHOW_PREV") AppAccent else AppText
+                                    )
+                                    val modulatedPrev = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_PREV")?.value ?: currentShow.prevTrigger.baseValue else 0f
+                                    KnobView(
+                                        baseValue = currentShow.prevTrigger.baseValue,
+                                        modulatedValue = modulatedPrev,
+                                        onValueChange = { currentShow = currentShow.copy(prevTrigger = currentShow.prevTrigger.copy(baseValue = it)) },
+                                        onInteractionFinished = {
+                                            if (currentShow.prevTrigger.baseValue > 0.5f) {
+                                                vm.triggerPrevMixer(currentShow.randomSetIds.size)
+                                            }
+                                        },
+                                        focused = focusedTriggerId == "SHOW_PREV" || currentShow.prevTrigger.modulators.isNotEmpty(),
+                                        tick = frameTick.toLong()
+                                    )
+                                }
 
-            // 4. RandomSet sequence (Set Editor style)
-            Column(modifier = Modifier.padding(horizontal = 12.dp).height(120.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    var showRandomSetPicker by remember { mutableStateOf(false) }
+                                // RANDOM Trigger
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally, 
+                                    modifier = Modifier.clickable { 
+                                        focusedTriggerId = "SHOW_RANDOM"
+                                        val currentTime = System.currentTimeMillis()
+                                        if (currentTime - lastGenerationTriggerTime > 1000L) {
+                                            mainRenderer?.getMixerParam("SHOW_RANDOM")?.triggerPulse()
+                                            if (currentShow.randomSetIds.isNotEmpty()) {
+                                                vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size))
+                                            }
+                                            lastGenerationTriggerTime = currentTime
+                                        }
+                                    }
+                                ) {
+                                    Text(
+                                        text = "RAND", 
+                                        style = MaterialTheme.typography.labelSmall, 
+                                        color = if (focusedTriggerId == "SHOW_RANDOM") AppAccent else AppText
+                                    )
+                                    val modulatedRand = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_RANDOM")?.value ?: currentShow.randomTrigger.baseValue else 0f
+                                    KnobView(
+                                        baseValue = currentShow.randomTrigger.baseValue,
+                                        modulatedValue = modulatedRand,
+                                        onValueChange = { currentShow = currentShow.copy(randomTrigger = currentShow.randomTrigger.copy(baseValue = it)) },
+                                        onInteractionFinished = {
+                                            if (currentShow.randomTrigger.baseValue > 0.5f) {
+                                                val currentTime = System.currentTimeMillis()
+                                                if (currentTime - lastGenerationTriggerTime > 1000L) {
+                                                    vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size))
+                                                    lastGenerationTriggerTime = currentTime
+                                                }
+                                            }
+                                        },
+                                        focused = focusedTriggerId == "SHOW_RANDOM" || currentShow.randomTrigger.modulators.isNotEmpty(),
+                                        tick = frameTick.toLong()
+                                    )
+                                }
 
-                    Button(onClick = { showRandomSetPicker = true }, modifier = Modifier.height(36.dp), contentPadding = PaddingValues(horizontal = 8.dp)) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add RandomSet", fontSize = 12.sp)
-                    }
+                                // NEXT Trigger
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally, 
+                                    modifier = Modifier.clickable { 
+                                        focusedTriggerId = "SHOW_NEXT"
+                                        mainRenderer?.getMixerParam("SHOW_NEXT")?.triggerPulse()
+                                    }
+                                ) {
+                                    Text(
+                                        text = "NEXT", 
+                                        style = MaterialTheme.typography.labelSmall, 
+                                        color = if (focusedTriggerId == "SHOW_NEXT") AppAccent else AppText
+                                    )
+                                    val modulatedNext = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_NEXT")?.value ?: currentShow.nextTrigger.baseValue else 0f
+                                    KnobView(
+                                        baseValue = currentShow.nextTrigger.baseValue,
+                                        modulatedValue = modulatedNext,
+                                        onValueChange = { currentShow = currentShow.copy(nextTrigger = currentShow.nextTrigger.copy(baseValue = it)) },
+                                        onInteractionFinished = {
+                                            if (currentShow.nextTrigger.baseValue > 0.5f) {
+                                                vm.triggerNextMixer(currentShow.randomSetIds.size)
+                                            }
+                                        },
+                                        focused = focusedTriggerId == "SHOW_NEXT" || currentShow.nextTrigger.modulators.isNotEmpty(),
+                                        tick = frameTick.toLong()
+                                    )
+                                }
 
-                    if (showRandomSetPicker) {
-                        PickerDialog(
-                            title = "Add RandomSet to Show",
-                            items = allRandomSets.map { it.name to it.id },
-                            onSelect = { randomSetId ->
-                                currentShow = currentShow.copy(randomSetIds = currentShow.randomSetIds + randomSetId)
-                                showRandomSetPicker = false
-                            },
-                            onDismiss = { showRandomSetPicker = false },
-                            onCreateNew = {
-                                vm.createAndPushLayer(LayerType.RANDOM_SET)
-                                showRandomSetPicker = false
+                                // GENERATE Trigger
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally, 
+                                    modifier = Modifier.clickable { 
+                                        focusedTriggerId = "SHOW_GENERATE"
+                                        val currentTime = System.currentTimeMillis()
+                                        if (currentTime - lastGenerationTriggerTime > 1000L) {
+                                            mainRenderer?.getMixerParam("SHOW_GENERATE")?.triggerPulse()
+                                            reRollTick++
+                                            lastGenerationTriggerTime = currentTime
+                                        }
+                                    }
+                                ) {
+                                    Text(
+                                        text = "GEN", 
+                                        style = MaterialTheme.typography.labelSmall, 
+                                        color = if (focusedTriggerId == "SHOW_GENERATE") AppAccent else AppText
+                                    )
+                                    val modulatedGen = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_GENERATE")?.value ?: currentShow.generateTrigger.baseValue else 0f
+                                    KnobView(
+                                        baseValue = currentShow.generateTrigger.baseValue,
+                                        modulatedValue = modulatedGen,
+                                        onValueChange = { currentShow = currentShow.copy(generateTrigger = currentShow.generateTrigger.copy(baseValue = it)) },
+                                        onInteractionFinished = {
+                                            if (currentShow.generateTrigger.baseValue > 0.5f) {
+                                                val currentTime = System.currentTimeMillis()
+                                                if (currentTime - lastGenerationTriggerTime > 1000L) {
+                                                    reRollTick++
+                                                    lastGenerationTriggerTime = currentTime
+                                                }
+                                            }
+                                        },
+                                        focused = focusedTriggerId == "SHOW_GENERATE" || currentShow.generateTrigger.modulators.isNotEmpty(),
+                                        tick = frameTick.toLong()
+                                    )
+                                }
                             }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            // RandomSet sequence (Set Editor style)
+                            Column(modifier = Modifier.padding(horizontal = 12.dp).height(120.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    var showRandomSetPicker by remember { mutableStateOf(false) }
+
+                                    Button(onClick = { showRandomSetPicker = true }, modifier = Modifier.height(36.dp), contentPadding = PaddingValues(horizontal = 8.dp)) {
+                                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Add RandomSet", fontSize = 12.sp)
+                                    }
+
+                                    if (showRandomSetPicker) {
+                                        PickerDialog(
+                                            title = "Add RandomSet to Show",
+                                            items = allRandomSets.map { it.name to it.id },
+                                            onSelect = { randomSetId ->
+                                                currentShow = currentShow.copy(randomSetIds = currentShow.randomSetIds + randomSetId)
+                                                showRandomSetPicker = false
+                                            },
+                                            onDismiss = { showRandomSetPicker = false },
+                                            onCreateNew = {
+                                                vm.createAndPushLayer(LayerType.RANDOM_SET)
+                                                showRandomSetPicker = false
+                                            }
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                // Create mapping from RandomSet IDs to (name, id) pairs for display
+                                val randomSetItems = remember(currentShow.randomSetIds, allRandomSets) {
+                                    currentShow.randomSetIds.mapNotNull { randomSetId ->
+                                        val randomSetEntity = allRandomSets.find { it.id == randomSetId }
+                                        randomSetEntity?.let { it.name to it.id }
+                                    }
+                                }
+
+                                SetChipList(
+                                    chipItems = randomSetItems,
+                                    onChipTapped = { randomSetId ->
+                                        val idx = currentShow.randomSetIds.indexOf(randomSetId)
+                                        if (idx != -1) vm.jumpToShowIndex(idx)
+                                    },
+                                    onChipReordered = { newList ->
+                                        // newList contains IDs in the new order
+                                        currentShow = currentShow.copy(randomSetIds = newList)
+                                    }
+                                )
+                            }
+                        }
+                    1 -> // Transition Controls
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = "Transitions",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = AppText,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Transition Type Dropdown
+                                var transitionTypeExpanded by remember { mutableStateOf(false) }
+                                Column {
+                                    Text("Type", style = MaterialTheme.typography.labelSmall, color = AppText)
+                                    Box(modifier = Modifier.clickable { transitionTypeExpanded = true }) {
+                                        Text(
+                                            text = currentShow.transitionType.name.replace("_", " "),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = AppText,
+                                            modifier = Modifier.border(1.dp, AppText.copy(alpha = 0.2f)).padding(8.dp)
+                                        )
+                                        DropdownMenu(
+                                            expanded = transitionTypeExpanded,
+                                            onDismissRequest = { transitionTypeExpanded = false },
+                                            containerColor = AppBackground
+                                        ) {
+                                            TransitionType.entries.forEach { type ->
+                                                DropdownMenuItem(
+                                                    text = { Text(type.name.replace("_", " "), color = AppText) },
+                                                    onClick = {
+                                                        currentShow = currentShow.copy(transitionType = type)
+                                                        transitionTypeExpanded = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Transition Duration Dropdown (replaces knob)
+                                var durationExpanded by remember { mutableStateOf(false) }
+                                val durationOptions = listOf(0.0f, 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f)
+                                val currentDurationText = if (currentShow.transitionDurationBeats == 0.0f) "0" else "%.2f".format(currentShow.transitionDurationBeats).removeSuffix(".00").removeSuffix("0")
+
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Duration (Beats)", style = MaterialTheme.typography.labelSmall, color = AppText)
+                                    Box(modifier = Modifier.clickable { durationExpanded = true }) {
+                                        Text(
+                                            text = currentDurationText,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = AppText,
+                                            modifier = Modifier.border(1.dp, AppText.copy(alpha = 0.2f)).padding(8.dp)
+                                        )
+                                        DropdownMenu(
+                                            expanded = durationExpanded,
+                                            onDismissRequest = { durationExpanded = false },
+                                            modifier = Modifier.background(AppBackground)
+                                        ) {
+                                            durationOptions.forEach { duration ->
+                                                DropdownMenuItem(
+                                                    text = { Text(if (duration == 0.0f) "0" else "%.2f".format(duration).removeSuffix(".00").removeSuffix("0"), color = AppText) },
+                                                    onClick = {
+                                                        currentShow = currentShow.copy(transitionDurationBeats = duration)
+                                                        durationExpanded = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // New: Fade Out % Dropdown
+                                var fadeOutExpanded by remember { mutableStateOf(false) }
+                                val fadePercentages = listOf(0.0f, 0.25f, 0.5f, 0.75f, 1.0f)
+                                val currentFadeOutText = "${(currentShow.transitionFadeOutPercent * 100).toInt()}%"
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Fade Out %", style = MaterialTheme.typography.labelSmall, color = AppText)
+                                    Box(modifier = Modifier.clickable { fadeOutExpanded = true }) {
+                                        Text(
+                                            text = currentFadeOutText,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = AppText,
+                                            modifier = Modifier.border(1.dp, AppText.copy(alpha = 0.2f)).padding(8.dp)
+                                        )
+                                        DropdownMenu(
+                                            expanded = fadeOutExpanded,
+                                            onDismissRequest = { fadeOutExpanded = false },
+                                            modifier = Modifier.background(AppBackground)
+                                        ) {
+                                            fadePercentages.forEach { percent ->
+                                                DropdownMenuItem(
+                                                    text = { Text("${(percent * 100).toInt()}%", color = AppText) },
+                                                    onClick = {
+                                                        currentShow = currentShow.copy(transitionFadeOutPercent = percent)
+                                                        fadeOutExpanded = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // New: Fade In % Dropdown
+                                var fadeInExpanded by remember { mutableStateOf(false) }
+                                val currentFadeInText = "${(currentShow.transitionFadeInPercent * 100).toInt()}%"
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("Fade In %", style = MaterialTheme.typography.labelSmall, color = AppText)
+                                    Box(modifier = Modifier.clickable { fadeInExpanded = true }) {
+                                        Text(
+                                            text = currentFadeInText,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = AppText,
+                                            modifier = Modifier.border(1.dp, AppText.copy(alpha = 0.2f)).padding(8.dp)
+                                        )
+                                        DropdownMenu(
+                                            expanded = fadeInExpanded,
+                                            onDismissRequest = { fadeInExpanded = false },
+                                            modifier = Modifier.background(AppBackground)
+                                        ) {
+                                            fadePercentages.forEach { percent ->
+                                                DropdownMenuItem(
+                                                    text = { Text("${(percent * 100).toInt()}%", color = AppText) },
+                                                    onClick = {
+                                                        currentShow = currentShow.copy(transitionFadeInPercent = percent)
+                                                        fadeInExpanded = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    2 -> // FX Tab
+                        FXTab(
+                            currentShow,
+                            onUpdate = { updatedShow -> currentShow = updatedShow }
                         )
-                    }
+                    3 -> // Original CV Editor
+                        Box(modifier = Modifier.fillMaxSize()) { // Fill the remaining space
+                            ShowCvEditor(
+                                show = currentShow,
+                                focusedId = focusedTriggerId,
+                                onShowUpdate = { currentShow = it }
+                            )
+                        }
                 }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Create mapping from RandomSet IDs to (name, id) pairs for display
-                val randomSetItems = remember(currentShow.randomSetIds, allRandomSets) {
-                    currentShow.randomSetIds.mapNotNull { randomSetId ->
-                        val randomSetEntity = allRandomSets.find { it.id == randomSetId }
-                        randomSetEntity?.let { it.name to it.id }
-                    }
-                }
-
-                SetChipList(
-                    chipItems = randomSetItems,
-                    onChipTapped = { randomSetId ->
-                        val idx = currentShow.randomSetIds.indexOf(randomSetId)
-                        if (idx != -1) vm.jumpToShowIndex(idx)
-                    },
-                    onChipReordered = { newList ->
-                        // newList contains IDs in the new order
-                        currentShow = currentShow.copy(randomSetIds = newList)
-                    }
-                )
             }
         }
 
@@ -653,6 +712,7 @@ fun ShowCvEditor(
             "SHOW_NEXT" -> show.nextTrigger
             "SHOW_RANDOM" -> show.randomTrigger
             "SHOW_GENERATE" -> show.generateTrigger
+            // Add FeedbackMode here if it becomes modulatable
             else -> null
         }
     }
@@ -719,4 +779,67 @@ private fun syncShowParam(show: ShowPatch, id: String, param: ModulatableParamet
         else -> show
     }
     onUpdate(newShow)
+}
+
+@Composable
+fun FXTab(
+    show: ShowPatch,
+    onUpdate: (ShowPatch) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AppBackground)
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        Text(
+            text = "Feedback Mode",
+            style = MaterialTheme.typography.titleMedium,
+            color = AppText,
+            modifier = Modifier.padding(bottom = 16.dp)
+        )
+        
+        FeedbackModeOption("None", FeedbackMode.NONE, show.feedbackMode) {
+            onUpdate(show.copy(feedbackMode = FeedbackMode.NONE))
+        }
+        
+        FeedbackModeOption("Light (subtle trails)", FeedbackMode.LIGHT, show.feedbackMode) {
+            onUpdate(show.copy(feedbackMode = FeedbackMode.LIGHT))
+        }
+        
+        FeedbackModeOption("Medium (noticeable)", FeedbackMode.MEDIUM, show.feedbackMode) {
+            onUpdate(show.copy(feedbackMode = FeedbackMode.MEDIUM))
+        }
+        
+        FeedbackModeOption("Heavy (intense)", FeedbackMode.HEAVY, show.feedbackMode) {
+            onUpdate(show.copy(feedbackMode = FeedbackMode.HEAVY))
+        }
+    }
+}
+
+@Composable
+fun FeedbackModeOption(
+    label: String,
+    mode: FeedbackMode,
+    currentMode: FeedbackMode,
+    onSelect: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSelect)
+            .padding(vertical = 8.dp)
+    ) {
+        RadioButton(
+            selected = currentMode == mode,
+            onClick = onSelect
+        )
+        Text(
+            text = label,
+            modifier = Modifier.padding(start = 8.dp),
+            color = AppText
+        )
+    }
 }

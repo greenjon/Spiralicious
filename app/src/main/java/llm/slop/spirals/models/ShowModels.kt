@@ -19,5 +19,15 @@ data class ShowPatch(
     val transitionType: TransitionType = TransitionType.NONE,
     val transitionDurationBeats: Float = 0.0f,
     val transitionFadeOutPercent: Float = 0.5f,
-    val transitionFadeInPercent: Float = 0.5f
+    val transitionFadeInPercent: Float = 0.5f,
+    val feedbackMode: FeedbackMode = FeedbackMode.NONE
 )
+
+@Serializable
+enum class FeedbackMode {
+    NONE,
+    LIGHT,
+    MEDIUM,
+    HEAVY,
+    CUSTOM
+}

@@ -46,12 +46,12 @@ private val LIGHT_FEEDBACK_PARAMS = FeedbackParams(
     blur = 0.001f
 )
 private val HEAVY_FEEDBACK_PARAMS = FeedbackParams(
-    decay = 0.05f,
-    gain = 1.015f,
-    zoom = 0.52f,
-    rotate = 0.51f,
-    shift = 0.01f,
-    blur = 0.01f
+    decay = 0.08f,
+    gain = 1.2f,
+    zoom = 1.00f,
+    rotate = 1.00f,
+    shift = .001f,
+    blur = .5f
 )
 
 /**

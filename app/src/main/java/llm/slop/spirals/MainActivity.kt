@@ -340,18 +340,13 @@ class MainActivity : ComponentActivity() {
                                                 HorizontalDivider(color = AppText.copy(alpha = 0.1f))
 
                                                 if (hasActiveData) {
-                                                    val isDirty = currentLayer.isDirty
-                                                    val textColor = if (isDirty) AppAccent else disabledColor
-
                                                     DropdownMenuItem(
-                                                        text = { Text("Save", color = textColor) },
+                                                        text = { Text("Save", color = AppAccent) },
                                                         onClick = {
-                                                            if (isDirty) {
-                                                                vm.saveLayer(currentLayer)
-                                                                showHeaderMenu = false
-                                                            }
+                                                            vm.saveLayer(currentLayer)
+                                                            showHeaderMenu = false
                                                         },
-                                                        enabled = isDirty
+                                                        enabled = true
                                                     )
                                                     HorizontalDivider(color = AppText.copy(alpha = 0.1f))
                                                 }

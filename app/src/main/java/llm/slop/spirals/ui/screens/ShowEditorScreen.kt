@@ -75,12 +75,14 @@ fun ShowEditorScreen(
     var lastModNext by remember { mutableFloatStateOf(0f) }
     var lastModRand by remember { mutableFloatStateOf(0f) }
     var lastModGen by remember { mutableFloatStateOf(0f) }
+    var lastModFbAmount by remember { mutableFloatStateOf(0f) } // New: for feedback amount
 
     LaunchedEffect(frameTick) {
         val modPrev = mainRenderer?.getMixerParam("SHOW_PREV")?.value ?: 0f
         val modNext = mainRenderer?.getMixerParam("SHOW_NEXT")?.value ?: 0f
         val modRand = mainRenderer?.getMixerParam("SHOW_RANDOM")?.value ?: 0f
         val modGen = mainRenderer?.getMixerParam("SHOW_GENERATE")?.value ?: 0f
+        val modFbAmount = mainRenderer?.getMixerParam("SHOW_FB_AMOUNT")?.value ?: 0f // New: for feedback amount
 
         if (modPrev > 0.5f && lastModPrev <= 0.5f) {
             vm.triggerPrevMixer(currentShow.randomSetIds.size)
@@ -103,6 +105,7 @@ fun ShowEditorScreen(
         lastModNext = modNext
         lastModRand = modRand
         lastModGen = modGen
+        lastModFbAmount = modFbAmount // New: for feedback amount
     }
 
     // Update local state if nav data changes
@@ -245,7 +248,7 @@ fun ShowEditorScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("Triggers") }
+                    text = { Text("Triggers & FX") } // Combined tab
                 )
                 Tab(
                     selected = selectedTab == 1,
@@ -255,11 +258,6 @@ fun ShowEditorScreen(
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    text = { Text("FX") } // New tab
-                )
-                Tab(
-                    selected = selectedTab == 3,
-                    onClick = { selectedTab = 3 },
                     text = { Text("CV") }
                 )
             }
@@ -271,7 +269,7 @@ fun ShowEditorScreen(
                     .weight(1f)
             ) {
                 when (selectedTab) {
-                    0 -> // Original performance controls and randomset list
+                    0 -> // Combined Triggers and FX
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -303,11 +301,7 @@ fun ShowEditorScreen(
                                         baseValue = currentShow.prevTrigger.baseValue,
                                         modulatedValue = modulatedPrev,
                                         onValueChange = { currentShow = currentShow.copy(prevTrigger = currentShow.prevTrigger.copy(baseValue = it)) },
-                                        onInteractionFinished = {
-                                            if (currentShow.prevTrigger.baseValue > 0.5f) {
-                                                vm.triggerPrevMixer(currentShow.randomSetIds.size)
-                                            }
-                                        },
+                                        onInteractionFinished = { /* No specific action needed on finish for triggers yet */ },
                                         focused = focusedTriggerId == "SHOW_PREV" || currentShow.prevTrigger.modulators.isNotEmpty(),
                                         tick = frameTick.toLong()
                                     )
@@ -338,15 +332,7 @@ fun ShowEditorScreen(
                                         baseValue = currentShow.randomTrigger.baseValue,
                                         modulatedValue = modulatedRand,
                                         onValueChange = { currentShow = currentShow.copy(randomTrigger = currentShow.randomTrigger.copy(baseValue = it)) },
-                                        onInteractionFinished = {
-                                            if (currentShow.randomTrigger.baseValue > 0.5f) {
-                                                val currentTime = System.currentTimeMillis()
-                                                if (currentTime - lastGenerationTriggerTime > 1000L) {
-                                                    vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size))
-                                                    lastGenerationTriggerTime = currentTime
-                                                }
-                                            }
-                                        },
+                                        onInteractionFinished = { /* No specific action needed on finish for triggers yet */ },
                                         focused = focusedTriggerId == "SHOW_RANDOM" || currentShow.randomTrigger.modulators.isNotEmpty(),
                                         tick = frameTick.toLong()
                                     )
@@ -370,11 +356,7 @@ fun ShowEditorScreen(
                                         baseValue = currentShow.nextTrigger.baseValue,
                                         modulatedValue = modulatedNext,
                                         onValueChange = { currentShow = currentShow.copy(nextTrigger = currentShow.nextTrigger.copy(baseValue = it)) },
-                                        onInteractionFinished = {
-                                            if (currentShow.nextTrigger.baseValue > 0.5f) {
-                                                vm.triggerNextMixer(currentShow.randomSetIds.size)
-                                            }
-                                        },
+                                        onInteractionFinished = { /* No specific action needed on finish for triggers yet */ },
                                         focused = focusedTriggerId == "SHOW_NEXT" || currentShow.nextTrigger.modulators.isNotEmpty(),
                                         tick = frameTick.toLong()
                                     )
@@ -403,20 +385,39 @@ fun ShowEditorScreen(
                                         baseValue = currentShow.generateTrigger.baseValue,
                                         modulatedValue = modulatedGen,
                                         onValueChange = { currentShow = currentShow.copy(generateTrigger = currentShow.generateTrigger.copy(baseValue = it)) },
-                                        onInteractionFinished = {
-                                            if (currentShow.generateTrigger.baseValue > 0.5f) {
-                                                val currentTime = System.currentTimeMillis()
-                                                if (currentTime - lastGenerationTriggerTime > 1000L) {
-                                                    reRollTick++
-                                                    lastGenerationTriggerTime = currentTime
-                                                }
-                                            }
-                                        },
+                                        onInteractionFinished = { /* No specific action needed on finish for triggers yet */ },
                                         focused = focusedTriggerId == "SHOW_GENERATE" || currentShow.generateTrigger.modulators.isNotEmpty(),
                                         tick = frameTick.toLong()
                                     )
                                 }
                             }
+                            
+                            Spacer(modifier = Modifier.height(16.dp)) 
+                            
+                            // New: Feedback Amount Knob
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp)
+                                    .clickable { focusedTriggerId = "SHOW_FB_AMOUNT" }
+                            ) {
+                                Text(
+                                    text = "Feedback Amount",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (focusedTriggerId == "SHOW_FB_AMOUNT") AppAccent else AppText
+                                )
+                                val modulatedFbAmount = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_FB_AMOUNT")?.value ?: currentShow.feedbackAmount.baseValue else 0f
+                                KnobView(
+                                    baseValue = currentShow.feedbackAmount.baseValue,
+                                    modulatedValue = modulatedFbAmount,
+                                    onValueChange = { currentShow = currentShow.copy(feedbackAmount = currentShow.feedbackAmount.copy(baseValue = it)) },
+                                    onInteractionFinished = { /* No specific action needed on finish */ },
+                                    focused = focusedTriggerId == "SHOW_FB_AMOUNT" || currentShow.feedbackAmount.modulators.isNotEmpty(),
+                                    tick = frameTick.toLong()
+                                )
+                            }
+
                             Spacer(modifier = Modifier.height(8.dp))
                             // RandomSet sequence (Set Editor style)
                             Column(modifier = Modifier.padding(horizontal = 12.dp).height(120.dp)) {
@@ -611,12 +612,7 @@ fun ShowEditorScreen(
                                 }
                             }
                         }
-                    2 -> // FX Tab
-                        FXTab(
-                            currentShow,
-                            onUpdate = { updatedShow -> currentShow = updatedShow }
-                        )
-                    3 -> // Original CV Editor
+                    2 -> // CV Editor
                         Box(modifier = Modifier.fillMaxSize()) { // Fill the remaining space
                             ShowCvEditor(
                                 show = currentShow,
@@ -711,7 +707,7 @@ fun ShowCvEditor(
             "SHOW_NEXT" -> show.nextTrigger
             "SHOW_RANDOM" -> show.randomTrigger
             "SHOW_GENERATE" -> show.generateTrigger
-            // Add FeedbackMode here if it becomes modulatable
+            "SHOW_FB_AMOUNT" -> show.feedbackAmount // New: for feedback amount
             else -> null
         }
     }
@@ -775,70 +771,8 @@ private fun syncShowParam(show: ShowPatch, id: String, param: ModulatableParamet
         "SHOW_NEXT" -> show.copy(nextTrigger = data)
         "SHOW_RANDOM" -> show.copy(randomTrigger = data)
         "SHOW_GENERATE" -> show.copy(generateTrigger = data)
+        "SHOW_FB_AMOUNT" -> show.copy(feedbackAmount = data) // New: for feedback amount
         else -> show
     }
     onUpdate(newShow)
-}
-
-@Composable
-fun FXTab(
-    show: ShowPatch,
-    onUpdate: (ShowPatch) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(AppBackground)
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        Text(
-            text = "Feedback Mode",
-            style = MaterialTheme.typography.titleMedium,
-            color = AppText,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        
-        FeedbackModeOption("None", FeedbackMode.NONE, show.feedbackMode) {
-            onUpdate(show.copy(feedbackMode = FeedbackMode.NONE))
-        }
-        
-        FeedbackModeOption("Light (subtle trails)", FeedbackMode.LIGHT, show.feedbackMode) {
-            onUpdate(show.copy(feedbackMode = FeedbackMode.LIGHT))
-        }
-        
-        FeedbackModeOption("Medium (noticeable)", FeedbackMode.MEDIUM, show.feedbackMode) {
-            onUpdate(show.copy(feedbackMode = FeedbackMode.MEDIUM))
-        }
-        
-        FeedbackModeOption("Heavy (intense)", FeedbackMode.HEAVY, show.feedbackMode) {
-            onUpdate(show.copy(feedbackMode = FeedbackMode.HEAVY))
-        }
-    }
-}
-
-@Composable
-fun FeedbackModeOption(
-    label: String,
-    mode: FeedbackMode,
-    currentMode: FeedbackMode,
-    onSelect: () -> Unit
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onSelect)
-            .padding(vertical = 8.dp)
-    ) {
-        RadioButton(
-            selected = currentMode == mode,
-            onClick = onSelect
-        )
-        Text(
-            text = label,
-            modifier = Modifier.padding(start = 8.dp),
-            color = AppText
-        )
-    }
 }

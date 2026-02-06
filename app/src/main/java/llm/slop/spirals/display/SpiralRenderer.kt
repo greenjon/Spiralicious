@@ -36,6 +36,24 @@ private data class FeedbackParams(
     val blur: Float
 )
 
+private val NONE_FEEDBACK_PARAMS = FeedbackParams(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)
+private val LIGHT_FEEDBACK_PARAMS = FeedbackParams(
+    decay = 0.01f, 
+    gain = 1.002f, 
+    zoom = 0.505f,
+    rotate = 0.501f,
+    shift = 0.001f,
+    blur = 0.001f
+)
+private val HEAVY_FEEDBACK_PARAMS = FeedbackParams(
+    decay = 0.05f,
+    gain = 1.015f,
+    zoom = 0.52f,
+    rotate = 0.51f,
+    shift = 0.01f,
+    blur = 0.01f
+)
+
 /**
  * Main OpenGL renderer for Spirals app.
  */
@@ -44,6 +62,10 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     companion object {
         const val TARGET_WIDTH = 1920
         const val TARGET_HEIGHT = 1080
+
+        private fun lerp(a: Float, b: Float, t: Float): Float {
+            return a + t * (b - a)
+        }
     }
 
     private var program: Int = 0
@@ -125,12 +147,10 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             field = value
             value?.let { 
                 syncShowParameters(it)
-                _feedbackMode = it.feedbackMode
+                // _feedbackMode is removed, now we sync feedbackAmount
+                mixerParams["SHOW_FB_AMOUNT"]?.let { param -> syncParam(param, it.feedbackAmount) }
             }
         }
-
-    @Volatile
-    private var _feedbackMode: FeedbackMode = FeedbackMode.NONE
         
     private var clearFeedbackNextFrame = false
 
@@ -175,6 +195,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         mixerParams["SHOW_NEXT"] = ModulatableParameter(0.0f)
         mixerParams["SHOW_RANDOM"] = ModulatableParameter(0.0f)
         mixerParams["SHOW_GENERATE"] = ModulatableParameter(0.0f)
+        mixerParams["SHOW_FB_AMOUNT"] = ModulatableParameter(0.001f) // New: for feedback amount
     }
 
     fun startTransition(from: MandalaVisualSource, to: MandalaVisualSource, durationBeats: Float, bpm: Float, fadeOutPercent: Float, fadeInPercent: Float, transitionType: TransitionType) {
@@ -228,6 +249,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         mixerParams["SHOW_NEXT"]?.let { syncParam(it, patch.nextTrigger) }
         mixerParams["SHOW_RANDOM"]?.let { syncParam(it, patch.randomTrigger) }
         mixerParams["SHOW_GENERATE"]?.let { syncParam(it, patch.generateTrigger) }
+        mixerParams["SHOW_FB_AMOUNT"]?.let { syncParam(it, patch.feedbackAmount) } // New: sync feedback amount
     }
 
     private fun syncGroup(group: MixerGroupData, prefix: String) {
@@ -422,12 +444,12 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
             if (sourceToRender != null) {
                 compositeWithFeedback(
                     render = { GLES30.glUseProgram(program); renderSource(sourceToRender, scale) },
-                    feedbackMode = FeedbackMode.NONE, // No feedback during transitions
                     fbTextures = finalFBTextures,
                     fbFramebuffers = finalFBFramebuffers,
                     fbIndexRef = { finalFBIndex },
                     fbIndexSet = { finalFBIndex = it },
-                    targetFboIdx = 6 // Final output always goes to masterFramebuffers[6]
+                    targetFboIdx = 6, // Final output always goes to masterFramebuffers[6]
+                    explicitFeedbackParams = NONE_FEEDBACK_PARAMS // No feedback during transitions
                 )
             }
         } else {
@@ -439,21 +461,19 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 // --- MIXER MODE ---
 
                 // 4a. Render each of the 4 slots into its master texture (`masterTextures[0-3]`).
-                // Each slot has its own independent feedback loop.
+                // Each slot has its own independent feedback loop, but for now we apply NONE.
                 for (i in 0..3) {
                     if (p.slots[i].enabled && p.slots[i].isPopulated()) {
                         val source = slotSources[i]
-                        // In mixer mode, slot feedback parameters come from the individual slot's settings, not the ShowPatch
-                        val slotFeedbackMode = FeedbackMode.NONE // Assuming no per-slot feedback modes for now, or fetch from MandalaVisualSource if implemented
 
                         compositeWithFeedback(
                             render = { GLES30.glUseProgram(program); renderSource(source) },
-                            feedbackMode = slotFeedbackMode,
                             fbTextures = slotFBTextures[i],
                             fbFramebuffers = slotFBFramebuffers[i],
                             fbIndexRef = { slotFBIndex[i] },
                             fbIndexSet = { slotFBIndex[i] = it },
-                            targetFboIdx = i // The output is written to masterFramebuffers[i]
+                            targetFboIdx = i, // The output is written to masterFramebuffers[i]
+                            explicitFeedbackParams = NONE_FEEDBACK_PARAMS // No per-slot feedback for now
                         )
                     } else {
                         // If a slot is disabled or empty, just clear its texture to black.
@@ -468,23 +488,21 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 // Mix slots 3 & 4 -> Mixer B (output to masterTextures[5])
                 renderMixerGroup(5, masterTextures[2], masterTextures[3], "B")
 
-                // 4c. Composite the final output.
-                // This is where the "white blob" issue originates. It mixes Mixer A & B.
+                // 4c. Composite the final output. Use global feedback amount.
                 compositeFinalMixer(masterTextures[4], masterTextures[5])
             } else {
                 // --- SINGLE MANDALA MODE ---
-                // This mode is simpler, rendering one mandala with one feedback system.
+                // This mode is simpler, rendering one mandala with global feedback amount.
                 val currentSource = visualSource
                 if (currentSource != null) {
-                    // In single mandala mode, the feedback mode comes from the ShowPatch
                     compositeWithFeedback(
                         render = { GLES30.glUseProgram(program); renderSource(currentSource) },
-                        feedbackMode = _feedbackMode, // Use the _feedbackMode property
                         fbTextures = finalFBTextures,
                         fbFramebuffers = finalFBFramebuffers,
                         fbIndexRef = { finalFBIndex },
                         fbIndexSet = { finalFBIndex = it },
                         targetFboIdx = 6 // Final output always goes to masterFramebuffers[6]
+                        // explicitFeedbackParams is null, so it will use the interpolated SHOW_FB_AMOUNT
                     )
                 }
             }
@@ -530,15 +548,6 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
     }
 
     private fun compositeFinalMixer(tA: Int, tB: Int) {
-        val fx = mixerPatch?.effects
-
-        val feedbackMode = if (fx != null && (mixerParams["MF_TRAILS"]?.value ?: 0f) > 0.5f) {
-             // If trails are enabled in mixer effects, assume CUSTOM mode to apply mixer's specific FX
-            FeedbackMode.CUSTOM
-        } else {
-            _feedbackMode // Use the show's feedback mode for final mixer output if not overridden by mixer trails
-        }
-
         compositeWithFeedback(
             render = { 
                 GLES30.glUseProgram(mixerProgram); 
@@ -555,84 +564,60 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                 GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4); 
                 GLES30.glEnable(GLES30.GL_BLEND) 
             },
-            feedbackMode = feedbackMode,
             fbTextures = finalFBTextures,
             fbFramebuffers = finalFBFramebuffers,
             fbIndexRef = { finalFBIndex },
             fbIndexSet = { finalFBIndex = it },
-            targetFboIdx = 6
+            targetFboIdx = 6 // Will use interpolated SHOW_FB_AMOUNT
         )
     }
 
     /**
-     * Composite with persistent feedback (no ghost/trails).
+     * Composite with persistent feedback.
+     * If explicitFeedbackParams is provided, it uses those. Otherwise, for targetFboIdx == 6 (final output),
+     * it interpolates feedback parameters based on `SHOW_FB_AMOUNT` from mixerParams.
+     * For other targetFboIdx (slots), it defaults to NONE.
      */
     private fun compositeWithFeedback(
         render: () -> Unit,
-        feedbackMode: FeedbackMode,
         fbTextures: IntArray,
         fbFramebuffers: IntArray,
         fbIndexRef: () -> Int,
         fbIndexSet: (Int) -> Unit,
-        targetFboIdx: Int
+        targetFboIdx: Int,
+        explicitFeedbackParams: FeedbackParams? = null
     ) {
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, currentFrameFBO)
         GLES30.glClearColor(0f, 0f, 0f, 0f)
         GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
         render()
 
-        val params = when (feedbackMode) {
-            FeedbackMode.NONE -> FeedbackParams(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)
-            FeedbackMode.LIGHT -> FeedbackParams(
-                decay = 0.01f, 
-                gain = 1.01f,
-                zoom = 0.52f,
-                rotate = 0.52f,
-                shift = 0.001f,
-                blur = 0.001f
-            )
-            FeedbackMode.MEDIUM -> FeedbackParams(
-                decay = 0.03f,
-                gain = 1.008f,
-                zoom = 0.51f,
-                rotate = 0.505f,
-                shift = 0.005f,
-                blur = 0.005f
-            )
-            FeedbackMode.HEAVY -> FeedbackParams(
-                decay = 0.5f,
-                gain = 1.200f,
-                zoom = 1.00f,
-                rotate = 1.00f,
-                shift = 1.00f,
-                blur = 1.00f
-            )
-            FeedbackMode.CUSTOM -> {
-                // For custom mode, we use the mixerParams for the final feedback stage
-                // For individual slots, assume no custom feedback mode for now (will be implemented later if needed)
-                if (targetFboIdx == 6) { // Only apply custom from mixerParams for the final output
-                    FeedbackParams(
-                        decay = mixerParams["MF_FB_DECAY"]?.value ?: 0.0f,
-                        gain = mixerParams["MF_FB_GAIN"]?.value ?: 1.0f,
-                        zoom = mixerParams["MF_FB_ZOOM"]?.value ?: 0.5f,
-                        rotate = mixerParams["MF_FB_ROTATE"]?.value ?: 0.5f,
-                        shift = mixerParams["MF_FB_SHIFT"]?.value ?: 0f,
-                        blur = mixerParams["MF_FB_BLUR"]?.value ?: 0f
-                    )
-                } else {
-                    // Default to NONE or some other behavior for slots if custom is not handled per slot
-                    FeedbackParams(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)
+        val params = explicitFeedbackParams ?: run {
+            if (targetFboIdx != 6) { // For individual slots, apply no feedback unless specified
+                NONE_FEEDBACK_PARAMS
+            } else { // For final output, use interpolated feedback amount
+                val feedbackAmount = mixerParams["SHOW_FB_AMOUNT"]?.value ?: 0.001f
+                // Normalize 0.001-1.0 range to 0-1 for interpolation
+                val t = (feedbackAmount - 0.001f) / (1.0f - 0.001f)
+                
+                FeedbackParams(
+                    decay = lerp(LIGHT_FEEDBACK_PARAMS.decay, HEAVY_FEEDBACK_PARAMS.decay, t),
+                    gain = lerp(LIGHT_FEEDBACK_PARAMS.gain, HEAVY_FEEDBACK_PARAMS.gain, t),
+                    zoom = lerp(LIGHT_FEEDBACK_PARAMS.zoom, HEAVY_FEEDBACK_PARAMS.zoom, t),
+                    rotate = lerp(LIGHT_FEEDBACK_PARAMS.rotate, HEAVY_FEEDBACK_PARAMS.rotate, t),
+                    shift = lerp(LIGHT_FEEDBACK_PARAMS.shift, HEAVY_FEEDBACK_PARAMS.shift, t),
+                    blur = lerp(LIGHT_FEEDBACK_PARAMS.blur, HEAVY_FEEDBACK_PARAMS.blur, t)
+                ).let { rawParams ->
+                    // Apply shader-specific mappings for zoom and rotate, others are direct
+                    val mappedZoom = ((rawParams.zoom - 0.5f) * 0.1f)
+                    val mappedRotate = ((rawParams.rotate - 0.5f) * 10f * (PI.toFloat() / 180f))
+                    rawParams.copy(zoom = mappedZoom, rotate = mappedRotate)
                 }
             }
-        }.let { params ->
-            // Apply shader-specific mappings for zoom and rotate, others are direct
-            val mappedZoom = ((params.zoom - 0.5f) * 0.1f)
-            val mappedRotate = ((params.rotate - 0.5f) * 10f * (PI.toFloat() / 180f))
-            // Return a new FeedbackParams with mapped values for zoom and rotate
-            params.copy(zoom = mappedZoom, rotate = mappedRotate)
         }
 
-        if (params.gain > 1.001f) { // Only apply feedback if there's significant gain
+        // Only apply feedback if there's significant gain
+        if (params.gain > 1.001f) {
             val fbIdx = fbIndexRef()
             val nextIdx = (fbIdx + 1) % 2
             GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, fbFramebuffers[nextIdx])

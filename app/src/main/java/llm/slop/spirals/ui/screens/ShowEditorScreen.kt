@@ -90,10 +90,22 @@ fun ShowEditorScreen(
         if (modNext > 0.5f && lastModNext <= 0.5f) {
             vm.triggerNextMixer(currentShow.randomSetIds.size)
         }
+
+        val currentTime = System.currentTimeMillis()
         if (modRand > 0.5f && lastModRand <= 0.5f) {
-            if (currentShow.randomSetIds.isNotEmpty()) {}
+            if (currentTime - lastGenerationTriggerTime > 1000L) {
+                if (currentShow.randomSetIds.isNotEmpty()) {
+                    vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size))
+                    lastGenerationTriggerTime = currentTime
+                }
+            }
         }
-        if (modGen > 0.5f && lastModGen <= 0.5f) {}
+        if (modGen > 0.5f && lastModGen <= 0.5f) {
+            if (currentTime - lastGenerationTriggerTime > 1000L) {
+                reRollTick++
+                lastGenerationTriggerTime = currentTime
+            }
+        }
         
         lastModPrev = modPrev
         lastModNext = modNext

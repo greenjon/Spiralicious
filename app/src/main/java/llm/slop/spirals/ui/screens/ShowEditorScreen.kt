@@ -265,191 +265,199 @@ fun ShowEditorScreen(
                 when (selectedTab) {
                     0 -> Column(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState())
+                                .fillMaxSize()
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.SpaceEvenly,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally, 
-                                    modifier = Modifier.clickable { 
-                                        focusedTriggerId = "SHOW_PREV"
-                                        mainRenderer?.getMixerParam("SHOW_PREV")?.triggerPulse()
-                                    }
+                            Column(Modifier.verticalScroll(rememberScrollState())) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.SpaceEvenly,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = "PREV", 
-                                        style = MaterialTheme.typography.labelSmall, 
-                                        color = if (focusedTriggerId == "SHOW_PREV") AppAccent else AppText
-                                    )
-                                    val modulatedPrev = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_PREV")?.value ?: currentShow.prevTrigger.baseValue else 0f
-                                    KnobView(
-                                        baseValue = currentShow.prevTrigger.baseValue,
-                                        modulatedValue = modulatedPrev,
-                                        onValueChange = { currentShow = currentShow.copy(prevTrigger = currentShow.prevTrigger.copy(baseValue = it)) },
-                                        onInteractionFinished = { },
-                                        focused = focusedTriggerId == "SHOW_PREV" || currentShow.prevTrigger.modulators.isNotEmpty(),
-                                        tick = frameTick.toLong()
-                                    )
-                                }
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.clickable {
+                                            focusedTriggerId = "SHOW_PREV"
+                                            mainRenderer?.getMixerParam("SHOW_PREV")?.triggerPulse()
+                                        }
+                                    ) {
+                                        Text(
+                                            text = "PREV",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (focusedTriggerId == "SHOW_PREV") AppAccent else AppText
+                                        )
+                                        val modulatedPrev = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_PREV")?.value
+                                            ?: currentShow.prevTrigger.baseValue else 0f
+                                        KnobView(
+                                            baseValue = currentShow.prevTrigger.baseValue,
+                                            modulatedValue = modulatedPrev,
+                                            onValueChange = { currentShow = currentShow.copy(prevTrigger = currentShow.prevTrigger.copy(baseValue = it)) },
+                                            onInteractionFinished = { },
+                                            focused = focusedTriggerId == "SHOW_PREV" || currentShow.prevTrigger.modulators.isNotEmpty(),
+                                            tick = frameTick.toLong()
+                                        )
+                                    }
 
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally, 
-                                    modifier = Modifier.clickable { 
-                                        focusedTriggerId = "SHOW_RANDOM"
-                                        val currentTime = System.currentTimeMillis()
-                                        if (currentTime - lastGenerationTriggerTime > 1000L) {
-                                            mainRenderer?.getMixerParam("SHOW_RANDOM")?.triggerPulse()
-                                            if (currentShow.randomSetIds.isNotEmpty()) {
-                                                vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size))
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.clickable {
+                                            focusedTriggerId = "SHOW_RANDOM"
+                                            val currentTime = System.currentTimeMillis()
+                                            if (currentTime - lastGenerationTriggerTime > 1000L) {
+                                                mainRenderer?.getMixerParam("SHOW_RANDOM")?.triggerPulse()
+                                                if (currentShow.randomSetIds.isNotEmpty()) {
+                                                    vm.jumpToShowIndex(Random.nextInt(currentShow.randomSetIds.size))
+                                                }
+                                                lastGenerationTriggerTime = currentTime
                                             }
-                                            lastGenerationTriggerTime = currentTime
                                         }
+                                    ) {
+                                        Text(
+                                            text = "RAND",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (focusedTriggerId == "SHOW_RANDOM") AppAccent else AppText
+                                        )
+                                        val modulatedRand = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_RANDOM")?.value
+                                            ?: currentShow.randomTrigger.baseValue else 0f
+                                        KnobView(
+                                            baseValue = currentShow.randomTrigger.baseValue,
+                                            modulatedValue = modulatedRand,
+                                            onValueChange = { currentShow = currentShow.copy(randomTrigger = currentShow.randomTrigger.copy(baseValue = it)) },
+                                            onInteractionFinished = { },
+                                            focused = focusedTriggerId == "SHOW_RANDOM" || currentShow.randomTrigger.modulators.isNotEmpty(),
+                                            tick = frameTick.toLong()
+                                        )
                                     }
-                                ) {
-                                    Text(
-                                        text = "RAND", 
-                                        style = MaterialTheme.typography.labelSmall, 
-                                        color = if (focusedTriggerId == "SHOW_RANDOM") AppAccent else AppText
-                                    )
-                                    val modulatedRand = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_RANDOM")?.value ?: currentShow.randomTrigger.baseValue else 0f
-                                    KnobView(
-                                        baseValue = currentShow.randomTrigger.baseValue,
-                                        modulatedValue = modulatedRand,
-                                        onValueChange = { currentShow = currentShow.copy(randomTrigger = currentShow.randomTrigger.copy(baseValue = it)) },
-                                        onInteractionFinished = { },
-                                        focused = focusedTriggerId == "SHOW_RANDOM" || currentShow.randomTrigger.modulators.isNotEmpty(),
-                                        tick = frameTick.toLong()
-                                    )
+
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.clickable {
+                                            focusedTriggerId = "SHOW_NEXT"
+                                            mainRenderer?.getMixerParam("SHOW_NEXT")?.triggerPulse()
+                                        }
+                                    ) {
+                                        Text(
+                                            text = "NEXT",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (focusedTriggerId == "SHOW_NEXT") AppAccent else AppText
+                                        )
+                                        val modulatedNext = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_NEXT")?.value
+                                            ?: currentShow.nextTrigger.baseValue else 0f
+                                        KnobView(
+                                            baseValue = currentShow.nextTrigger.baseValue,
+                                            modulatedValue = modulatedNext,
+                                            onValueChange = { currentShow = currentShow.copy(nextTrigger = currentShow.nextTrigger.copy(baseValue = it)) },
+                                            onInteractionFinished = { },
+                                            focused = focusedTriggerId == "SHOW_NEXT" || currentShow.nextTrigger.modulators.isNotEmpty(),
+                                            tick = frameTick.toLong()
+                                        )
+                                    }
+
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.clickable {
+                                            focusedTriggerId = "SHOW_GENERATE"
+                                            val currentTime = System.currentTimeMillis()
+                                            if (currentTime - lastGenerationTriggerTime > 1000L) {
+                                                mainRenderer?.getMixerParam("SHOW_GENERATE")?.triggerPulse()
+                                                reRollTick++
+                                                lastGenerationTriggerTime = currentTime
+                                            }
+                                        }
+                                    ) {
+                                        Text(
+                                            text = "GEN",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (focusedTriggerId == "SHOW_GENERATE") AppAccent else AppText
+                                        )
+                                        val modulatedGen = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_GENERATE")?.value
+                                            ?: currentShow.generateTrigger.baseValue else 0f
+                                        KnobView(
+                                            baseValue = currentShow.generateTrigger.baseValue,
+                                            modulatedValue = modulatedGen,
+                                            onValueChange = { currentShow = currentShow.copy(generateTrigger = currentShow.generateTrigger.copy(baseValue = it)) },
+                                            onInteractionFinished = { },
+                                            focused = focusedTriggerId == "SHOW_GENERATE" || currentShow.generateTrigger.modulators.isNotEmpty(),
+                                            tick = frameTick.toLong()
+                                        )
+                                    }
                                 }
 
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally, 
-                                    modifier = Modifier.clickable { 
-                                        focusedTriggerId = "SHOW_NEXT"
-                                        mainRenderer?.getMixerParam("SHOW_NEXT")?.triggerPulse()
-                                    }
-                                ) {
-                                    Text(
-                                        text = "NEXT", 
-                                        style = MaterialTheme.typography.labelSmall, 
-                                        color = if (focusedTriggerId == "SHOW_NEXT") AppAccent else AppText
-                                    )
-                                    val modulatedNext = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_NEXT")?.value ?: currentShow.nextTrigger.baseValue else 0f
-                                    KnobView(
-                                        baseValue = currentShow.nextTrigger.baseValue,
-                                        modulatedValue = modulatedNext,
-                                        onValueChange = { currentShow = currentShow.copy(nextTrigger = currentShow.nextTrigger.copy(baseValue = it)) },
-                                        onInteractionFinished = { },
-                                        focused = focusedTriggerId == "SHOW_NEXT" || currentShow.nextTrigger.modulators.isNotEmpty(),
-                                        tick = frameTick.toLong()
-                                    )
-                                }
+                                Spacer(modifier = Modifier.height(16.dp))
 
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally, 
-                                    modifier = Modifier.clickable { 
-                                        focusedTriggerId = "SHOW_GENERATE"
-                                        val currentTime = System.currentTimeMillis()
-                                        if (currentTime - lastGenerationTriggerTime > 1000L) {
-                                            mainRenderer?.getMixerParam("SHOW_GENERATE")?.triggerPulse()
-                                            reRollTick++
-                                            lastGenerationTriggerTime = currentTime
-                                        }
-                                    }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.SpaceAround
                                 ) {
-                                    Text(
-                                        text = "GEN", 
-                                        style = MaterialTheme.typography.labelSmall, 
-                                        color = if (focusedTriggerId == "SHOW_GENERATE") AppAccent else AppText
-                                    )
-                                    val modulatedGen = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_GENERATE")?.value ?: currentShow.generateTrigger.baseValue else 0f
-                                    KnobView(
-                                        baseValue = currentShow.generateTrigger.baseValue,
-                                        modulatedValue = modulatedGen,
-                                        onValueChange = { currentShow = currentShow.copy(generateTrigger = currentShow.generateTrigger.copy(baseValue = it)) },
-                                        onInteractionFinished = { },
-                                        focused = focusedTriggerId == "SHOW_GENERATE" || currentShow.generateTrigger.modulators.isNotEmpty(),
-                                        tick = frameTick.toLong()
-                                    )
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.clickable { focusedTriggerId = "SHOW_FB_AMOUNT" }
+                                    ) {
+                                        Text(
+                                            text = "Feedback",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (focusedTriggerId == "SHOW_FB_AMOUNT") AppAccent else AppText
+                                        )
+                                        val modulatedFbAmount = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_FB_AMOUNT")?.value
+                                            ?: currentShow.feedbackAmount.baseValue else 0f
+                                        KnobView(
+                                            baseValue = currentShow.feedbackAmount.baseValue,
+                                            modulatedValue = modulatedFbAmount,
+                                            onValueChange = { currentShow = currentShow.copy(feedbackAmount = currentShow.feedbackAmount.copy(baseValue = it)) },
+                                            onInteractionFinished = { },
+                                            focused = focusedTriggerId == "SHOW_FB_AMOUNT" || currentShow.feedbackAmount.modulators.isNotEmpty(),
+                                            tick = frameTick.toLong()
+                                        )
+                                    }
+
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.clickable { focusedTriggerId = "SHOW_BG_HUE" }
+                                    ) {
+                                        Text(
+                                            text = "BG Hue",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (focusedTriggerId == "SHOW_BG_HUE") AppAccent else AppText
+                                        )
+                                        val modulatedBgHue = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_BG_HUE")?.value
+                                            ?: currentShow.backgroundHue.baseValue else 0f
+                                        KnobView(
+                                            baseValue = currentShow.backgroundHue.baseValue,
+                                            modulatedValue = modulatedBgHue,
+                                            onValueChange = { currentShow = currentShow.copy(backgroundHue = currentShow.backgroundHue.copy(baseValue = it)) },
+                                            onInteractionFinished = { },
+                                            focused = focusedTriggerId == "SHOW_BG_HUE" || currentShow.backgroundHue.modulators.isNotEmpty(),
+                                            tick = frameTick.toLong()
+                                        )
+                                    }
+
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        modifier = Modifier.clickable { focusedTriggerId = "SHOW_BG_BRIGHTNESS" }
+                                    ) {
+                                        Text(
+                                            text = "BG Bright",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = if (focusedTriggerId == "SHOW_BG_BRIGHTNESS") AppAccent else AppText
+                                        )
+                                        val modulatedBgBrightness = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_BG_BRIGHTNESS")?.value
+                                            ?: currentShow.backgroundBrightness.baseValue else 0f
+                                        KnobView(
+                                            baseValue = currentShow.backgroundBrightness.baseValue,
+                                            modulatedValue = modulatedBgBrightness,
+                                            onValueChange = { currentShow = currentShow.copy(backgroundBrightness = currentShow.backgroundBrightness.copy(baseValue = it)) },
+                                            onInteractionFinished = { },
+                                            focused = focusedTriggerId == "SHOW_BG_BRIGHTNESS" || currentShow.backgroundBrightness.modulators.isNotEmpty(),
+                                            tick = frameTick.toLong()
+                                        )
+                                    }
                                 }
                             }
-                            
-                            Spacer(modifier = Modifier.height(16.dp)) 
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                                horizontalArrangement = Arrangement.SpaceAround
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.clickable { focusedTriggerId = "SHOW_FB_AMOUNT" }
-                                ) {
-                                    Text(
-                                        text = "Feedback",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (focusedTriggerId == "SHOW_FB_AMOUNT") AppAccent else AppText
-                                    )
-                                    val modulatedFbAmount = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_FB_AMOUNT")?.value ?: currentShow.feedbackAmount.baseValue else 0f
-                                    KnobView(
-                                        baseValue = currentShow.feedbackAmount.baseValue,
-                                        modulatedValue = modulatedFbAmount,
-                                        onValueChange = { currentShow = currentShow.copy(feedbackAmount = currentShow.feedbackAmount.copy(baseValue = it)) },
-                                        onInteractionFinished = { },
-                                        focused = focusedTriggerId == "SHOW_FB_AMOUNT" || currentShow.feedbackAmount.modulators.isNotEmpty(),
-                                        tick = frameTick.toLong()
-                                    )
-                                }
-
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.clickable { focusedTriggerId = "SHOW_BG_HUE" }
-                                ) {
-                                    Text(
-                                        text = "BG Hue",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (focusedTriggerId == "SHOW_BG_HUE") AppAccent else AppText
-                                    )
-                                    val modulatedBgHue = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_BG_HUE")?.value ?: currentShow.backgroundHue.baseValue else 0f
-                                    KnobView(
-                                        baseValue = currentShow.backgroundHue.baseValue,
-                                        modulatedValue = modulatedBgHue,
-                                        onValueChange = { currentShow = currentShow.copy(backgroundHue = currentShow.backgroundHue.copy(baseValue = it)) },
-                                        onInteractionFinished = { },
-                                        focused = focusedTriggerId == "SHOW_BG_HUE" || currentShow.backgroundHue.modulators.isNotEmpty(),
-                                        tick = frameTick.toLong()
-                                    )
-                                }
-
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.clickable { focusedTriggerId = "SHOW_BG_BRIGHTNESS" }
-                                ) {
-                                    Text(
-                                        text = "BG Bright",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (focusedTriggerId == "SHOW_BG_BRIGHTNESS") AppAccent else AppText
-                                    )
-                                    val modulatedBgBrightness = if (frameTick >= 0) mainRenderer?.getMixerParam("SHOW_BG_BRIGHTNESS")?.value ?: currentShow.backgroundBrightness.baseValue else 0f
-                                    KnobView(
-                                        baseValue = currentShow.backgroundBrightness.baseValue,
-                                        modulatedValue = modulatedBgBrightness,
-                                        onValueChange = { currentShow = currentShow.copy(backgroundBrightness = currentShow.backgroundBrightness.copy(baseValue = it)) },
-                                        onInteractionFinished = { },
-                                        focused = focusedTriggerId == "SHOW_BG_BRIGHTNESS" || currentShow.backgroundBrightness.modulators.isNotEmpty(),
-                                        tick = frameTick.toLong()
-                                    )
-                                }
-                            }
-
 
                             Spacer(modifier = Modifier.height(8.dp))
-                            Column(modifier = Modifier.padding(horizontal = 12.dp).height(120.dp)) {
+                            
+                            Column(modifier = Modifier.padding(horizontal = 12.dp).weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     var showRandomSetPicker by remember { mutableStateOf(false) }
 
@@ -493,6 +501,9 @@ fun ShowEditorScreen(
                                     },
                                     onChipReordered = { newList ->
                                         currentShow = currentShow.copy(randomSetIds = newList)
+                                    },
+                                    onChipDeleted = { randomSetId ->
+                                        currentShow = currentShow.copy(randomSetIds = currentShow.randomSetIds - randomSetId)
                                     }
                                 )
                             }

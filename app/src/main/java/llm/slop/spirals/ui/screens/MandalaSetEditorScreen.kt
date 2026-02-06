@@ -182,6 +182,14 @@ fun MandalaSetEditorScreen(
                             onChipReordered = { newList ->
                                 // newList contains mandala names in the new order
                                 currentSet = activeSet.copy(orderedMandalaIds = newList.toMutableList())
+                            },
+                            onChipDeleted = { mandalaId ->
+                                val newList = activeSet.orderedMandalaIds.toMutableList()
+                                newList.remove(mandalaId)
+                                currentSet = activeSet.copy(orderedMandalaIds = newList)
+                                if (focusedMandalaId == mandalaId) {
+                                    focusedMandalaId = newList.firstOrNull()
+                                }
                             }
                         )
                     }

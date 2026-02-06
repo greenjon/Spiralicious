@@ -583,9 +583,30 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
 
         val params = when (feedbackMode) {
             FeedbackMode.NONE -> FeedbackParams(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)
-            FeedbackMode.LIGHT -> FeedbackParams(0.01f, 1.05f, 0.001f, 0.001f, 0.001f, 0.001f)
-            FeedbackMode.MEDIUM -> FeedbackParams(0.05f, 1.10f, 0.005f, 0.005f, 0.005f, 0.005f)
-            FeedbackMode.HEAVY -> FeedbackParams(0.1f, 1.15f, 0.01f, 0.01f, 0.01f, 0.01f)
+            FeedbackMode.LIGHT -> FeedbackParams(
+                decay = 0.01f, 
+                gain = 1.01f,
+                zoom = 0.52f,
+                rotate = 0.52f,
+                shift = 0.001f,
+                blur = 0.001f
+            )
+            FeedbackMode.MEDIUM -> FeedbackParams(
+                decay = 0.03f,
+                gain = 1.008f,
+                zoom = 0.51f,
+                rotate = 0.505f,
+                shift = 0.005f,
+                blur = 0.005f
+            )
+            FeedbackMode.HEAVY -> FeedbackParams(
+                decay = 0.5f,
+                gain = 1.200f,
+                zoom = 1.00f,
+                rotate = 1.00f,
+                shift = 1.00f,
+                blur = 1.00f
+            )
             FeedbackMode.CUSTOM -> {
                 // For custom mode, we use the mixerParams for the final feedback stage
                 // For individual slots, assume no custom feedback mode for now (will be implemented later if needed)
@@ -603,15 +624,15 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
                     FeedbackParams(0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f)
                 }
             }
-        }.let { (d, g, z, r, s, b) ->
-            // Map values to shader range if needed
-            val mappedGain = if (g <= 0.01f) 0.0f else 1.1f + (g * 0.15f)
-            val mappedZoom = ((z - 0.5f) * 0.1f)
-            val mappedRotate = ((r - 0.5f) * 10f * (PI.toFloat() / 180f))
-            FeedbackParams(decay = d, gain = mappedGain, zoom = mappedZoom, rotate = mappedRotate, shift = s, blur = b)
+        }.let { params ->
+            // Apply shader-specific mappings for zoom and rotate, others are direct
+            val mappedZoom = ((params.zoom - 0.5f) * 0.1f)
+            val mappedRotate = ((params.rotate - 0.5f) * 10f * (PI.toFloat() / 180f))
+            // Return a new FeedbackParams with mapped values for zoom and rotate
+            params.copy(zoom = mappedZoom, rotate = mappedRotate)
         }
 
-        if (params.gain > 0.01f) {
+        if (params.gain > 1.001f) { // Only apply feedback if there's significant gain
             val fbIdx = fbIndexRef()
             val nextIdx = (fbIdx + 1) % 2
             GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, fbFramebuffers[nextIdx])
@@ -646,7 +667,7 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glBindVertexArray(trailVao)
         GLES30.glUniform1f(uTrailAlphaLocation, 1.0f)
         GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
-        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, if (params.gain > 0.01f) fbTextures[fbIndexRef()] else currentFrameTexture)
+        GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, if (params.gain > 1.001f) fbTextures[fbIndexRef()] else currentFrameTexture)
         GLES30.glUniform1i(uTrailTextureLocation, 0)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLE_STRIP, 0, 4)
     }

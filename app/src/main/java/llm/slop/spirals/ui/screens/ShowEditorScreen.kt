@@ -705,7 +705,6 @@ fun ShowCvEditor(
     onShowUpdate: (ShowPatch) -> Unit
 ) {
     val scrollState = rememberScrollState()
-    
     val focusedParamData = remember(show, focusedId) {
         when (focusedId) {
             "SHOW_PREV" -> show.prevTrigger

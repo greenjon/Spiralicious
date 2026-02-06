@@ -1,6 +1,7 @@
 package llm.slop.spirals.display
 
 import android.content.Context
+import android.graphics.Color
 import android.opengl.GLES30
 import android.opengl.GLSurfaceView
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -196,6 +197,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         mixerParams["SHOW_RANDOM"] = ModulatableParameter(0.0f)
         mixerParams["SHOW_GENERATE"] = ModulatableParameter(0.0f)
         mixerParams["SHOW_FB_AMOUNT"] = ModulatableParameter(0.001f) // New: for feedback amount
+        mixerParams["SHOW_BG_HUE"] = ModulatableParameter(0.0f)
+        mixerParams["SHOW_BG_BRIGHTNESS"] = ModulatableParameter(0.0f)
     }
 
     fun startTransition(from: MandalaVisualSource, to: MandalaVisualSource, durationBeats: Float, bpm: Float, fadeOutPercent: Float, fadeInPercent: Float, transitionType: TransitionType) {
@@ -250,6 +253,8 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         mixerParams["SHOW_RANDOM"]?.let { syncParam(it, patch.randomTrigger) }
         mixerParams["SHOW_GENERATE"]?.let { syncParam(it, patch.generateTrigger) }
         mixerParams["SHOW_FB_AMOUNT"]?.let { syncParam(it, patch.feedbackAmount) } // New: sync feedback amount
+        mixerParams["SHOW_BG_HUE"]?.let { syncParam(it, patch.backgroundHue) }
+        mixerParams["SHOW_BG_BRIGHTNESS"]?.let { syncParam(it, patch.backgroundBrightness) }
     }
 
     private fun syncGroup(group: MixerGroupData, prefix: String) {
@@ -366,6 +371,11 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
     }
 
+    private fun hsvToRgb(h: Float, s: Float, v: Float): Int {
+        val hue = h * 360f
+        return Color.HSVToColor(floatArrayOf(hue, s, v))
+    }
+    
     override fun onDrawFrame(gl: GL10?) {
         // This is the main rendering loop, executed for every frame.
 
@@ -515,8 +525,22 @@ class SpiralRenderer(private val context: Context) : GLSurfaceView.Renderer {
         SharedContextManager.notifyFrameReady(masterTextures[6])
 
         // 7. Blit the selected monitor source texture to the screen.
-        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0); GLES30.glViewport(0, 0, screenWidth, screenHeight); GLES30.glClearColor(0f,0f,0f,1f); GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
-        val dTex = getTextureForSource(monitorSource); if (dTex != 0) drawTextureToCurrentBuffer(dTex)
+        GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, 0)
+        GLES30.glViewport(0, 0, screenWidth, screenHeight)
+        val bgHue = mixerParams["SHOW_BG_HUE"]?.value ?: 0f
+        val bgBrightness = mixerParams["SHOW_BG_BRIGHTNESS"]?.value ?: 0f
+        val bgColor = hsvToRgb(bgHue, 1f, bgBrightness)
+        GLES30.glClearColor(Color.red(bgColor) / 255f, Color.green(bgColor) / 255f, Color.blue(bgColor) / 255f, 1f)
+        GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT)
+        
+        val dTex = getTextureForSource(monitorSource)
+        if (dTex != 0) {
+            // Use additive blending to make trails appear as light on the background
+            GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE)
+            drawTextureToCurrentBuffer(dTex)
+            // Restore standard alpha blending for UI, etc.
+            GLES30.glBlendFunc(GLES30.GL_SRC_ALPHA, GLES30.GL_ONE_MINUS_SRC_ALPHA)
+        }
     }
 
     private fun isSourceStatic(s: MandalaVisualSource?): Boolean {

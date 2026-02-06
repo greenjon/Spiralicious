@@ -20,5 +20,7 @@ data class ShowPatch(
     val transitionDurationBeats: Float = 0.0f,
     val transitionFadeOutPercent: Float = 0.5f,
     val transitionFadeInPercent: Float = 0.5f,
-    val feedbackAmount: ModulatableParameterData = ModulatableParameterData(0.001f) // New feedback amount knob parameter
+    val feedbackAmount: ModulatableParameterData = ModulatableParameterData(0.001f),
+    val backgroundHue: ModulatableParameterData = ModulatableParameterData(0.0f),
+    val backgroundBrightness: ModulatableParameterData = ModulatableParameterData(0.0f)
 )
